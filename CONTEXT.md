@@ -24,3 +24,19 @@ _Avoid_: model dump, fixture (for the raw responses)
 **Flag model**:
 The language-neutral form of a project's flags that every target is generated from, derived from a snapshot or live fetch.
 _Avoid_: IR, schema, manifest
+
+**Flag kind**:
+The value type of a flag: boolean, string, number or JSON. Inferred from the flag's variation values, the same way LaunchDarkly itself infers it.
+_Avoid_: variation type, flag type (LaunchDarkly's own `kind` only distinguishes boolean from multivariate)
+
+**Maintainer**:
+The member or team accountable for a flag in LaunchDarkly. A member is identified by email; a team by its key and name.
+_Avoid_: owner
+
+**Deprecated flag**:
+A flag whose generated accessor carries the target's deprecation annotation. Set by LaunchDarkly's own deprecated marker or by the `codegen.deprecated` custom property, which can also supply the message.
+_Avoid_: archived (archived flags are not generated at all)
+
+**Base URI**:
+The root URL of the LaunchDarkly instance a project lives on, used both for API calls and for links to flags in the UI. Named after the LaunchDarkly CLI's setting.
+_Avoid_: base URL, host, server
