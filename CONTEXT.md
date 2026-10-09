@@ -16,3 +16,11 @@ _Avoid_: language, platform, emitter (in user-facing text)
 **Emitter**:
 The internal component that produces one target's files. Internal vocabulary only; users configure targets, never emitters.
 _Avoid_: generator, template, backend
+
+**Snapshot**:
+The raw LaunchDarkly API responses for one project, saved to a file so a run can replay them without network access. The normalizer still runs on a snapshot.
+_Avoid_: model dump, fixture (for the raw responses)
+
+**Flag model**:
+The language-neutral form of a project's flags that every target is generated from, derived from a snapshot or live fetch.
+_Avoid_: IR, schema, manifest
