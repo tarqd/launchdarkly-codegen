@@ -1,0 +1,30 @@
+{
+  "_comment": "PROTOTYPE fixture for the Go and Java cross-check. A Flag model (post-normalizer), not a snapshot. Each flag exists to poke one edge case; see README.md.",
+  "projectKey": "my-project",
+  "flags": [
+    { "key": "2fa-required", "name": "2FA required", "description": "", "kind": "boolean", "tags": ["platform"],
+      "_probes": "leading digit" },
+    { "key": "api-url-id", "name": "API URL ID", "description": "Which API URL ID to route to.", "kind": "boolean", "tags": ["platform"],
+      "_probes": "Go initialisms" },
+    { "key": "big-quota", "name": "Big quota", "description": "", "kind": "number", "variations": [1, 5000000000], "tags": [],
+      "_probes": "integer outside Java int range" },
+    { "key": "checkout", "name": "Checkout", "description": "Routes eligible users to the rewritten checkout flow.", "kind": "boolean", "tags": ["checkout"],
+      "maintainer": { "kind": "team", "key": "payments", "name": "Payments" } },
+    { "key": "checkout-config", "name": "Checkout config", "description": "Shape: {\"steps\": [...]}. Ends a */ comment & uses <b>HTML</b>.", "kind": "json", "tags": ["checkout", "billing"],
+      "_probes": "JSON; multi-tag; comment escaping" },
+    { "key": "checkout-detail", "name": "Checkout detail text", "description": "", "kind": "string", "tags": ["checkout"],
+      "_probes": "collides with checkout's ...Detail method in every target" },
+    { "key": "default", "name": "Default", "description": "", "kind": "string", "tags": [],
+      "_probes": "Java reserved word; untagged" },
+    { "key": "discount-rate", "name": "Discount rate", "description": "", "kind": "number", "variations": [0.1, 0.25], "tags": ["billing"],
+      "_probes": "float number" },
+    { "key": "max-items", "name": "Max items", "description": "", "kind": "number", "variations": [10, 50], "tags": [],
+      "_probes": "int number; untagged" },
+    { "key": "old-banner", "name": "Old banner", "description": "Shows the pre-2024 banner.", "kind": "boolean", "tags": ["web", "checkout"],
+      "deprecated": true, "deprecationMessage": "Use checkout instead.",
+      "maintainer": { "kind": "member", "email": "ada@example.com", "name": "Ada Lovelace" },
+      "_probes": "deprecated; multi-tag; tag order" },
+    { "key": "wait", "name": "Wait", "description": "", "kind": "boolean", "tags": [],
+      "_probes": "Java: overloads final Object.wait" }
+  ]
+}
