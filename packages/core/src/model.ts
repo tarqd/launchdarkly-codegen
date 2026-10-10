@@ -1,6 +1,6 @@
 /** The language-neutral Flag model (DESIGN.md → Normalizer and the FlagModel). */
 
-export type TargetId = 'ts-server' | 'ts-browser' | 'go' | 'java';
+export type TargetId = 'ts-server' | 'ts-browser' | 'go' | 'java' | 'dotnet';
 
 export type FlagKind = 'boolean' | 'string' | 'number' | 'json';
 

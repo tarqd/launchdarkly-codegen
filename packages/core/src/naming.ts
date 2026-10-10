@@ -29,3 +29,8 @@ export function lowerCamel(key: string): string {
     .map((word, i) => (i === 0 ? word : capitalize(word)))
     .join('');
 }
+
+/** `checkout-v2.new_flow` → `CheckoutV2NewFlow`. Acronyms are ordinary words: `api-url` → `ApiUrl`. */
+export function upperCamel(key: string): string {
+  return splitWords(key).map(capitalize).join('');
+}

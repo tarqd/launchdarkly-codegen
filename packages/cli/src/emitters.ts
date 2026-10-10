@@ -1,9 +1,10 @@
 /** Built-in emitters, discovered statically (DESIGN.md → Repository layout). */
 
 import type { Emitter } from '@launchtarqly/core';
+import { dotnetEmitter } from '@launchtarqly/emit-dotnet';
 import { tsServerEmitter } from '@launchtarqly/emit-ts-server';
 
-export const BUILT_IN_EMITTERS: readonly Emitter[] = [tsServerEmitter];
+export const BUILT_IN_EMITTERS: readonly Emitter[] = [tsServerEmitter, dotnetEmitter];
 
 /**
  * The emitter for a target id. Config loading has already rejected unknown

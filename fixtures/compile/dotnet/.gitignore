@@ -1,0 +1,7 @@
+# build output
+bin/
+obj/
+# written by the compile test
+/Flags.g.cs
+/Flags.cs
+/Consumer.cs
