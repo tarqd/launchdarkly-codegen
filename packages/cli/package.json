@@ -3,21 +3,28 @@
   "version": "0.1.0",
   "description": "Generates type-safe wrappers around the official LaunchDarkly SDKs",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
-    "launchtarqly-codegen": "./dist/main.js"
+    "launchtarqly-codegen": "./bundle/launchtarqly-codegen.js"
   },
   "exports": {
     ".": {
       "source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "default": "./bundle/index.js"
     }
   },
   "files": [
-    "dist"
+    "bundle"
   ],
-  "dependencies": {
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "prepack": "node scripts/bundle.mjs"
+  },
+  "devDependencies": {
     "@launchtarqly/core": "workspace:*",
-    "@launchtarqly/emit-ts-server": "workspace:*"
+    "@launchtarqly/emit-ts-server": "workspace:*",
+    "esbuild": "0.28.2"
   }
 }
