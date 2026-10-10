@@ -3,6 +3,7 @@
  * a live fetch and on a replayed snapshot.
  */
 
+import { aliasesFor } from './aliases.js';
 import { CodegenError } from './errors.js';
 import type { Flag, FlagModel } from './model.js';
 import type { ApiFlag, Snapshot } from './snapshot.js';
@@ -33,7 +34,7 @@ function normalizeFlag(item: ApiFlag, snapshot: Snapshot): Flag {
     tags: item.tags,
     deprecated: item.deprecated,
     archived: item.archived,
-    aliases: {},
+    aliases: aliasesFor(item),
     uiUrl: `${snapshot.baseUri}/projects/${snapshot.projectKey}/flags/${item.key}`,
   };
 }
