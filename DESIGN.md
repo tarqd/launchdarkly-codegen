@@ -65,7 +65,7 @@ generated code is a facade on top. We follow that.
 | --- | --- |
 | Source of truth | LaunchDarkly REST API, live at generation time, or a recorded snapshot of its responses |
 | Scope of a run | one project; environments are not part of generation |
-| Targets for v1 | TypeScript (Node server SDK), TypeScript (browser client SDK), Go, Java. React later. |
+| Targets for v1 | TypeScript (Node server SDK), TypeScript (browser client SDK), Go, Java, .NET. React later. |
 | Generated shape | one method per flag, plus a `...Detail` variant per flag (Go also emits `...Ctx` forms) |
 | Value types | the SDK's native type per flag kind; numbers are `double` unless the flag opts into `int`; JSON flags return the SDK's JSON value type |
 | Defaults | caller passes a fallback on every call |
@@ -250,11 +250,12 @@ constant form:
 If the flag has an alias for the target, the alias is used as is (after
 validation) instead of the converted key. Otherwise the steps are: split on
 `-`, `_`, `.`, `/`, whitespace, and case changes; drop characters that are not
-letters or digits; apply the target's casing. Go additionally fixes common
-initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to `API`), so `api-url-id`
-becomes `APIURLID` and the Java constant `API_URL_ID`. .NET follows the
-Framework Design Guidelines instead (`Api`, `Url`, `Id`), so it applies no
-initialism table: `api-url-id` becomes `ApiUrlId`.
+letters or digits; apply the target's casing. Go additionally upper-cases
+staticcheck's 42 default initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to
+`API`, `Http` to `HTTP`, …; ADR 0002), so `api-url-id` becomes `APIURLID` and
+the Java constant `API_URL_ID`. .NET follows the Framework Design Guidelines
+instead (`Api`, `Url`, `Id`), so it applies no initialism table: `api-url-id`
+becomes `ApiUrlId`.
 
 The generator never invents a name: an identifier is either the converted key
 or an alias the user chose. These are errors, each naming the flag and
@@ -266,12 +267,15 @@ suggesting `codegen.name.<target>`:
   methods (`wait`, `notify`, `notifyAll`, `equals`, `hashCode`, `toString`,
   `getClass`, `clone`, `finalize`). Go's keywords can't collide with
   UpperCamel names, so Go checks only the names it generates itself (`New`,
-  `Client`, `Flags`). C# keywords are all lowercase too, so .NET checks its
-  own names (`Flags`, `FlagKeys`; a member can't share its class's name,
-  CS0542) and the `System.Object` members (`Equals`, `GetHashCode`,
-  `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`).
-  An alias, which can be in any case, is also checked against the C#
-  keywords. The generator never escapes a name with `@`.
+  `Client`, `Flags`), and requires every identifier, aliases included, to
+  match `^\p{Lu}[\p{L}\p{Nd}_]*$`: an exported name must start with an
+  upper-case letter, so an alias like `checkout` or `日本` is an error. C#
+  keywords are all lowercase too, so .NET checks its own names (`Flags`,
+  `FlagKeys`; a member can't share its class's name, CS0542) and the
+  `System.Object` members (`Equals`, `GetHashCode`, `ToString`, `GetType`,
+  `MemberwiseClone`, `Finalize`, `ReferenceEquals`). An alias, which can be
+  in any case, is also checked against the C# keywords. The generator never
+  escapes a name with `@`.
 - **Collision.** The check covers every identifier a target emits: flag
   methods, their `Detail` and `Ctx` variants, and key constants. For example,
   flag `checkout`'s detail method and a flag named `checkout-detail` both want
@@ -322,7 +326,8 @@ Every generated file starts with a header:
 // project: my-project   generator: 0.3.0
 ```
 
-Go uses that exact first line so `go vet` and tooling recognize it as
+Go uses that exact first line, which matches `^// Code generated .* DO NOT
+EDIT\.$`, so staticcheck, gopls and `go/ast.IsGenerated` recognize the file as
 generated. Because the generator version is in the header and `check`
 compares bytes, upgrading the generator with unchanged flags reports the
 output as stale until it is regenerated. That is intended: the committed
@@ -335,7 +340,7 @@ output is the contract.
 | ts-server, ts-browser | `/** @deprecated ... */` on the method |
 | go | `// Deprecated: ...` paragraph in the doc comment |
 | java | `@Deprecated` plus `@deprecated` Javadoc tag |
-| dotnet | `[System.Obsolete(...)]`, with `DiagnosticId = "LDFLAG001"` and the flag's UI link as `UrlFormat` on .NET 5+ (ADR 0002) |
+| dotnet | `[System.Obsolete(...)]`, with `DiagnosticId = "LDFLAG001"` and the flag's UI link as `UrlFormat` on .NET 5+ (ADR 0003) |
 
 The annotation goes on the flag's method, its `Detail` and `Ctx` variants,
 and its key constant. The text is the flag's `deprecationMessage`; without one,
@@ -364,9 +369,11 @@ configured base URI.
 Escaping per target:
 
 - **TS:** escape `*/`.
-- **Go:** nothing to escape. The comment starts with the identifier, as Go
-  convention requires (`// CheckoutV2 evaluates the "Checkout V2" flag.`),
-  followed by the flag name and description.
+- **Go:** nothing needs escaping (`*/` is harmless in `//` comments), but
+  gofmt rewrites doc comments, so the name and description are sanitized
+  instead (Generated code by target → go). The comment starts with the
+  identifier, as Go convention requires (`// CheckoutV2 evaluates the
+  "Checkout V2" flag.`), followed by the description.
 - **Java:** Javadoc is HTML, so escape `&`, `<`, `>`, and `*/` (as `*&#47;`).
   Emit `@param` and `@return`, and comment every member, private ones
   included, so the output passes `-Xdoclint:all`.
@@ -457,74 +464,215 @@ A React target (later) would emit `useCheckoutV2(fallback)` hooks on top of
 
 ### go (`github.com/launchdarkly/go-server-sdk/v7`)
 
-The full emitter spec is later work; this records the shape the shared design
-was checked against.
+`sdkMajors: [7]`. The `...Ctx` methods the wrapper calls arrived in v7.3.0,
+so that is the oldest supported release; the compile fixture pins v7.19.0.
+SDK facts are in [`docs/research/go-server-sdk-v7.md`](docs/research/go-server-sdk-v7.md).
 
-`New` takes a generated `Client` interface listing exactly the SDK methods the
-wrapper calls, `...Ctx` forms included. `*ld.LDClient` satisfies it, so
-callers pass the real client unchanged and tests can pass a fake. The SDK's
-own `interfaces.LDClientEvaluations` can't be used because it lacks the `Ctx`
-methods. Each flag gets four methods, with the suffix order the SDK uses
-(`BoolVariationDetailCtx`).
+**Config.** `out` is the path of the one generated `.go` file (for example
+`internal/ldflags/flags_gen.go`); a value not ending in `.go` is exit 2.
+`package` is required: a lowercase Go identifier that is not a keyword, else
+exit 2 naming the key. There is no default from the directory name, since
+directories like `ld-flags` aren't valid package names.
+
+**Client.** `New` takes a generated `Client` interface listing the twenty
+typed evaluation methods: four forms (`X`, `XDetail`, `XCtx`, `XDetailCtx`)
+for each of bool, string, float64, int and JSON, always all five kinds in that
+order, so adding a project's first flag of a kind never changes the interface
+and breaks a hand-written fake. Signatures and parameter names are copied from
+`*ld.LDClient`, which satisfies it; fakes can embed `Client` to stub only what
+they use. No SDK interface has the `Ctx` methods, so neither
+`interfaces.LDClientInterface` nor the value `WithEventsDisabled(true)`
+returns can be passed to `New`. The file does not assert
+`var _ Client = (*ld.LDClient)(nil)`: that would import the whole server SDK
+into a package that otherwise needs only `go-sdk-common`. The compile fixture
+asserts it instead.
+
+**Methods.** Each flag gets four methods, with the SDK's suffix order. The
+evaluation context parameter is named `context`, as in the SDK, so the stdlib
+package is imported as `gocontext`, also as the SDK does. Results are passed
+through unchanged, including the SDK's `error`.
+
+**Doc comments.** The primary method's comment starts with the identifier,
+then the description, the shared trailer (key in double quotes, since Go doc
+has no code spans) and the UI link. The variants get one line each:
+`XDetail is X with the evaluation reason.`, `XCtx is X with a Go context for
+SDK hooks.`, `XDetailCtx is XDetail with a Go context for SDK hooks.` A
+deprecated flag adds a `Deprecated:` paragraph to all four, and a
+`// Deprecated:` comment on its constant inside the `const ( )` group. A
+deprecation comment on the group itself would deprecate every constant in it.
+The header is followed by a blank line and a `// Package <pkg> ...` comment;
+without the blank line the header becomes the package doc and fails ST1000.
+
+**Sanitizing doc text.** gofmt rewrites doc comments above top-level
+declarations, so the emitter writes what gofmt would leave alone. The flag
+name and description pass through these rules, fuzzed stable over 55k random
+inputs on the prototype branch and re-fuzzed by the compile test:
+
+- Drop control characters, NUL and BOM, turn tabs into spaces, and trim every
+  line. No indented line survives, so nothing becomes a code block or list.
+- Rewrite ` `` ` to “ and `''` to ”, as gofmt itself does.
+- Collapse runs of blank lines. The flag name is put on one line.
+- Join a description paragraph to the one before it when gofmt could
+  reinterpret it: a lone heading-like line (gofmt's `isOldHeading`), a block
+  made only of `[text]: ` link definitions, or a paragraph starting
+  `Deprecated: `. Over-matching is harmless, since a joined paragraph is
+  always stable. So a one-line description with no final period joins the
+  summary paragraph.
+
+**Constants.** `Key` + the flag's identifier, in one `const ( )` group sorted
+by flag key. A `// Deprecated:` line ends gofmt's `=` alignment run, which the
+emitter reproduces: alignment is per run of consecutive single-line specs,
+padded by rune count.
+
+**Toolchain.** The output passes `gofmt -l`, `go vet ./...` and
+`staticcheck -checks all` (2025.1.1) on Go 1.25, the SDK's own floor: its
+`go.mod` says `go 1.25.0` since v7.15.5. The compile fixture and CI pin those
+versions, since staticcheck 2026.2.1 fails on go1.27.2. The working prototype
+is on the
+[`prototype/go-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/go-emitter/prototypes/go-emitter)
+branch.
+
+Complete output for the three example flags, with `checkout-config`
+deprecated (`codegen.deprecated: Use checkout-layout instead.`):
 
 ```go
 // Code generated by launchdarkly-codegen. DO NOT EDIT.
+// project: my-project   generator: 0.3.0
+
+// Package ldflags is a type-safe wrapper around the LaunchDarkly Go server SDK
+// for the flags in project my-project.
 package ldflags
 
 import (
-    gocontext "context"
+	gocontext "context"
 
-    "github.com/launchdarkly/go-sdk-common/v3/ldcontext"
-    "github.com/launchdarkly/go-sdk-common/v3/ldreason"
-    "github.com/launchdarkly/go-sdk-common/v3/ldvalue"
+	"github.com/launchdarkly/go-sdk-common/v3/ldcontext"
+	"github.com/launchdarkly/go-sdk-common/v3/ldreason"
+	"github.com/launchdarkly/go-sdk-common/v3/ldvalue"
 )
 
-// Client is the subset of *ld.LDClient the generated wrapper calls.
+// Client is the subset of the LaunchDarkly client that Flags calls: the typed
+// evaluation methods for every flag kind. *ld.LDClient satisfies it.
 type Client interface {
-    BoolVariation(key string, context ldcontext.Context, defaultVal bool) (bool, error)
-    BoolVariationDetail(key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
-    BoolVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, error)
-    BoolVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
-    // ... one group per kind the project uses
+	BoolVariation(key string, context ldcontext.Context, defaultVal bool) (bool, error)
+	BoolVariationDetail(key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
+	BoolVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, error)
+	BoolVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
+	StringVariation(key string, context ldcontext.Context, defaultVal string) (string, error)
+	StringVariationDetail(key string, context ldcontext.Context, defaultVal string) (string, ldreason.EvaluationDetail, error)
+	StringVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal string) (string, error)
+	StringVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal string) (string, ldreason.EvaluationDetail, error)
+	Float64Variation(key string, context ldcontext.Context, defaultVal float64) (float64, error)
+	Float64VariationDetail(key string, context ldcontext.Context, defaultVal float64) (float64, ldreason.EvaluationDetail, error)
+	Float64VariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal float64) (float64, error)
+	Float64VariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal float64) (float64, ldreason.EvaluationDetail, error)
+	IntVariation(key string, context ldcontext.Context, defaultVal int) (int, error)
+	IntVariationDetail(key string, context ldcontext.Context, defaultVal int) (int, ldreason.EvaluationDetail, error)
+	IntVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal int) (int, error)
+	IntVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal int) (int, ldreason.EvaluationDetail, error)
+	JSONVariation(key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, error)
+	JSONVariationDetail(key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error)
+	JSONVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, error)
+	JSONVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error)
 }
 
-// Flags is the typed wrapper.
+// Flags evaluates the flags of project my-project.
 type Flags struct{ client Client }
 
 // New returns a Flags that evaluates through client.
 func New(client Client) *Flags { return &Flags{client: client} }
 
-// CheckoutV2 evaluates the "Checkout V2" flag. ...
-func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
-    return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
-}
-
-// CheckoutV2Detail ...
-func (f *Flags) CheckoutV2Detail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) { ... }
-
-// CheckoutV2Ctx ...
-func (f *Flags) CheckoutV2Ctx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) { ... }
-
-// CheckoutV2DetailCtx ...
-func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) { ... }
-
-// CheckoutConfig ...
+// CheckoutConfig evaluates the "Checkout config" flag.
+//
+// Layout and copy for the checkout page.
+//
+// key: "checkout-config" · tags: checkout · maintainer: team Payments
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+//
+// Deprecated: Use checkout-layout instead.
 func (f *Flags) CheckoutConfig(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
-    return f.client.JSONVariation(KeyCheckoutConfig, context, fallback)
+	return f.client.JSONVariation(KeyCheckoutConfig, context, fallback)
 }
 
+// CheckoutConfigDetail is CheckoutConfig with the evaluation reason.
+//
+// Deprecated: Use checkout-layout instead.
+func (f *Flags) CheckoutConfigDetail(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
+	return f.client.JSONVariationDetail(KeyCheckoutConfig, context, fallback)
+}
+
+// CheckoutConfigCtx is CheckoutConfig with a Go context for SDK hooks.
+//
+// Deprecated: Use checkout-layout instead.
+func (f *Flags) CheckoutConfigCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
+	return f.client.JSONVariationCtx(ctx, KeyCheckoutConfig, context, fallback)
+}
+
+// CheckoutConfigDetailCtx is CheckoutConfigDetail with a Go context for SDK hooks.
+//
+// Deprecated: Use checkout-layout instead.
+func (f *Flags) CheckoutConfigDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
+	return f.client.JSONVariationDetailCtx(ctx, KeyCheckoutConfig, context, fallback)
+}
+
+// CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
+	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
+}
+
+// CheckoutV2Detail is CheckoutV2 with the evaluation reason.
+func (f *Flags) CheckoutV2Detail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
+	return f.client.BoolVariationDetail(KeyCheckoutV2, context, fallback)
+}
+
+// CheckoutV2Ctx is CheckoutV2 with a Go context for SDK hooks.
+func (f *Flags) CheckoutV2Ctx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) {
+	return f.client.BoolVariationCtx(ctx, KeyCheckoutV2, context, fallback)
+}
+
+// CheckoutV2DetailCtx is CheckoutV2Detail with a Go context for SDK hooks.
+func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
+	return f.client.BoolVariationDetailCtx(ctx, KeyCheckoutV2, context, fallback)
+}
+
+// PricingTier evaluates the "Pricing tier" flag.
+//
+// Which pricing tier a customer sees.
+//
+// key: "pricing-tier" · tags: billing
+// https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+func (f *Flags) PricingTier(context ldcontext.Context, fallback string) (string, error) {
+	return f.client.StringVariation(KeyPricingTier, context, fallback)
+}
+
+// PricingTierDetail is PricingTier with the evaluation reason.
+func (f *Flags) PricingTierDetail(context ldcontext.Context, fallback string) (string, ldreason.EvaluationDetail, error) {
+	return f.client.StringVariationDetail(KeyPricingTier, context, fallback)
+}
+
+// PricingTierCtx is PricingTier with a Go context for SDK hooks.
+func (f *Flags) PricingTierCtx(ctx gocontext.Context, context ldcontext.Context, fallback string) (string, error) {
+	return f.client.StringVariationCtx(ctx, KeyPricingTier, context, fallback)
+}
+
+// PricingTierDetailCtx is PricingTierDetail with a Go context for SDK hooks.
+func (f *Flags) PricingTierDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback string) (string, ldreason.EvaluationDetail, error) {
+	return f.client.StringVariationDetailCtx(ctx, KeyPricingTier, context, fallback)
+}
+
+// Flag keys, for code that needs the raw key.
 const (
-    KeyCheckoutV2     = "checkout-v2"
-    KeyPricingTier    = "pricing-tier"
-    KeyCheckoutConfig = "checkout-config"
+	// Deprecated: Use checkout-layout instead.
+	KeyCheckoutConfig = "checkout-config"
+	KeyCheckoutV2     = "checkout-v2"
+	KeyPricingTier    = "pricing-tier"
 )
 ```
-
-The output must pass `gofmt`, `go vet` and staticcheck. go-server-sdk v7.19.0
-raises the `go` directive to 1.25.0 under `go mod tidy`, so the Go compile
-fixture needs Go 1.25 or later. The working prototype is on the
-[`prototype/go-java-crosscheck`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/go-java-crosscheck/prototypes/go-java-crosscheck)
-branch.
 
 ### java (`com.launchdarkly:launchdarkly-java-server-sdk` 7.x)
 
@@ -599,7 +747,7 @@ member has a doc comment and deprecation reaches consumers.
 Deprecation is a compile error for consumers who build with
 `TreatWarningsAsErrors`: on .NET 5+ it is `LDFLAG001` with a link to the
 flag, which `<NoWarn>LDFLAG001</NoWarn>` or `#pragma warning disable
-LDFLAG001` silences on its own; on older frameworks it is CS0618 (ADR 0002).
+LDFLAG001` silences on its own; on older frameworks it is CS0618 (ADR 0003).
 The deprecated members of the same file can reference each other without a
 warning.
 
@@ -810,7 +958,7 @@ targets:
     out: apps/web/src/flags.generated.ts
     sdkMajor: 4
   - id: go
-    out: internal/ldflags/
+    out: internal/ldflags/flags_gen.go
     package: ldflags
     sdkMajor: 7
   - id: java
