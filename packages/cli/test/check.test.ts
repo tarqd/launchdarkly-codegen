@@ -145,6 +145,28 @@ describe('check --from-snapshot', () => {
       expect(result.stderr).toMatch(/^error: /);
     });
 
+    it('exits 2 and reports no drift on a network failure during a live fetch', async () => {
+      const dir = await generatedProject();
+      await writeFile(join(dir, OUT), 'stale\n');
+      const fetch = async (): Promise<Response> => {
+        throw new TypeError('fetch failed');
+      };
+      const result = await runCli(['check'], dir, { env: { LD_ACCESS_TOKEN: 'api-test' }, fetch });
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(await readFile(join(dir, OUT), 'utf8')).toBe('stale\n');
+    });
+
+    it('exits 2 and reports no drift when the API returns an error', async () => {
+      const dir = await generatedProject();
+      await writeFile(join(dir, OUT), 'stale\n');
+      const fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ code: 'unauthorized', message: 'Invalid access token' }), { status: 401 });
+      const result = await runCli(['check'], dir, { env: { LD_ACCESS_TOKEN: 'api-test' }, fetch });
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+    });
+
     it('exits 2 and reports no drift when the snapshot cannot be read', async () => {
       const dir = await projectDir(minimalConfig);
       const result = await runCli(['check', '--from-snapshot', join(dir, 'nope.json')], dir);

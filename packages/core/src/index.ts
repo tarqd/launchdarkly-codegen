@@ -8,5 +8,6 @@ export * from './aliases.js';
 export * from './identifiers.js';
 export * from './writer.js';
 export * from './emitter.js';
+export * from './fetcher.js';
 export * from './check/diff.js';
 export * from './check/flag-changes.js';
