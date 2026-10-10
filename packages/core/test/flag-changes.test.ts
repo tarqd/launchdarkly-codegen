@@ -29,6 +29,20 @@ describe('summarizeFlagChanges', () => {
     );
   });
 
+  it('reports a number flag whose number type changed, when both sides know it', () => {
+    const before: GeneratedFlag[] = [{ key: 'max-items', identifier: 'MaxItems', kind: 'number', numberType: 'double' }];
+    const after: GeneratedFlag[] = [{ key: 'max-items', identifier: 'MaxItems', kind: 'number', numberType: 'int' }];
+    expect(summarizeFlagChanges(before, after)).toBe(
+      'flags: 1 changed kind (max-items: number (double) → number (int))',
+    );
+  });
+
+  it('ignores the number type when either side does not know it', () => {
+    const known: GeneratedFlag[] = [{ key: 'max-items', identifier: 'maxItems', kind: 'number', numberType: 'int' }];
+    expect(summarizeFlagChanges(flags.slice(1, 2), known)).toBe('flags: no changes');
+    expect(summarizeFlagChanges(known, flags.slice(1, 2))).toBe('flags: no changes');
+  });
+
   it('says so when no flag changed (for example a generator upgrade)', () => {
     expect(summarizeFlagChanges(flags, [...flags].reverse())).toBe('flags: no changes');
   });

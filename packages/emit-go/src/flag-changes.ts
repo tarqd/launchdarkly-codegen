@@ -4,16 +4,8 @@
  * parses text rather than trusting a Flag model.
  */
 
-import { summarizeFlagChanges, type FlagKind, type GeneratedFlag } from '@launchtarqly/core';
-
-/** The Go type a primary method takes and returns, by flag kind. `int` and `float64` are both number flags. */
-const GO_KINDS: Record<string, FlagKind> = {
-  bool: 'boolean',
-  string: 'string',
-  int: 'number',
-  float64: 'number',
-  'ldvalue.Value': 'json',
-};
+import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import { FLAGS_STRUCT, keyConstant, KEYS_COMMENT, kindOfGoType } from './output.js';
 
 const IDENT = String.raw`[\p{L}\p{Nd}_]+`;
 
@@ -24,8 +16,13 @@ const METHOD = new RegExp(
   'gmu',
 );
 
-const KEYS = /\n\/\/ Flag keys, for code that needs the raw key\.\nconst \(\n([\s\S]*?)\n\)\n/;
-const CONSTANT = new RegExp(String.raw`^Key(${IDENT}) *= ("(?:[^"\\\n]|\\.)*")$`, 'u');
+/** `text` matched literally inside a RegExp. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const KEYS = new RegExp(String.raw`\n${escapeRegExp(KEYS_COMMENT)}\nconst \(\n([\s\S]*?)\n\)\n`);
+const CONSTANT = new RegExp(String.raw`^${escapeRegExp(keyConstant(''))}(${IDENT}) *= ("(?:[^"\\\n]|\\.)*")$`, 'u');
 
 /** A Go interpreted string literal as the emitter writes it (JSON-compatible escapes), or `undefined`. */
 function unquote(literal: string): string | undefined {
@@ -39,16 +36,17 @@ function unquote(literal: string): string | undefined {
 /**
  * The flags in a go file, in `Key…` constant order (the identifier is the
  * constant without `Key`, which is also the primary method's name), or
- * `undefined` when the file doesn't look like go output. The kind comes from
- * the primary method's signature. Tolerates `// Deprecated:` lines in the
- * constant group; anything else unexpected there makes it unparseable.
+ * `undefined` when the file doesn't look like go output. The kind, and a
+ * number flag's number type, come from the primary method's signature.
+ * Tolerates `// Deprecated:` lines in the constant group; anything else
+ * unexpected there makes it unparseable.
  */
 export function parseGoFlags(text: string): GeneratedFlag[] | undefined {
-  if (!text.includes('\ntype Flags struct{ client Client }\n')) return undefined;
+  if (!text.includes(`\n${FLAGS_STRUCT}\n`)) return undefined;
 
-  const kinds = new Map<string, FlagKind>();
+  const kinds = new Map<string, Pick<GeneratedFlag, 'kind' | 'numberType'>>();
   for (const [, name, type] of text.matchAll(METHOD)) {
-    const kind = GO_KINDS[type!];
+    const kind = kindOfGoType(type!);
     if (!kind) return undefined;
     kinds.set(name!, kind);
   }
@@ -67,7 +65,7 @@ export function parseGoFlags(text: string): GeneratedFlag[] | undefined {
     const key = unquote(constant[2]!);
     const kind = kinds.get(identifier);
     if (key === undefined || !kind) return undefined;
-    flags.push({ key, identifier, kind });
+    flags.push({ key, identifier, ...kind });
   }
   return flags;
 }
