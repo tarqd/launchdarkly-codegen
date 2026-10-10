@@ -5,9 +5,11 @@
 
 import {
   checkIdentifiers,
+  deprecationText,
   ECMASCRIPT_RESERVED_WORDS,
   flagIdentifier,
   lowerCamel,
+  maintainerLabel,
   Writer,
   type EmittedIdentifier,
   type Emitter,
@@ -59,21 +61,11 @@ function docLines(flag: Flag): string[] {
   if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
   const trailer = [`key: \`${flag.key}\``];
   if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
-  if (flag.maintainer) {
-    trailer.push(
-      `maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`,
-    );
-  }
+  if (flag.maintainer) trailer.push(`maintainer: ${maintainerLabel(flag.maintainer)}`);
   lines.push(trailer.join(' · '), flag.uiUrl);
   const deprecation = deprecationText(flag);
   if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
   return lines;
-}
-
-/** The `@deprecated` text: the flag's message, else a generic one. No date, so output doesn't churn. */
-function deprecationText(flag: Flag): string | undefined {
-  if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
 }
 
 /** The SDK method prefix and TypeScript type for each Flag kind. */

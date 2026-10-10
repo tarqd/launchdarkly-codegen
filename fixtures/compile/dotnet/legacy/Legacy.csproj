@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    C# 7.3 on netstandard2.0, the default for the SDK's netstandard2.0 and
+    net462 targets. The compile test writes ../Flags.g.cs and ../Consumer.cs.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningLevel>9999</WarningLevel>
+    <Features>strict</Features>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LaunchDarkly.ServerSdk" Version="[8.17.2]" />
+    <Compile Include="../Flags.g.cs;../Consumer.cs" />
+  </ItemGroup>
+</Project>
