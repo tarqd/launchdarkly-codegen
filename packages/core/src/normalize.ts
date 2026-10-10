@@ -16,12 +16,18 @@ export interface NormalizeOptions {
 
 export function normalize(snapshot: Snapshot, options: NormalizeOptions = {}): FlagModel {
   const warn = options.warn ?? (() => {});
-  const flags = snapshot.flagPages
-    .flatMap((page) => page.items)
+  const flags = dedupeByKey(snapshot.flagPages.flatMap((page) => page.items))
     .filter((item) => !item.archived)
     .map((item) => normalizeFlag(item, snapshot, warn))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { projectKey: snapshot.projectKey, flags };
+}
+
+/** Offset paging can repeat a flag across pages; the first occurrence wins. */
+function dedupeByKey(items: ApiFlag[]): ApiFlag[] {
+  const byKey = new Map<string, ApiFlag>();
+  for (const item of items) if (!byKey.has(item.key)) byKey.set(item.key, item);
+  return [...byKey.values()];
 }
 
 function normalizeFlag(item: ApiFlag, snapshot: Snapshot, warn: (message: string) => void): Flag {

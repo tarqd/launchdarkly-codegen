@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { run } from '../src/index.js';
+import { run, type RunIO } from '../src/index.js';
 
 export const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 export const SNAPSHOTS_DIR = join(REPO_ROOT, 'fixtures/snapshots');
@@ -20,13 +20,14 @@ export interface CliResult {
   stderr: string;
 }
 
-/** Runs the CLI in-process with `cwd` and captured output. */
-export async function runCli(args: string[], cwd: string): Promise<CliResult> {
+/** Runs the CLI in-process with `cwd` and captured output; `io` can set env and a fake fetch. */
+export async function runCli(args: string[], cwd: string, io: Partial<Pick<RunIO, 'env' | 'fetch'>> = {}): Promise<CliResult> {
   let stdout = '';
   let stderr = '';
   const exitCode = await run(args, {
     cwd,
     env: {},
+    ...io,
     stdout: (s) => (stdout += s),
     stderr: (s) => (stderr += s),
   });
