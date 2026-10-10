@@ -45,6 +45,9 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // BannerIds evaluates the "Banner ids" flag.
+//
+// key: "banner-ids"
+// https://app.launchdarkly.com/projects/my-project/flags/banner-ids
 func (f *Flags) BannerIds(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
 	return f.client.JSONVariation(KeyBannerIds, context, fallback)
 }
@@ -65,6 +68,9 @@ func (f *Flags) BannerIdsDetailCtx(ctx gocontext.Context, context ldcontext.Cont
 }
 
 // CheckoutConfig evaluates the "Checkout config" flag.
+//
+// key: "checkout-config"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-config
 func (f *Flags) CheckoutConfig(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
 	return f.client.JSONVariation(KeyCheckoutConfig, context, fallback)
 }
@@ -85,6 +91,9 @@ func (f *Flags) CheckoutConfigDetailCtx(ctx gocontext.Context, context ldcontext
 }
 
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// key: "checkout-v2"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }
@@ -105,6 +114,9 @@ func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Con
 }
 
 // MaxCartItems evaluates the "Max cart items" flag.
+//
+// key: "max-cart-items"
+// https://app.launchdarkly.com/projects/my-project/flags/max-cart-items
 func (f *Flags) MaxCartItems(context ldcontext.Context, fallback int) (int, error) {
 	return f.client.IntVariation(KeyMaxCartItems, context, fallback)
 }
@@ -125,6 +137,11 @@ func (f *Flags) MaxCartItemsDetailCtx(ctx gocontext.Context, context ldcontext.C
 }
 
 // PricingTier evaluates the "Pricing tier" flag.
+//
+// Which pricing tier a customer sees.
+//
+// key: "pricing-tier" · tags: billing
+// https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
 func (f *Flags) PricingTier(context ldcontext.Context, fallback string) (string, error) {
 	return f.client.StringVariation(KeyPricingTier, context, fallback)
 }
@@ -145,6 +162,9 @@ func (f *Flags) PricingTierDetailCtx(ctx gocontext.Context, context ldcontext.Co
 }
 
 // SampleRate evaluates the "Sample rate" flag.
+//
+// key: "sample-rate"
+// https://app.launchdarkly.com/projects/my-project/flags/sample-rate
 func (f *Flags) SampleRate(context ldcontext.Context, fallback float64) (float64, error) {
 	return f.client.Float64Variation(KeySampleRate, context, fallback)
 }

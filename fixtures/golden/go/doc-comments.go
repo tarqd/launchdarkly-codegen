@@ -45,6 +45,13 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// Matches paths like /cart/**/*.json */ and more.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: team Payments
+// https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }
@@ -65,69 +72,109 @@ func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Con
 }
 
 // LegacyCart evaluates the "Legacy cart" flag.
+//
+// The pre-2024 cart.
+//
+// key: "legacy-cart" · tags: checkout · maintainer: ada@example.com
+// https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart
+//
+// Deprecated: The "legacy-cart" flag is deprecated.
 func (f *Flags) LegacyCart(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyLegacyCart, context, fallback)
 }
 
 // LegacyCartDetail is LegacyCart with the evaluation reason.
+//
+// Deprecated: The "legacy-cart" flag is deprecated.
 func (f *Flags) LegacyCartDetail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetail(KeyLegacyCart, context, fallback)
 }
 
 // LegacyCartCtx is LegacyCart with a Go context for SDK hooks.
+//
+// Deprecated: The "legacy-cart" flag is deprecated.
 func (f *Flags) LegacyCartCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariationCtx(ctx, KeyLegacyCart, context, fallback)
 }
 
 // LegacyCartDetailCtx is LegacyCartDetail with a Go context for SDK hooks.
+//
+// Deprecated: The "legacy-cart" flag is deprecated.
 func (f *Flags) LegacyCartDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetailCtx(ctx, KeyLegacyCart, context, fallback)
 }
 
 // OldSearch evaluates the "Old search" flag.
+//
+// key: "old-search"
+// https://app.eu.launchdarkly.com/projects/storefront/flags/old-search
+//
+// Deprecated: Use search-v2. Removal planned for Q4 */ 2026.
 func (f *Flags) OldSearch(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyOldSearch, context, fallback)
 }
 
 // OldSearchDetail is OldSearch with the evaluation reason.
+//
+// Deprecated: Use search-v2. Removal planned for Q4 */ 2026.
 func (f *Flags) OldSearchDetail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetail(KeyOldSearch, context, fallback)
 }
 
 // OldSearchCtx is OldSearch with a Go context for SDK hooks.
+//
+// Deprecated: Use search-v2. Removal planned for Q4 */ 2026.
 func (f *Flags) OldSearchCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariationCtx(ctx, KeyOldSearch, context, fallback)
 }
 
 // OldSearchDetailCtx is OldSearchDetail with a Go context for SDK hooks.
+//
+// Deprecated: Use search-v2. Removal planned for Q4 */ 2026.
 func (f *Flags) OldSearchDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetailCtx(ctx, KeyOldSearch, context, fallback)
 }
 
 // PromoBanner evaluates the "Promo banner" flag.
+//
+// Shows the seasonal promo banner.
+//
+// key: "promo-banner" · tags: marketing
+// https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner
+//
+// Deprecated: Use the CMS banner slot.
 func (f *Flags) PromoBanner(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyPromoBanner, context, fallback)
 }
 
 // PromoBannerDetail is PromoBanner with the evaluation reason.
+//
+// Deprecated: Use the CMS banner slot.
 func (f *Flags) PromoBannerDetail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetail(KeyPromoBanner, context, fallback)
 }
 
 // PromoBannerCtx is PromoBanner with a Go context for SDK hooks.
+//
+// Deprecated: Use the CMS banner slot.
 func (f *Flags) PromoBannerCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariationCtx(ctx, KeyPromoBanner, context, fallback)
 }
 
 // PromoBannerDetailCtx is PromoBannerDetail with a Go context for SDK hooks.
+//
+// Deprecated: Use the CMS banner slot.
 func (f *Flags) PromoBannerDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
 	return f.client.BoolVariationDetailCtx(ctx, KeyPromoBanner, context, fallback)
 }
 
 // Flag keys, for code that needs the raw key.
 const (
-	KeyCheckoutV2  = "checkout-v2"
-	KeyLegacyCart  = "legacy-cart"
-	KeyOldSearch   = "old-search"
+	KeyCheckoutV2 = "checkout-v2"
+	// Deprecated: The "legacy-cart" flag is deprecated.
+	KeyLegacyCart = "legacy-cart"
+	// Deprecated: Use search-v2. Removal planned for Q4 */ 2026.
+	KeyOldSearch = "old-search"
+	// Deprecated: Use the CMS banner slot.
 	KeyPromoBanner = "promo-banner"
 )

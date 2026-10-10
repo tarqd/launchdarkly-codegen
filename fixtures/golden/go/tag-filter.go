@@ -45,6 +45,11 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }
@@ -65,6 +70,11 @@ func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Con
 }
 
 // ExpressPay evaluates the "Express pay" flag.
+//
+// One-click payment in the q3 checkout.
+//
+// key: "express-pay" · tags: billing, checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/express-pay
 func (f *Flags) ExpressPay(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyExpressPay, context, fallback)
 }

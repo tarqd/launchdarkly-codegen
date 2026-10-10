@@ -45,6 +45,9 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // AllowGuestCheckout evaluates the "Allow guest checkout" flag.
+//
+// key: "AllowGuestCheckout" · tags: checkout
+// https://app.launchdarkly.com/projects/my-project/flags/AllowGuestCheckout
 func (f *Flags) AllowGuestCheckout(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyAllowGuestCheckout, context, fallback)
 }
@@ -65,6 +68,9 @@ func (f *Flags) AllowGuestCheckoutDetailCtx(ctx gocontext.Context, context ldcon
 }
 
 // BetaDarkMode evaluates the "Dark mode (beta)" flag.
+//
+// key: "beta.dark_mode"
+// https://app.launchdarkly.com/projects/my-project/flags/beta.dark_mode
 func (f *Flags) BetaDarkMode(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyBetaDarkMode, context, fallback)
 }
@@ -85,6 +91,11 @@ func (f *Flags) BetaDarkModeDetailCtx(ctx gocontext.Context, context ldcontext.C
 }
 
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }

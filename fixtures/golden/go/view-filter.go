@@ -45,6 +45,9 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // AllowGuestCheckout evaluates the "Allow guest checkout" flag.
+//
+// key: "AllowGuestCheckout" · tags: checkout
+// https://app.launchdarkly.com/projects/my-project/flags/AllowGuestCheckout
 func (f *Flags) AllowGuestCheckout(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyAllowGuestCheckout, context, fallback)
 }
@@ -65,6 +68,11 @@ func (f *Flags) AllowGuestCheckoutDetailCtx(ctx gocontext.Context, context ldcon
 }
 
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }

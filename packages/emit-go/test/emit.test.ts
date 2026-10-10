@@ -70,6 +70,9 @@ describe('go emitter', () => {
       PREAMBLE +
         `
 // CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// key: "checkout-v2"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
 func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
 \treturn f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }
@@ -95,6 +98,100 @@ const (
 )
 `,
     );
+  });
+
+  it('documents the primary method with the description, the trailer and the UI link (DESIGN.md → go sample)', () => {
+    const flag = modelFlag('checkout-v2', {
+      name: 'Checkout V2',
+      description: 'Routes eligible users to the rewritten checkout flow.',
+      tags: ['checkout', 'q3'],
+      maintainer: { kind: 'member', email: 'ada@example.com', name: 'Ada Lovelace' },
+    });
+    const out = emitOne({ projectKey: 'my-project', flags: [flag] });
+    expect(out).toContain(`
+// CheckoutV2 evaluates the "Checkout V2" flag.
+//
+// Routes eligible users to the rewritten checkout flow.
+//
+// key: "checkout-v2" · tags: checkout, q3 · maintainer: ada@example.com
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
+`);
+    expect(out).toContain('\n// CheckoutV2Detail is CheckoutV2 with the evaluation reason.\nfunc ');
+  });
+
+  it('shows a team maintainer as team <name>', () => {
+    const flag = modelFlag('checkout-v2', { maintainer: { kind: 'team', key: 'payments', name: 'Payments' } });
+    expect(emitOne({ projectKey: 'my-project', flags: [flag] })).toContain('\n// key: "checkout-v2" · maintainer: team Payments\n');
+  });
+
+  describe('a deprecated flag', () => {
+    const model: FlagModel = {
+      projectKey: 'my-project',
+      flags: [
+        modelFlag('checkout-config', {
+          name: 'Checkout config',
+          kind: 'json',
+          deprecated: true,
+          deprecationMessage: 'Use checkout-layout instead.',
+        }),
+        modelFlag('checkout-v2'),
+        modelFlag('pricing-tier'),
+      ],
+    };
+
+    it('gets a Deprecated: paragraph on all four methods', () => {
+      const out = emitOne(model);
+      expect(out).toContain(`
+// key: "checkout-config"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+//
+// Deprecated: Use checkout-layout instead.
+func (f *Flags) CheckoutConfig(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
+`);
+      for (const [suffix, doc] of [
+        ['Detail', 'is CheckoutConfig with the evaluation reason.'],
+        ['Ctx', 'is CheckoutConfig with a Go context for SDK hooks.'],
+        ['DetailCtx', 'is CheckoutConfigDetail with a Go context for SDK hooks.'],
+      ]) {
+        expect(out).toContain(`
+// CheckoutConfig${suffix} ${doc}
+//
+// Deprecated: Use checkout-layout instead.
+func (f *Flags) CheckoutConfig${suffix}(`);
+      }
+      expect(out.match(/Deprecated:/g)).toHaveLength(5);
+    });
+
+    it('gets a Deprecated: comment on its constant inside the group, which ends the = alignment run', () => {
+      const out = emitOne(model);
+      expect(out.slice(out.indexOf('// Flag keys'))).toBe(`// Flag keys, for code that needs the raw key.
+const (
+\t// Deprecated: Use checkout-layout instead.
+\tKeyCheckoutConfig = "checkout-config"
+\tKeyCheckoutV2     = "checkout-v2"
+\tKeyPricingTier    = "pricing-tier"
+)
+`);
+    });
+
+    it('starts a new alignment run after a deprecated constant mid-group', () => {
+      const flags = [modelFlag('a'), modelFlag('bb-long-name'), modelFlag('c', { deprecated: true }), modelFlag('dd')];
+      const out = emitOne({ projectKey: 'my-project', flags });
+      expect(out.slice(out.indexOf('const ('))).toBe(`const (
+\tKeyA          = "a"
+\tKeyBbLongName = "bb-long-name"
+\t// Deprecated: The "c" flag is deprecated.
+\tKeyC  = "c"
+\tKeyDd = "dd"
+)
+`);
+    });
+
+    it('without a message says the flag is deprecated, naming it', () => {
+      const out = emitOne({ projectKey: 'my-project', flags: [modelFlag('legacy-cart', { deprecated: true })] });
+      expect(out).toContain('\n//\n// Deprecated: The "legacy-cart" flag is deprecated.\nfunc (f *Flags) LegacyCart(');
+    });
   });
 
   it('names a flag by its go alias and aligns the key constants as gofmt does', () => {
