@@ -77,11 +77,11 @@ const OPTIONS = {
       }
       const segments = namespace.split('.');
       const keyword = segments.find((segment) => CSHARP_KEYWORDS.has(segment));
-      if (keyword !== undefined) fail(`segment "${keyword}" is a C# keyword; got ${JSON.stringify(namespace)}`);
+      if (keyword !== undefined) fail(`segment "${keyword}" is a C# keyword, got ${JSON.stringify(namespace)}`);
       const last = segments[segments.length - 1]!;
       if (CLASS_NAMES.includes(last)) {
         fail(
-          `must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
+          `must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace), got ${JSON.stringify(namespace)}`,
         );
       }
       return namespace;

@@ -239,7 +239,7 @@ function normalizeBaseUri(baseUri: string): string {
   return baseUri.replace(/\/+$/, '');
 }
 
-/** The keys every target has; any other key must be one of its emitter's options. */
+/** The keys every target has; any other key must be one of the target's options, as its emitter declares them. */
 const TARGET_KEYS = ['id', 'out', 'sdkMajor'];
 
 /**

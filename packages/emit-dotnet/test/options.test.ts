@@ -41,7 +41,7 @@ describe('dotnet target options', () => {
     ['class', 'class'],
     ['MyApp.string', 'string'],
   ])('rejects the namespace %s, whose segment %s is a C# keyword', (namespace, segment) => {
-    expect(() => parse({ namespace })).toThrow(`namespace segment "${segment}" is a C# keyword; got ${JSON.stringify(namespace)}`);
+    expect(() => parse({ namespace })).toThrow(`namespace segment "${segment}" is a C# keyword, got ${JSON.stringify(namespace)}`);
   });
 
   it.each(['MyApp.Flags', 'MyApp.FlagKeys', 'Flags'])(
@@ -49,7 +49,7 @@ describe('dotnet target options', () => {
     (namespace) => {
       const last = namespace.split('.').pop();
       expect(() => parse({ namespace })).toThrow(
-        `namespace must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
+        `namespace must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace), got ${JSON.stringify(namespace)}`,
       );
     },
   );

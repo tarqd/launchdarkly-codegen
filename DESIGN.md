@@ -541,8 +541,9 @@ SDK facts are in [`docs/research/go-server-sdk-v7.md`](docs/research/go-server-s
 **Config.** `out` is the path of the one generated `.go` file (for example
 `internal/ldflags/flags_gen.go`); a value not ending in `.go` is exit 2.
 `package` is required: a lowercase Go identifier that is not a keyword, else
-exit 2 naming the key (Configuration → Target options). There is no default from the directory name, since
-directories like `ld-flags` aren't valid package names.
+exit 2 naming the key (Configuration → Target options). There is no default
+from the directory name, since directories like `ld-flags` aren't valid
+package names.
 
 **Client.** `New` takes a generated `Client` interface listing the twenty
 typed evaluation methods: four forms (`X`, `XDetail`, `XCtx`, `XDetailCtx`)
@@ -781,8 +782,8 @@ entry and one fixture run. Facts and sources:
 holding `public final class Flags`, the only class name Java allows in that
 file. `package` is required: dot-separated identifiers, each matching
 `[A-Za-z_$][A-Za-z0-9_$]*` and not a reserved word; anything else is exit 2
-naming the key (Configuration → Target options). The generator doesn't check `package` against `out`, because
-javac reports the mismatch.
+naming the key (Configuration → Target options). The generator doesn't check
+`package` against `out`, because javac reports the mismatch.
 
 **Shape.**
 

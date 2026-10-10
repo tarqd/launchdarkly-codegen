@@ -169,8 +169,15 @@ describe('target options', () => {
     expect(await loadError({ ...t, out })).toContain(`: targets[0].out must end in ${extensions}, got ${JSON.stringify(out)}`);
   });
 
-  it.each(['flags.ts', 'flags.mts', 'flags.cts'])('accepts a ts-server out of %s', async (out) => {
-    await expect(load({ ...target, out })).resolves.toBeDefined();
+  it.each([
+    ['ts-server', target, 'flags.ts'],
+    ['ts-server', target, 'flags.mts'],
+    ['ts-server', target, 'flags.cts'],
+    ['go', goTarget, 'internal/ldflags/flags_gen.go'],
+    ['dotnet', { id: 'dotnet', sdkMajor: 8, namespace: 'MyApp' }, 'src/Flags.cs'],
+    ['dotnet', { id: 'dotnet', sdkMajor: 8, namespace: 'MyApp' }, 'src/Flags.g.cs'],
+  ])('accepts a %s out of %s', async (_id, t, out) => {
+    await expect(load({ ...t, out })).resolves.toBeDefined();
   });
 
   it('accepts any java out, which is a directory', async () => {

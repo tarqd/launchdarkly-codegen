@@ -30,7 +30,10 @@ export interface TargetOption<T extends OptionType = OptionType, Req extends boo
   parse?: (value: OptionTypes[T], fail: (message: string) => never) => R;
 }
 
-/** A target's options, keyed as the config file spells them. */
+/**
+ * A target's options, keyed as the config file spells them. `any` lets an
+ * option whose `parse` takes a narrower value type still fit the record.
+ */
 export type OptionDeclarations = Readonly<Record<string, TargetOption<any, boolean, unknown>>>;
 
 /** The parsed options a set of declarations gives: an optional option that is missing is `undefined`. */
