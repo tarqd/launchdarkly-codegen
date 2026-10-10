@@ -4,12 +4,17 @@
  */
 
 import {
+  checkIdentifiers,
   CodegenError,
   flagIdentifier,
+  GO_INITIALISMS,
   upperCamel,
   Writer,
+  type EmittedIdentifier,
   type Emitter,
   type Flag,
+  type FlagModel,
+  type IdentifierRules,
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
@@ -42,6 +47,36 @@ function packageName(cfg: TargetConfig): string {
     );
   }
   return pkg;
+}
+
+const NAMING: IdentifierRules = {
+  target: GO,
+  // Go keywords are all lowercase, so the export rule already excludes them.
+  reserved: new Set(),
+  pattern: /^\p{Lu}[\p{L}\p{Nd}_]*$/u,
+  invalidReason: 'is not an exported Go identifier (it must start with an upper-case letter)',
+};
+
+/** Names the file declares itself, which no flag may take. */
+const GENERATOR_NAMES = ['Client', 'Flags', 'New'];
+
+/** The method suffixes each flag gets besides its own name. */
+const VARIANT_SUFFIXES = ['Detail', 'Ctx', 'DetailCtx'];
+
+/** Each flag's name, after checking every identifier the file will emit (DESIGN.md → Naming). */
+function flagNames(model: FlagModel): Map<Flag, string> {
+  const convert = (key: string) => upperCamel(key, { initialisms: GO_INITIALISMS });
+  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, GO, convert)]));
+  const emitted: EmittedIdentifier[] = GENERATOR_NAMES.map((identifier) => ({ identifier }));
+  for (const [flag, name] of names) {
+    emitted.push(
+      { flagKey: flag.key, identifier: name, primary: true },
+      ...VARIANT_SUFFIXES.map((suffix) => ({ flagKey: flag.key, identifier: `${name}${suffix}` })),
+      { flagKey: flag.key, identifier: `Key${name}` },
+    );
+  }
+  checkIdentifiers(NAMING, emitted);
+  return names;
 }
 
 /** An SDK evaluation method family and the Go type it takes and returns. */
@@ -136,7 +171,7 @@ export const goEmitter: Emitter = {
   sdkMajors: [7],
   emit(model, cfg, ctx) {
     const pkg = packageName(cfg);
-    const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, GO, upperCamel)]));
+    const names = flagNames(model);
     // The Flag model is sorted by key, so methods and constants are too.
     const flags = model.flags;
     const w = new Writer({ indent: '\t', commentPrefix: '//' });
