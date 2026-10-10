@@ -4,9 +4,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CodegenError, defaultFetchDeps, fetchSnapshot, readSnapshot, type Snapshot } from '@launchtarqly/core';
-import { loadConfig, type Config } from './config.js';
-import { resolveConnection } from './connection.js';
+import { resolveConfig, type Config } from './config.js';
 import { generateFiles, writeFiles } from './generate.js';
+import { writeStarterConfig } from './init.js';
+import { settingOptions } from './settings.js';
 
 export interface RunIO {
   cwd: string;
@@ -17,8 +18,11 @@ export interface RunIO {
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
-const USAGE = `usage: launchtarqly-codegen generate [--config path] [--base-uri uri] [--access-token token] [--from-snapshot file]
-       launchtarqly-codegen snapshot --write-snapshot file [--config path] [--base-uri uri] [--access-token token]
+const USAGE = `usage: launchtarqly-codegen generate [--config path] [--target id]... [--project key]
+                                     [--base-uri uri] [--access-token token] [--from-snapshot file]
+       launchtarqly-codegen snapshot --write-snapshot file [--config path] [--project key]
+                                     [--base-uri uri] [--access-token token]
+       launchtarqly-codegen init [--config path]
 `;
 
 /** Runs the CLI and returns its exit code: 0 ok, 1 stale, 2 error. */
@@ -30,6 +34,8 @@ export async function run(argv: string[], io: RunIO): Promise<number> {
         return await generateCommand(rest, io);
       case 'snapshot':
         return await snapshotCommand(rest, io);
+      case 'init':
+        return await initCommand(rest, io);
       case undefined:
       case '--help':
       case '-h':
@@ -54,10 +60,10 @@ function parse(args: string[]) {
       strict: true,
       options: {
         config: { type: 'string' },
+        target: { type: 'string', multiple: true },
         'from-snapshot': { type: 'string' },
         'write-snapshot': { type: 'string' },
-        'base-uri': { type: 'string' },
-        'access-token': { type: 'string' },
+        ...settingOptions(),
       },
     }).values;
   } catch (err) {
@@ -67,11 +73,11 @@ function parse(args: string[]) {
 
 async function generateCommand(args: string[], io: RunIO): Promise<number> {
   const opts = parse(args);
-  const { config, dir } = await loadConfig(io.cwd, opts.config);
+  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
+  const { config, dir } = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
   const snapshotPath = opts['from-snapshot'];
   const snapshot =
-    snapshotPath === undefined ? await fetchLive(opts, config, io) : await readSnapshot(resolve(io.cwd, snapshotPath));
-  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
+    snapshotPath === undefined ? await fetchLive(config, io) : await readSnapshot(resolve(io.cwd, snapshotPath));
   const written = await writeFiles(generateFiles(config, snapshot, { warn }), dir);
   for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
   return 0;
@@ -82,8 +88,9 @@ async function snapshotCommand(args: string[], io: RunIO): Promise<number> {
   const opts = parse(args);
   const out = opts['write-snapshot'];
   if (out === undefined) throw new CodegenError(`snapshot needs --write-snapshot <file>\n${USAGE}`);
-  const { config } = await loadConfig(io.cwd, opts.config);
-  const snapshot = await fetchLive(opts, config, io);
+  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
+  const { config } = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
+  const snapshot = await fetchLive(config, io);
   const path = resolve(io.cwd, out);
   try {
     await mkdir(dirname(path), { recursive: true });
@@ -95,14 +102,28 @@ async function snapshotCommand(args: string[], io: RunIO): Promise<number> {
   return 0;
 }
 
-function fetchLive(opts: ReturnType<typeof parse>, config: Config, io: RunIO): Promise<Snapshot> {
-  const connection = resolveConnection(
-    { baseUri: opts['base-uri'], accessToken: opts['access-token'] },
-    io.env,
-    config,
-  );
+/** Fetches the flags list with the resolved connection settings. */
+function fetchLive(config: Config, io: RunIO): Promise<Snapshot> {
+  const { project, baseUri, accessToken } = config;
+  if (accessToken === undefined) {
+    throw new CodegenError(
+      'no LaunchDarkly access token: pass --access-token or set LD_ACCESS_TOKEN (or use --from-snapshot <file>)',
+    );
+  }
   return fetchSnapshot(
-    { projectKey: config.project, ...connection },
+    { projectKey: project, baseUri, accessToken },
     io.fetch ? { ...defaultFetchDeps, fetch: io.fetch } : defaultFetchDeps,
   );
+}
+
+async function initCommand(args: string[], io: RunIO): Promise<number> {
+  let opts: { config?: string };
+  try {
+    opts = parseArgs({ args, strict: true, options: { config: { type: 'string' } } }).values;
+  } catch (err) {
+    throw new CodegenError((err as Error).message);
+  }
+  const path = await writeStarterConfig(io.cwd, opts.config);
+  io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
+  return 0;
 }

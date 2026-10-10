@@ -127,6 +127,20 @@ describe('live fetch from the CLI', () => {
     await expect(readFile(join(dir, 'flags.json'))).rejects.toThrow();
   });
 
+  it('snapshot takes the project from --project and LD_CODEGEN_PROJECT like generate', async () => {
+    const dir = await projectDir({ ...config, project: 'from-file' });
+    const env = { LD_ACCESS_TOKEN: 't', LD_CODEGEN_PROJECT: 'from-env' };
+    const fromCli = recordedApi();
+    const args = ['snapshot', '--write-snapshot', 'flags.json'];
+    expect(await runCli([...args, '--project', 'my-project'], dir, { env, fetch: fromCli.fetch })).toMatchObject({
+      exitCode: 0,
+    });
+    expect(fromCli.requests[0]!.url.pathname).toBe('/api/v2/flags/my-project');
+    const fromEnv = recordedApi();
+    expect(await runCli(args, dir, { env, fetch: fromEnv.fetch })).toMatchObject({ exitCode: 2 });
+    expect(fromEnv.requests[0]!.url.pathname).toBe('/api/v2/flags/from-env');
+  });
+
   it('snapshot requires --write-snapshot', async () => {
     const result = await runCli(['snapshot'], await projectDir(config), { env: { LD_ACCESS_TOKEN: 't' } });
     expect(result.exitCode).toBe(2);

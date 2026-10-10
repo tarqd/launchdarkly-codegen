@@ -7,10 +7,14 @@ export const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 export const SNAPSHOTS_DIR = join(REPO_ROOT, 'fixtures/snapshots');
 export const GOLDEN_DIR = join(REPO_ROOT, 'fixtures/golden');
 
-/** A temp directory holding `launchdarkly-codegen.config.json` with `config`. */
-export async function projectDir(config: unknown): Promise<string> {
+/**
+ * A temp directory holding `launchdarkly-codegen.config.json` with `config`.
+ * A string `config` is written verbatim under `filename` instead.
+ */
+export async function projectDir(config: unknown, filename = 'launchdarkly-codegen.config.json'): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'ld-codegen-'));
-  await writeFile(join(dir, 'launchdarkly-codegen.config.json'), JSON.stringify(config, null, 2));
+  const text = typeof config === 'string' ? config : JSON.stringify(config, null, 2);
+  await writeFile(join(dir, filename), text);
   return dir;
 }
 
@@ -21,7 +25,11 @@ export interface CliResult {
 }
 
 /** Runs the CLI in-process with `cwd` and captured output; `io` can set env and a fake fetch. */
-export async function runCli(args: string[], cwd: string, io: Partial<Pick<RunIO, 'env' | 'fetch'>> = {}): Promise<CliResult> {
+export async function runCli(
+  args: string[],
+  cwd: string,
+  io: Partial<Pick<RunIO, 'env' | 'fetch'>> = {},
+): Promise<CliResult> {
   let stdout = '';
   let stderr = '';
   const exitCode = await run(args, {

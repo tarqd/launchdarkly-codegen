@@ -23,5 +23,7 @@ await build({
   conditions: ['source'],
   packages: 'bundle',
   legalComments: 'none',
+  // Bundled CommonJS dependencies (yaml) `require` Node built-ins; ESM output has no `require`.
+  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
   logLevel: 'warning',
 });
