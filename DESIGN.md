@@ -6,12 +6,13 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: `core`, the `ts-server` target and the `dotnet` target are built; the
-shared design (flag model, naming, emitter interface) has been checked against
-Go and Java with a compiling prototype. The `go` and `java` emitters are
-specified but not built yet, and the full `ts-browser` spec is later work.
-Facts that could not be confirmed from a primary source are listed at the end,
-to be checked during implementation.
+Status: `core` and two targets, `ts-server` and `dotnet`, are built. The `go`
+and `java` targets are fully specified below but not built yet; `ts-browser`
+has an outline, and its full spec is later work. Before any target past
+`ts-server` was specified, the shared design (flag model, naming, emitter
+interface) was checked against Go and Java with compiling prototypes. Facts
+from research that still lack a primary-source check are listed under To
+verify during implementation.
 
 ## Goals
 
@@ -307,7 +308,8 @@ interface EmitContext {
 `sdkMajors` is the one place a target's supported SDK majors are listed;
 config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
 one. `summarizeChanges` is optional and only used by `check`: it reads the
-file on disk and the new output back into flags (key, identifier, kind) and
+file on disk and the new output back into flags (key, identifier, kind, and
+for a number flag the `int` or `double` type when the output shows it) and
 returns the one-line summary from core's `summarizeFlagChanges`, or
 `undefined` when the old file can't be read back, in which case `check`
 prints the diff alone. Only the emitter knows its own output format, so the
@@ -1223,11 +1225,12 @@ Characters XML 1.0 forbids in a doc comment (most C0 controls) become U+FFFD.
 
 `check` reads a stale file back through `FlagKeys` (each constant's name and
 key) and the `_client.<Kind>Variation(FlagKeys.<Name>, …)` call in each main
-method (the kind). `IntVariation` and `DoubleVariation` both read back as
-`number`, so switching a flag's `codegen.number` changes the diff but not the
-summary line. A file whose `FlagKeys` holds anything besides doc comments,
-`#if` lines, attributes and `public const string` constants with a matching
-method gets the diff alone.
+method (the kind). `IntVariation` and `DoubleVariation` read back as a number
+flag with its type, so switching a flag's `codegen.number` shows in the
+summary line as `changed kind (<key>: number (int) → number (double))`. A
+file whose `FlagKeys` holds anything besides doc comments, `#if` lines,
+attributes and `public const string` constants with a matching method gets
+the diff alone.
 
 The compile fixture `fixtures/compile/dotnet/` builds every golden file with
 `TreatWarningsAsErrors`, `AnalysisLevel=latest-all`, `AnalysisMode=All`,

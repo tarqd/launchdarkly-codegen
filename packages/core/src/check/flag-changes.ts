@@ -4,7 +4,7 @@
  * back into `GeneratedFlag`s (`Emitter.summarizeChanges`); this compares them.
  */
 
-import type { FlagKind } from '../model.js';
+import type { Flag, FlagKind } from '../model.js';
 
 /** A flag as read back from generated text. */
 export interface GeneratedFlag {
@@ -12,6 +12,16 @@ export interface GeneratedFlag {
   /** The identifier the target emitted for the flag. */
   identifier: string;
   kind: FlagKind;
+  /**
+   * For a number flag, whether the target emitted it as an int or a double;
+   * left out by targets whose output doesn't tell them apart (ts-server).
+   */
+  numberType?: Flag['numberType'];
+}
+
+/** `number (int)` for a number flag whose number type the target read back, else the kind. */
+function kindLabel(flag: GeneratedFlag): string {
+  return flag.kind === 'number' && flag.numberType ? `number (${flag.numberType})` : flag.kind;
 }
 
 function part(count: number, label: string, items: string[]): string | undefined {
@@ -39,7 +49,8 @@ export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlag
     else if (!n) removed.push(key);
     else {
       if (o.identifier !== n.identifier) renamed.push(`${key}: ${o.identifier} → ${n.identifier}`);
-      if (o.kind !== n.kind) changedKind.push(`${key}: ${o.kind} → ${n.kind}`);
+      const [oldKind, newKind] = [kindLabel(o), kindLabel(n)];
+      if (oldKind !== newKind) changedKind.push(`${key}: ${oldKind} → ${newKind}`);
     }
   }
 

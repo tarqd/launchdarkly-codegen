@@ -18,14 +18,14 @@ describe('parseDotnetFlags', () => {
     expect(parseDotnetFlags(text)?.map((f) => `        public const string ${f.identifier} = "${f.key}";`)).toEqual(constants);
   });
 
-  it('reads every kind, int and double both as number', () => {
+  it('reads every kind, with the number type of a number flag', () => {
     expect(parseDotnetFlags(KINDS)).toEqual([
       { key: 'banner-ids', identifier: 'BannerIds', kind: 'json' },
       { key: 'checkout-config', identifier: 'CheckoutConfig', kind: 'json' },
       { key: 'checkout-v2', identifier: 'CheckoutV2', kind: 'boolean' },
-      { key: 'max-cart-items', identifier: 'MaxCartItems', kind: 'number' },
+      { key: 'max-cart-items', identifier: 'MaxCartItems', kind: 'number', numberType: 'int' },
       { key: 'pricing-tier', identifier: 'PricingTier', kind: 'string' },
-      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number' },
+      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number', numberType: 'double' },
     ]);
   });
 
@@ -67,6 +67,14 @@ describe('summarizeDotnetChanges', () => {
     expect(summarizeDotnetChanges(KINDS, next)).toBe(
       'flags: 1 added (promo-ids), 1 removed (banner-ids), 1 renamed (max-cart-items: MaxCartItems → CartLimit), 1 changed kind (checkout-config: json → string)',
     );
+  });
+
+  it('reports a number flag switching from int to double', () => {
+    const next = KINDS.replaceAll('int MaxCartItems', 'double MaxCartItems')
+      .replace('<int> MaxCartItemsDetail', '<double> MaxCartItemsDetail')
+      .replace('IntVariation(FlagKeys.MaxCartItems', 'DoubleVariation(FlagKeys.MaxCartItems')
+      .replace('IntVariationDetail(FlagKeys.MaxCartItems', 'DoubleVariationDetail(FlagKeys.MaxCartItems');
+    expect(summarizeDotnetChanges(KINDS, next)).toBe('flags: 1 changed kind (max-cart-items: number (int) → number (double))');
   });
 
   it('says so when no flag changed (for example a generator upgrade)', () => {

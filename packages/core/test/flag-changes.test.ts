@@ -29,6 +29,12 @@ describe('summarizeFlagChanges', () => {
     );
   });
 
+  it('reports a number flag switching between int and double', () => {
+    const before: GeneratedFlag[] = [{ key: 'max-items', identifier: 'MaxItems', kind: 'number', numberType: 'double' }];
+    const after: GeneratedFlag[] = [{ key: 'max-items', identifier: 'MaxItems', kind: 'number', numberType: 'int' }];
+    expect(summarizeFlagChanges(before, after)).toBe('flags: 1 changed kind (max-items: number (double) → number (int))');
+  });
+
   it('says so when no flag changed (for example a generator upgrade)', () => {
     expect(summarizeFlagChanges(flags, [...flags].reverse())).toBe('flags: no changes');
   });

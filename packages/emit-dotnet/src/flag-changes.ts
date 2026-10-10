@@ -4,15 +4,15 @@
  * parses text rather than trusting a Flag model.
  */
 
-import { summarizeFlagChanges, type FlagKind, type GeneratedFlag } from '@launchtarqly/core';
+import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
 import { IDENTIFIER as ID } from './identifier.js';
 
-const SDK_KINDS: Record<string, FlagKind> = {
-  Bool: 'boolean',
-  String: 'string',
-  Int: 'number',
-  Double: 'number',
-  Json: 'json',
+const SDK_KINDS: Record<string, Pick<GeneratedFlag, 'kind' | 'numberType'>> = {
+  Bool: { kind: 'boolean' },
+  String: { kind: 'string' },
+  Int: { kind: 'number', numberType: 'int' },
+  Double: { kind: 'number', numberType: 'double' },
+  Json: { kind: 'json' },
 };
 
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
@@ -31,15 +31,15 @@ function unquote(literal: string): string {
  * The flags in a dotnet file, in `FlagKeys` order (the identifier is the
  * `FlagKeys` constant, which is also the evaluation method's name), or
  * `undefined` when the file doesn't look like dotnet output. Tolerates doc
- * comments, `[Obsolete]` attributes and every flag kind (`int` and `double`
- * both read back as `number`); anything else unexpected in `FlagKeys` makes it
+ * comments, `[Obsolete]` attributes and every flag kind (a number flag keeps
+ * its `int` or `double` type); anything else unexpected in `FlagKeys` makes it
  * unparseable.
  */
 export function parseDotnetFlags(text: string): GeneratedFlag[] | undefined {
   const block = /\n[ \t]*public\s+static\s+class\s+FlagKeys\s*\{\r?\n([\s\S]*?)\r?\n[ \t]*\}/.exec(text);
   if (!block) return undefined;
 
-  const kinds = new Map<string, FlagKind>();
+  const kinds = new Map<string, Pick<GeneratedFlag, 'kind' | 'numberType'>>();
   for (const [, sdkKind, name] of text.matchAll(CALL)) kinds.set(name!, SDK_KINDS[sdkKind!]!);
 
   const flags: GeneratedFlag[] = [];
@@ -51,7 +51,7 @@ export function parseDotnetFlags(text: string): GeneratedFlag[] | undefined {
     const identifier = entry[1]!;
     const kind = kinds.get(identifier);
     if (!kind) return undefined;
-    flags.push({ key: unquote(entry[2]!), identifier, kind });
+    flags.push({ key: unquote(entry[2]!), identifier, ...kind });
   }
   return flags;
 }
