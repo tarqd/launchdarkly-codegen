@@ -999,10 +999,12 @@ public final class Flags {
 reads a `Flags.java` back into flags. Comments are dropped and whitespace is
 squeezed out of the code (kept only between two words), so every line break
 above reads the same as the one-line form. Each `Keys` constant gives the
-identifier (the CONSTANT_CASE name) and the key (its string literal). The
-kind is the return type of the primary method whose `client.xVariation` call
-reads that constant: `boolean`, `String`, `double`, `int` or `LDValue`, each
-only with its own SDK method. `int` and `double` are reported as separate
+key (its string literal). The primary method whose `client.xVariation` call
+reads that constant (`Keys.X`) gives the identifier, its name as for
+ts-server (the CONSTANT_CASE name is lossy: aliases `apiUrlId` and
+`apiURLId` both give `API_URL_ID`, so a rename between them must still show
+as `renamed`), and the kind, its return type: `boolean`, `String`, `double`,
+`int` or `LDValue`, each only with its own SDK method. `int` and `double` are reported as separate
 kinds, so switching `codegen.number` shows as `changed kind (k: double →
 int)`. A file with no `Keys` class, anything but string constants in it, or a
 constant no primary method reads gives no summary, and `check` prints the

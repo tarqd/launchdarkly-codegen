@@ -54,9 +54,11 @@ function unquote(literal: string): string {
 }
 
 /**
- * The flags in a java `Flags.java`, in `Keys` order: the identifier is the
- * `Keys` constant, the key its value, and the kind the return type of the
- * primary method that reads the constant (so `int` and `double` differ).
+ * The flags in a java `Flags.java`, in `Keys` order: the key is a `Keys`
+ * constant's value, and the identifier and kind are the name and return type
+ * of the primary method whose body reads that constant (`Keys.X`), so `int`
+ * and `double` differ. The method name, not the constant, is the identifier:
+ * aliases such as `apiUrlId` and `apiURLId` share the constant `API_URL_ID`.
  * `undefined` when the file doesn't look like java output: no `Keys` class,
  * anything but constants in it, or a constant no primary method reads.
  */
@@ -65,10 +67,10 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
   const keys = KEYS.exec(code);
   if (!keys) return undefined;
 
-  const kinds = new Map<string, JavaKindName>();
-  for (const [, type, , call, constant] of code.matchAll(METHOD)) {
+  const readers = new Map<string, { identifier: string; kind: JavaKindName }>();
+  for (const [, type, identifier, call, constant] of code.matchAll(METHOD)) {
     const java = BY_TYPE.get(type!);
-    if (java !== undefined && java.method === call) kinds.set(constant!, java.kind);
+    if (java !== undefined && java.method === call) readers.set(constant!, { identifier: identifier!, kind: java.kind });
   }
 
   const body = keys[1]!;
@@ -77,9 +79,9 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
     CONSTANT.lastIndex = at;
     const entry = CONSTANT.exec(body);
     if (!entry) return undefined;
-    const kind = kinds.get(entry[1]!);
-    if (!kind) return undefined;
-    flags.push({ key: unquote(entry[2]!), identifier: entry[1]!, kind });
+    const reader = readers.get(entry[1]!);
+    if (!reader) return undefined;
+    flags.push({ key: unquote(entry[2]!), ...reader });
   }
   return flags;
 }

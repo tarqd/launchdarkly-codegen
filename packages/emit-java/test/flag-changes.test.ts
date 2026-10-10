@@ -15,7 +15,7 @@ function snapshotFlags(name: string): GeneratedFlag[] {
   const names = flagNames(model);
   return model.flags.map((flag) => ({
     key: flag.key,
-    identifier: names.get(flag)!.constant,
+    identifier: names.get(flag)!.method,
     kind: flag.kind === 'number' ? (flag.numberType ?? 'double') : flag.kind,
   }));
 }
@@ -34,7 +34,7 @@ const FLAG_KINDS = readFileSync(join(GOLDEN, 'flag-kinds.java'), 'utf8');
 describe('parseJavaFlags on hand-edited files', () => {
   it('reads a key with escaped characters', () => {
     const text = FLAG_KINDS.replace('SAMPLE_RATE = "sample-rate";', 'SAMPLE_RATE = "say \\"hi\\" \\\\o/";');
-    expect(parseJavaFlags(text)?.at(-1)).toEqual({ key: 'say "hi" \\o/', identifier: 'SAMPLE_RATE', kind: 'double' });
+    expect(parseJavaFlags(text)?.at(-1)).toEqual({ key: 'say "hi" \\o/', identifier: 'sampleRate', kind: 'double' });
   });
 
   it('returns undefined for a file without Keys', () => {
@@ -69,13 +69,21 @@ describe('summarizeJavaChanges', () => {
         'public double maxCartItems(LDContext context, double fallback) {\n    return client.doubleVariation(',
       )
       // pricing-tier gets an alias.
+      .replaceAll('pricingTier', 'tier')
       .replaceAll('PRICING_TIER', 'TIER')
       // banner-ids is replaced by hero-ids.
       .replaceAll('BANNER_IDS', 'HERO_IDS')
       .replace('"banner-ids"', '"hero-ids"');
     expect(summarizeJavaChanges(FLAG_KINDS, next)).toBe(
-      'flags: 1 added (hero-ids), 1 removed (banner-ids), 1 renamed (pricing-tier: PRICING_TIER → TIER), 1 changed kind (max-cart-items: int → double)',
+      'flags: 1 added (hero-ids), 1 removed (banner-ids), 1 renamed (pricing-tier: pricingTier → tier), 1 changed kind (max-cart-items: int → double)',
     );
+  });
+
+  it('reports an alias rename that keeps the Keys constant', () => {
+    // apiUrlId and apiURLId both give the constant API_URL_ID.
+    const before = FLAG_KINDS.replaceAll('sampleRate', 'apiUrlId').replaceAll('SAMPLE_RATE', 'API_URL_ID');
+    const after = FLAG_KINDS.replaceAll('sampleRate', 'apiURLId').replaceAll('SAMPLE_RATE', 'API_URL_ID');
+    expect(summarizeJavaChanges(before, after)).toBe('flags: 1 renamed (sample-rate: apiUrlId → apiURLId)');
   });
 
   it('says so when no flag changed (for example a generator upgrade)', () => {

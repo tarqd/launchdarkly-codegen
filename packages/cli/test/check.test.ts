@@ -96,10 +96,11 @@ describe('check --from-snapshot', () => {
       const dir = await generatedProject(javaConfig);
       const path = join(dir, JAVA_OUT);
       // As if the committed file predates an alias for checkout-v2.
-      await writeFile(path, (await readFile(path, 'utf8')).replaceAll('CHECKOUT_V2', 'CHECKOUT_VERSION_2'));
+      const old = (await readFile(path, 'utf8')).replaceAll('checkoutV2', 'checkoutVersion2');
+      await writeFile(path, old.replaceAll('CHECKOUT_V2', 'CHECKOUT_VERSION_2'));
       const result = await runCli(['check', '--from-snapshot', snapshot], dir);
       expect(result.exitCode).toBe(1);
-      expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 renamed \(checkout-v2: CHECKOUT_VERSION_2 → CHECKOUT_V2\)\n$/);
+      expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 renamed \(checkout-v2: checkoutVersion2 → checkoutV2\)\n$/);
     });
 
     it('is left out for a hand-mangled Flags.java, but the diff is still printed', async () => {
