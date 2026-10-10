@@ -37,6 +37,12 @@ describe('Writer', () => {
     expect(w.toString()).toBe('  /** @deprecated a *\\/ b */\n');
   });
 
+  it('writes a preprocessor directive at column 0 whatever the indentation', () => {
+    const w = new Writer();
+    w.block('{', '}', () => w.directive('#if X').line('y').directive('#endif'));
+    expect(w.toString()).toBe('{\n#if X\n  y\n#endif\n}\n');
+  });
+
   it('uses the configured indent unit', () => {
     const w = new Writer({ indent: '\t' });
     w.block('{', '}', () => w.line('x'));

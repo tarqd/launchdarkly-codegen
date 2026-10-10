@@ -25,6 +25,9 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Two-factor auth
+        /// <para>Key starts with a digit, so ts-server needs an alias.</para>
+        /// <para>key: <c>2fa-enabled</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -45,6 +48,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout
+        /// <para>key: <c>checkout</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -65,6 +70,9 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout detail page
+        /// <para>Would collide with checkoutDetail() of flag checkout without its alias.</para>
+        /// <para>key: <c>checkout-detail</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-detail"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -85,6 +93,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Default theme
+        /// <para>key: <c>default</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/default"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -105,6 +115,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Search v3
+        /// <para>key: <c>search-v3</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/search-v3"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>

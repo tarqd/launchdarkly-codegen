@@ -25,6 +25,9 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout V2
+        /// <para>Routes eligible users to the rewritten checkout flow.</para>
+        /// <para>key: <c>checkout-v2</c> · tags: checkout, q3 · maintainer: ada@example.com</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-v2"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -45,6 +48,9 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Express pay
+        /// <para>One-click payment in the q3 checkout.</para>
+        /// <para>key: <c>express-pay</c> · tags: billing, checkout, q3 · maintainer: ada@example.com</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/express-pay"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>

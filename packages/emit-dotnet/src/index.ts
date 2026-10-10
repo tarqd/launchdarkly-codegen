@@ -75,6 +75,26 @@ function xmlText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Escapes text for a double-quoted XML attribute value in a doc comment. */
+function xmlAttribute(text: string): string {
+  return xmlText(text).replace(/"/g, '&quot;');
+}
+
+/**
+ * A `<para>` per paragraph of `text` (paragraphs are separated by blank lines),
+ * one doc-comment line per source line, trailing whitespace dropped.
+ */
+function paragraphs(text: string): string[] {
+  const lines: string[] = [];
+  for (const paragraph of text.trim().split(/(?:\r?\n[ \t]*){2,}/)) {
+    const body = paragraph.split(/\r?\n/).map((l) => xmlText(l.trimEnd()));
+    body[0] = `<para>${body[0]}`;
+    body[body.length - 1] += '</para>';
+    lines.push(...body);
+  }
+  return lines;
+}
+
 /** The SDK method prefix and C# type for a flag's kind; `codegen.number: int` picks `int` (ADR 0001). */
 function kindMethod(flag: Flag): { method: string; type: string } {
   switch (flag.kind) {
@@ -96,6 +116,45 @@ function braces(w: Writer, body: () => void): void {
   w.block('{', '}', body);
 }
 
+/**
+ * The `<summary>` body of a flag's main method (DESIGN.md → Doc comments):
+ * the name, then a `<para>` each for the description, the trailer and the UI link.
+ */
+function summaryLines(flag: Flag): string[] {
+  const lines = [xmlText(flag.name)];
+  if (flag.description.trim() !== '') lines.push(...paragraphs(flag.description));
+  const trailer = [`key: <c>${xmlText(flag.key)}</c>`];
+  if (flag.tags.length > 0) trailer.push(`tags: ${xmlText(flag.tags.join(', '))}`);
+  if (flag.maintainer) {
+    const maintainer = flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email;
+    trailer.push(`maintainer: ${xmlText(maintainer)}`);
+  }
+  lines.push(`<para>${trailer.join(' · ')}</para>`, `<para><see href="${xmlAttribute(flag.uiUrl)}"/></para>`);
+  return lines;
+}
+
+/** The deprecation message: the flag's own, else a generic one. No date, so output doesn't churn. */
+function deprecationText(flag: Flag): string | undefined {
+  if (!flag.deprecated) return undefined;
+  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
+}
+
+/**
+ * `[System.Obsolete]` for a deprecated flag's member: on .NET 5+ with the
+ * `LDFLAG001` diagnostic id and the flag's UI link, plain before (ADR 0003).
+ * `UrlFormat` is a format string, so its braces are doubled.
+ */
+function emitObsolete(w: Writer, flag: Flag): void {
+  const message = deprecationText(flag);
+  if (message === undefined) return;
+  const url = flag.uiUrl.replace(/\{/g, '{{').replace(/\}/g, '}}');
+  w.directive('#if NET5_0_OR_GREATER');
+  w.line(`[System.Obsolete(${csString(message)}, DiagnosticId = "LDFLAG001", UrlFormat = ${csString(url)})]`);
+  w.directive('#else');
+  w.line(`[System.Obsolete(${csString(message)})]`);
+  w.directive('#endif');
+}
+
 function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const { method, type } = kindMethod(flag);
   const title = xmlText(flag.name);
@@ -104,16 +163,20 @@ function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
     '/// <param name="fallback">The value to use if the flag can\'t be evaluated.</param>',
   ];
   w.line('/// <summary>');
-  w.line(`/// ${title}`);
+  for (const text of summaryLines(flag)) w.line(`/// ${text}`);
   w.line('/// </summary>');
+  const deprecation = deprecationText(flag);
+  if (deprecation !== undefined) w.line(`/// <remarks>Deprecated: ${xmlText(deprecation)}</remarks>`);
   for (const p of params) w.line(p);
   w.line('/// <returns>The flag\'s value for <paramref name="context"/>.</returns>');
+  emitObsolete(w, flag);
   w.line(`public ${type} ${name}(Context context, ${type} fallback)`);
   braces(w, () => w.line(`return _client.${method}(FlagKeys.${name}, context, fallback);`));
   w.line();
   w.line(`/// <summary>${title}, with the reason for the value. See <see cref="${name}"/>.</summary>`);
   for (const p of params) w.line(p);
   w.line('/// <returns>The flag\'s value and the reason it was chosen.</returns>');
+  emitObsolete(w, flag);
   w.line(`public EvaluationDetail<${type}> ${name}Detail(Context context, ${type} fallback)`);
   braces(w, () => w.line(`return _client.${method}Detail(FlagKeys.${name}, context, fallback);`));
 }
@@ -162,6 +225,7 @@ export const dotnetEmitter: Emitter = {
           if (i > 0) w.line();
           const name = names.get(flag)!;
           w.line(`/// <summary>Key of the flag behind <see cref="Flags.${name}"/>.</summary>`);
+          emitObsolete(w, flag);
           w.line(`public const string ${name} = ${csString(flag.key)};`);
         });
       });

@@ -25,6 +25,10 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout V2
+        /// <para>Routes eligible users to the rewritten checkout flow.</para>
+        /// <para>Matches paths like /cart/**/*.json */ and more.</para>
+        /// <para>key: <c>checkout-v2</c> · tags: checkout, q3 · maintainer: team Payments</para>
+        /// <para><see href="https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -45,10 +49,19 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Legacy cart
+        /// <para>The pre-2024 cart.</para>
+        /// <para>key: <c>legacy-cart</c> · tags: checkout · maintainer: ada@example.com</para>
+        /// <para><see href="https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart"/></para>
         /// </summary>
+        /// <remarks>Deprecated: The `legacy-cart` flag is deprecated.</remarks>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value for <paramref name="context"/>.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("The `legacy-cart` flag is deprecated.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart")]
+#else
+        [System.Obsolete("The `legacy-cart` flag is deprecated.")]
+#endif
         public bool LegacyCart(Context context, bool fallback)
         {
             return _client.BoolVariation(FlagKeys.LegacyCart, context, fallback);
@@ -58,6 +71,11 @@ namespace MyApp.FeatureFlags
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value and the reason it was chosen.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("The `legacy-cart` flag is deprecated.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart")]
+#else
+        [System.Obsolete("The `legacy-cart` flag is deprecated.")]
+#endif
         public EvaluationDetail<bool> LegacyCartDetail(Context context, bool fallback)
         {
             return _client.BoolVariationDetail(FlagKeys.LegacyCart, context, fallback);
@@ -65,10 +83,18 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Old search
+        /// <para>key: <c>old-search</c></para>
+        /// <para><see href="https://app.eu.launchdarkly.com/projects/storefront/flags/old-search"/></para>
         /// </summary>
+        /// <remarks>Deprecated: Use search-v2. Removal planned for Q4 */ 2026.</remarks>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value for <paramref name="context"/>.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/old-search")]
+#else
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.")]
+#endif
         public bool OldSearch(Context context, bool fallback)
         {
             return _client.BoolVariation(FlagKeys.OldSearch, context, fallback);
@@ -78,6 +104,11 @@ namespace MyApp.FeatureFlags
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value and the reason it was chosen.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/old-search")]
+#else
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.")]
+#endif
         public EvaluationDetail<bool> OldSearchDetail(Context context, bool fallback)
         {
             return _client.BoolVariationDetail(FlagKeys.OldSearch, context, fallback);
@@ -85,10 +116,19 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Promo banner
+        /// <para>Shows the seasonal promo banner.</para>
+        /// <para>key: <c>promo-banner</c> · tags: marketing</para>
+        /// <para><see href="https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner"/></para>
         /// </summary>
+        /// <remarks>Deprecated: Use the CMS banner slot.</remarks>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value for <paramref name="context"/>.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use the CMS banner slot.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner")]
+#else
+        [System.Obsolete("Use the CMS banner slot.")]
+#endif
         public bool PromoBanner(Context context, bool fallback)
         {
             return _client.BoolVariation(FlagKeys.PromoBanner, context, fallback);
@@ -98,6 +138,11 @@ namespace MyApp.FeatureFlags
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value and the reason it was chosen.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use the CMS banner slot.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner")]
+#else
+        [System.Obsolete("Use the CMS banner slot.")]
+#endif
         public EvaluationDetail<bool> PromoBannerDetail(Context context, bool fallback)
         {
             return _client.BoolVariationDetail(FlagKeys.PromoBanner, context, fallback);
@@ -113,12 +158,27 @@ namespace MyApp.FeatureFlags
         public const string CheckoutV2 = "checkout-v2";
 
         /// <summary>Key of the flag behind <see cref="Flags.LegacyCart"/>.</summary>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("The `legacy-cart` flag is deprecated.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart")]
+#else
+        [System.Obsolete("The `legacy-cart` flag is deprecated.")]
+#endif
         public const string LegacyCart = "legacy-cart";
 
         /// <summary>Key of the flag behind <see cref="Flags.OldSearch"/>.</summary>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/old-search")]
+#else
+        [System.Obsolete("Use search-v2. Removal planned for Q4 */ 2026.")]
+#endif
         public const string OldSearch = "old-search";
 
         /// <summary>Key of the flag behind <see cref="Flags.PromoBanner"/>.</summary>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use the CMS banner slot.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner")]
+#else
+        [System.Obsolete("Use the CMS banner slot.")]
+#endif
         public const string PromoBanner = "promo-banner";
     }
 }

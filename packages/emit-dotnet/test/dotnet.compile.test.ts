@@ -10,6 +10,11 @@
  *   analyzers that skip generated code run on it too;
  * - `dotnet format --verify-no-changes --include-generated` changes nothing.
  *
+ * The consumer reads deprecated members inside `#pragma warning disable
+ * LDFLAG001, CS0618`. Without it, each one is an error: LDFLAG001 with the
+ * flag's UI link on `modern`, CS0618 on `legacy` (ADR 0003). The generated
+ * file's deprecated members reference each other without a warning.
+ *
  * Needs the .NET 8 SDK on the PATH. Run with `pnpm test:compile -t dotnet`.
  */
 import { execFile } from 'node:child_process';
@@ -35,22 +40,47 @@ const FALLBACKS: Record<string, string> = {
   LdValue: 'LdValue.Null',
 };
 
+/** A member is deprecated when its signature follows the `#if` / `#else` / `#endif` `[Obsolete]` pair. */
+const OBSOLETE = '(#endif\\n)?';
+
 /**
  * C# that calls every flag method, `Detail` method and `FlagKeys` constant in
- * `generated`, read back from its signatures.
+ * `generated`, read back from its signatures. The deprecated ones are read
+ * inside `#pragma warning disable LDFLAG001, CS0618`, unless `suppress` is false.
  */
-function consumerFor(generated: string): string {
+function consumerFor(generated: string, { suppress = true } = {}): string {
   const namespace = /^namespace (\S+)$/m.exec(generated)?.[1];
-  const methods = [...generated.matchAll(/^ {8}public (\S+) (\w+)\(Context context, (\w+) fallback\)$/gm)];
-  const keys = [...generated.matchAll(/^ {8}public const string (\w+) = /gm)].map((m) => m[1]!);
+  const methods = [
+    ...generated.matchAll(new RegExp(`^${OBSOLETE} {8}public (\\S+) (\\w+)\\(Context context, (\\w+) fallback\\)$`, 'gm')),
+  ];
+  const keys = [...generated.matchAll(new RegExp(`^${OBSOLETE} {8}public const string (\\w+) = `, 'gm'))];
   if (!namespace || methods.length === 0 || methods.length !== keys.length * 2) {
     throw new Error('cannot read the generated members back');
   }
-  const locals = methods.map(([, type, name, fallbackType], i) => {
-    const value = `flags.${name}(context, ${FALLBACKS[fallbackType!]!})`;
-    return { declaration: `${type} v${i} = ${value};`, use: type!.startsWith('EvaluationDetail<') ? `v${i}.Value` : `v${i}` };
-  });
-  const uses = [...locals.map((l) => l.use), ...keys.map((k) => `FlagKeys.${k}`)];
+  const locals = [
+    ...methods.map(([, obsolete, type, name, fallbackType], i) => ({
+      deprecated: obsolete !== undefined,
+      declaration: `${type} v${i} = flags.${name}(context, ${FALLBACKS[fallbackType!]!});`,
+      use: type!.startsWith('EvaluationDetail<') ? `v${i}.Value` : `v${i}`,
+    })),
+    ...keys.map(([, obsolete, name], i) => ({
+      deprecated: obsolete !== undefined,
+      declaration: `string k${i} = FlagKeys.${name};`,
+      use: `k${i}`,
+    })),
+  ];
+  const current = locals.filter((l) => !l.deprecated).map((l) => l.declaration);
+  const deprecated = locals.filter((l) => l.deprecated).map((l) => l.declaration);
+  const statements =
+    suppress && deprecated.length > 0
+      ? [
+          ...current,
+          '#pragma warning disable LDFLAG001, CS0618 // calls a deprecated flag on purpose',
+          ...deprecated,
+          '#pragma warning restore LDFLAG001, CS0618',
+        ]
+      : [...current, ...deprecated];
+  const uses = locals.map((l) => l.use);
   return `namespace Consumer
 {
     using LaunchDarkly.Sdk;
@@ -67,7 +97,7 @@ function consumerFor(generated: string): string {
         {
             var flags = new Flags(client);
             var context = Context.New("user-key");
-${locals.map((l) => `            ${l.declaration}\n`).join('')}            return string.Join(",", ${uses.join(', ')});
+${statements.map((s) => (s.startsWith('#') ? `${s}\n` : `            ${s}\n`)).join('')}            return string.Join(",", ${uses.join(', ')});
         }
     }
 }
@@ -108,5 +138,24 @@ describe('dotnet golden output compiles against LaunchDarkly.ServerSdk 8.x', () 
     const format = await run(['format', MODERN, '--verify-no-changes', '--include-generated', '--no-restore']);
     expect(format.output, 'dotnet format').toBe('');
     expect(format.ok).toBe(true);
+  });
+
+  const deprecating = goldens.filter((file) => file === 'doc-comments.g.cs');
+
+  it.each(deprecating)('%s: calling a deprecated flag unsuppressed is LDFLAG001 on net5+ and CS0618 before', async (file) => {
+    const generated = await readFile(join(GOLDEN_DIR, file), 'utf8');
+    expect(generated).toContain('[System.Obsolete(');
+    await writeFile(join(FIXTURE_DIR, 'Flags.g.cs'), generated);
+    await writeFile(join(FIXTURE_DIR, 'Consumer.cs'), consumerFor(generated, { suppress: false }));
+
+    const modern = await build(MODERN);
+    expect(modern).toMatch(/Consumer\.cs.*error LDFLAG001: .* is obsolete: .* \(https:\/\/\S+\/flags\/[\w.-]+\)/);
+    expect(modern).not.toContain('CS0618');
+    expect(modern, 'the generated file itself raises nothing').not.toMatch(/Flags\.g\.cs.*(?:error|warning)/);
+
+    const legacy = await build(LEGACY);
+    expect(legacy).toMatch(/Consumer\.cs.*error CS0618/);
+    expect(legacy).not.toContain('LDFLAG001');
+    expect(legacy, 'the generated file itself raises nothing').not.toMatch(/Flags\.g\.cs.*(?:error|warning)/);
   });
 });

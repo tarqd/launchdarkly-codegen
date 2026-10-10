@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FlagModel } from '@launchtarqly/core';
+import type { Flag, FlagModel } from '@launchtarqly/core';
 import { dotnetEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
@@ -42,6 +42,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout V2
+        /// <para>key: <c>checkout-v2</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-v2"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -62,6 +64,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// dark_mode
+        /// <para>key: <c>dark_mode</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/dark_mode"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -115,5 +119,176 @@ namespace MyApp.FeatureFlags
             return _client.${method}Detail(FlagKeys.MyFlag, context, fallback);
         }
 `);
+  });
+});
+
+/** The generated text of a one-flag model. */
+function emitOne(flag: Flag): string {
+  const [file] = dotnetEmitter.emit({ projectKey: 'my-project', flags: [flag] }, cfg, ctx);
+  return file!.contents;
+}
+
+const PARAMS = `        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+`;
+
+describe('dotnet doc comments', () => {
+  it('documents the main method with the name, description, trailer and UI link', () => {
+    const contents = emitOne(
+      modelFlag('checkout-v2', {
+        name: 'Checkout V2',
+        description: 'Routes eligible users to the rewritten checkout flow.',
+        tags: ['checkout', 'q3'],
+        maintainer: { kind: 'member', email: 'ada@example.com', name: 'Ada Lovelace' },
+      }),
+    );
+    expect(contents).toContain(`        /// <summary>
+        /// Checkout V2
+        /// <para>Routes eligible users to the rewritten checkout flow.</para>
+        /// <para>key: <c>checkout-v2</c> · tags: checkout, q3 · maintainer: ada@example.com</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-v2"/></para>
+        /// </summary>
+${PARAMS}        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+        public bool CheckoutV2(Context context, bool fallback)
+`);
+  });
+
+  it('shows a team maintainer as `team <name>` and leaves out a missing description', () => {
+    const contents = emitOne(
+      modelFlag('pricing-tier', {
+        name: 'Pricing Tier',
+        maintainer: { kind: 'team', key: 'payments', name: 'Payments' },
+      }),
+    );
+    expect(contents).toContain(`        /// <summary>
+        /// Pricing Tier
+        /// <para>key: <c>pricing-tier</c> · maintainer: team Payments</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/pricing-tier"/></para>
+        /// </summary>
+`);
+  });
+
+  it('gives each paragraph of a multi-paragraph description its own <para>', () => {
+    const contents = emitOne(
+      modelFlag('checkout-v2', {
+        name: 'Checkout V2',
+        description: 'Routes eligible users\r\nto the new flow.\n\n\nMatches paths like /cart/**.  \n',
+      }),
+    );
+    expect(contents).toContain(`        /// Checkout V2
+        /// <para>Routes eligible users
+        /// to the new flow.</para>
+        /// <para>Matches paths like /cart/**.</para>
+        /// <para>key: <c>checkout-v2</c></para>
+`);
+  });
+
+  it('documents the Detail method and key constant in one line pointing at the main method', () => {
+    const contents = emitOne(
+      modelFlag('checkout-v2', { name: 'Checkout V2', description: 'Routes eligible users to the rewritten checkout flow.' }),
+    );
+    expect(contents).toContain(`        /// <summary>Checkout V2, with the reason for the value. See <see cref="CheckoutV2"/>.</summary>
+${PARAMS}        /// <returns>The flag's value and the reason it was chosen.</returns>
+        public EvaluationDetail<bool> CheckoutV2Detail(`);
+    expect(contents).toContain(`        /// <summary>Key of the flag behind <see cref="Flags.CheckoutV2"/>.</summary>
+        public const string CheckoutV2 = "checkout-v2";`);
+    expect(contents.match(/Routes eligible users/g)).toHaveLength(1);
+  });
+
+  it.each([
+    ['&', '&amp;'],
+    ['<', '&lt;'],
+    ['>', '&gt;'],
+  ])('escapes %s in the name, description, tags and maintainer', (raw, escaped) => {
+    const contents = emitOne(
+      modelFlag('cart', {
+        name: `Cart ${raw} Checkout`,
+        description: `Caps items ${raw} totals.`,
+        tags: [`a${raw}b`],
+        maintainer: { kind: 'team', key: 'pay', name: `Pay${raw}Ops` },
+      }),
+    );
+    expect(contents).toContain(`        /// Cart ${escaped} Checkout
+        /// <para>Caps items ${escaped} totals.</para>
+        /// <para>key: <c>cart</c> · tags: a${escaped}b · maintainer: team Pay${escaped}Ops</para>
+`);
+    expect(contents).toContain(`/// <summary>Cart ${escaped} Checkout, with the reason for the value.`);
+  });
+
+  it.each([
+    ['&', '&amp;'],
+    ['<', '&lt;'],
+    ['>', '&gt;'],
+    ['"', '&quot;'],
+  ])('escapes %s in the UI link href', (raw, escaped) => {
+    const contents = emitOne(modelFlag('cart', { uiUrl: `https://ld.example/flags/cart?a=1${raw}b=2` }));
+    expect(contents).toContain(`        /// <para><see href="https://ld.example/flags/cart?a=1${escaped}b=2"/></para>\n`);
+  });
+});
+
+describe('dotnet deprecation', () => {
+  const OBSOLETE = `#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
+        [System.Obsolete("Use cart-limits instead.")]
+#endif
+`;
+  const maxCartItems = modelFlag('max-cart-items', {
+    name: 'Max Cart Items',
+    kind: 'number',
+    numberType: 'double',
+    deprecated: true,
+    deprecationMessage: 'Use cart-limits instead.',
+  });
+
+  it('adds a Deprecated remark and [System.Obsolete] to the main method', () => {
+    expect(emitOne(maxCartItems)).toContain(`        /// </summary>
+        /// <remarks>Deprecated: Use cart-limits instead.</remarks>
+${PARAMS}        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+${OBSOLETE}        public double MaxCartItems(Context context, double fallback)
+`);
+  });
+
+  it('marks the Detail method and the key constant obsolete without the remark', () => {
+    const contents = emitOne(maxCartItems);
+    expect(contents).toContain(`        /// <returns>The flag's value and the reason it was chosen.</returns>
+${OBSOLETE}        public EvaluationDetail<double> MaxCartItemsDetail(Context context, double fallback)
+`);
+    expect(contents).toContain(`        /// <summary>Key of the flag behind <see cref="Flags.MaxCartItems"/>.</summary>
+${OBSOLETE}        public const string MaxCartItems = "max-cart-items";
+`);
+    expect(contents.match(/<remarks>/g)).toHaveLength(1);
+    expect(contents.match(/^#if NET5_0_OR_GREATER$/gm)).toHaveLength(3);
+  });
+
+  it('uses a generic message naming the flag when there is no deprecation message', () => {
+    const contents = emitOne(modelFlag('legacy-cart', { deprecated: true }));
+    expect(contents).toContain('/// <remarks>Deprecated: The `legacy-cart` flag is deprecated.</remarks>\n');
+    expect(contents).toContain(
+      '[System.Obsolete("The `legacy-cart` flag is deprecated.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/legacy-cart")]\n',
+    );
+    expect(contents).toContain('[System.Obsolete("The `legacy-cart` flag is deprecated.")]\n');
+  });
+
+  it('doubles braces in UrlFormat and escapes the strings for C# and the remark for XML', () => {
+    const contents = emitOne(
+      modelFlag('cart', {
+        deprecated: true,
+        deprecationMessage: 'Use "cart-v2" & {not} C:\\old <cart>.',
+        uiUrl: 'https://ld.example/{env}/flags/cart',
+      }),
+    );
+    expect(contents).toContain('/// <remarks>Deprecated: Use "cart-v2" &amp; {not} C:\\old &lt;cart&gt;.</remarks>\n');
+    expect(contents).toContain(
+      '[System.Obsolete("Use \\"cart-v2\\" & {not} C:\\\\old <cart>.", DiagnosticId = "LDFLAG001", UrlFormat = "https://ld.example/{{env}}/flags/cart")]\n',
+    );
+    expect(contents).toContain('[System.Obsolete("Use \\"cart-v2\\" & {not} C:\\\\old <cart>.")]\n');
+  });
+
+  it('leaves flags that are not deprecated unannotated', () => {
+    const contents = emitOne(modelFlag('checkout-v2'));
+    expect(contents).not.toContain('<remarks>');
+    expect(contents).not.toContain('Obsolete');
+    expect(contents).not.toContain('#if');
   });
 });

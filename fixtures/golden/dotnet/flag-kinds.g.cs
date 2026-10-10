@@ -25,6 +25,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Banner ids
+        /// <para>key: <c>banner-ids</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/banner-ids"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -45,6 +47,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout config
+        /// <para>key: <c>checkout-config</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-config"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -65,6 +69,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Checkout V2
+        /// <para>key: <c>checkout-v2</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-v2"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -85,6 +91,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Max cart items
+        /// <para>key: <c>max-cart-items</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/max-cart-items"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -105,6 +113,9 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Pricing tier
+        /// <para>Which pricing tier a customer sees.</para>
+        /// <para>key: <c>pricing-tier</c> · tags: billing</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/pricing-tier"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
@@ -125,6 +136,8 @@ namespace MyApp.FeatureFlags
 
         /// <summary>
         /// Sample rate
+        /// <para>key: <c>sample-rate</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/sample-rate"/></para>
         /// </summary>
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
