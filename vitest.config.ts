@@ -7,6 +7,6 @@ export default defineConfig({
   ssr: { resolve: { conditions: ['source'] } },
   test: {
     include: ['packages/*/test/**/*.test.ts'],
-    exclude: ['**/*.compile.test.ts', '**/node_modules/**'],
+    exclude: ['**/*.compile.test.ts', '**/*.smoke.test.ts', '**/node_modules/**'],
   },
 });

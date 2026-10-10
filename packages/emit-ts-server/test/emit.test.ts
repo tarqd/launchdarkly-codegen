@@ -87,6 +87,75 @@ export const FlagKeys = {
     ]);
   });
 
+  it('emits typed methods for string, number and json flags', () => {
+    const model: FlagModel = {
+      projectKey: 'my-project',
+      flags: [
+        { ...boolFlag('checkout-config'), kind: 'json' },
+        { ...boolFlag('max-items'), kind: 'number', numberType: 'int' },
+        { ...boolFlag('pricing-tier'), kind: 'string' },
+      ],
+    };
+    const [file] = tsServerEmitter.emit(model, cfg, ctx);
+    expect(file?.contents).toContain(`  /**
+   * checkout-config
+   *
+   * key: \`checkout-config\`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+   */
+  checkoutConfig(context: LDContext, fallback: unknown): Promise<unknown> {
+    return this.client.jsonVariation('checkout-config', context, fallback);
+  }
+  /**
+   * checkout-config
+   *
+   * key: \`checkout-config\`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+   */
+  checkoutConfigDetail(context: LDContext, fallback: unknown): Promise<LDEvaluationDetailTyped<unknown>> {
+    return this.client.jsonVariationDetail('checkout-config', context, fallback);
+  }
+
+  /**
+   * max-items
+   *
+   * key: \`max-items\`
+   * https://app.launchdarkly.com/projects/my-project/flags/max-items
+   */
+  maxItems(context: LDContext, fallback: number): Promise<number> {
+    return this.client.numberVariation('max-items', context, fallback);
+  }
+  /**
+   * max-items
+   *
+   * key: \`max-items\`
+   * https://app.launchdarkly.com/projects/my-project/flags/max-items
+   */
+  maxItemsDetail(context: LDContext, fallback: number): Promise<LDEvaluationDetailTyped<number>> {
+    return this.client.numberVariationDetail('max-items', context, fallback);
+  }
+
+  /**
+   * pricing-tier
+   *
+   * key: \`pricing-tier\`
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+   */
+  pricingTier(context: LDContext, fallback: string): Promise<string> {
+    return this.client.stringVariation('pricing-tier', context, fallback);
+  }
+  /**
+   * pricing-tier
+   *
+   * key: \`pricing-tier\`
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+   */
+  pricingTierDetail(context: LDContext, fallback: string): Promise<LDEvaluationDetailTyped<string>> {
+    return this.client.stringVariationDetail('pricing-tier', context, fallback);
+  }
+`);
+  });
+
   it('rejects an SDK major it does not support', () => {
     const model: FlagModel = { projectKey: 'my-project', flags: [] };
     expect(() => tsServerEmitter.emit(model, { ...cfg, sdkMajor: 8 }, ctx)).toThrow(

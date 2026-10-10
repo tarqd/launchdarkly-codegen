@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalize, type ApiFlag, type Snapshot } from '../src/index.js';
+import { CodegenError, normalize, type ApiFlag, type Snapshot } from '../src/index.js';
 
 function boolFlag(key: string, extra: Partial<ApiFlag> = {}): ApiFlag {
   return {
@@ -151,5 +151,104 @@ describe('normalize', () => {
       expect(flag?.deprecated).toBe(false);
       expect(flag).not.toHaveProperty('deprecationMessage');
     });
+  });
+});
+
+function mvFlag(key: string, values: unknown[], extra: Partial<ApiFlag> = {}): ApiFlag {
+  return { ...boolFlag(key), kind: 'multivariate', variations: values.map((value) => ({ value })), ...extra };
+}
+
+function numberProp(value: string[]): NonNullable<ApiFlag['customProperties']> {
+  return { 'codegen.number': { name: 'codegen.number', value } };
+}
+
+describe('normalize: flag kind', () => {
+  it('infers string for a multivariate flag with only string values', () => {
+    const [flag] = normalize(snapshot([mvFlag('tier', ['free', 'pro'])])).flags;
+    expect(flag?.kind).toBe('string');
+  });
+
+  it('infers number for a multivariate flag with only number values', () => {
+    const [flag] = normalize(snapshot([mvFlag('limit', [1, 2.5, -3])])).flags;
+    expect(flag?.kind).toBe('number');
+  });
+
+  it('infers json for objects, arrays and null without a warning', () => {
+    const warnings: string[] = [];
+    const model = normalize(
+      snapshot([mvFlag('obj', [{ a: 1 }, { b: [2] }]), mvFlag('arr', [[1], ['x']]), mvFlag('nul', [null, {}])]),
+      { warn: (m) => warnings.push(m) },
+    );
+    expect(model.flags.map((f) => [f.key, f.kind])).toEqual([
+      ['arr', 'json'],
+      ['nul', 'json'],
+      ['obj', 'json'],
+    ]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('infers json for mixed primitive values and warns naming the flag', () => {
+    const warnings: string[] = [];
+    const model = normalize(snapshot([mvFlag('mixed', ['a', 1])]), { warn: (m) => warnings.push(m) });
+    expect(model.flags[0]?.kind).toBe('json');
+    expect(warnings).toEqual(['flag mixed: variations mix value types (string, number); treating it as json']);
+  });
+
+  it('gives number flags numberType double by default and other kinds none', () => {
+    const model = normalize(snapshot([mvFlag('limit', [1, 2]), mvFlag('tier', ['a', 'b'])]));
+    expect(model.flags.map((f) => [f.key, f.numberType])).toEqual([
+      ['limit', 'double'],
+      ['tier', undefined],
+    ]);
+    expect(model.flags[1]).not.toHaveProperty('numberType');
+  });
+
+  it('sets numberType int from codegen.number: int', () => {
+    const [flag] = normalize(
+      snapshot([mvFlag('limit', [0, -2147483648, 2147483647], { customProperties: numberProp(['int']) })]),
+    ).flags;
+    expect(flag?.numberType).toBe('int');
+  });
+
+  it('treats an empty codegen.number as unset', () => {
+    const [flag] = normalize(snapshot([mvFlag('limit', [1.5], { customProperties: numberProp([]) })])).flags;
+    expect(flag?.numberType).toBe('double');
+  });
+
+  it.each([
+    [1.5, '1.5'],
+    [2147483648, '2147483648'],
+    [-2147483649, '-2147483649'],
+  ])('fails codegen.number: int when a variation is %s, naming the flag and value', (value, shown) => {
+    const flag = mvFlag('limit', [1, value], { customProperties: numberProp(['int']) });
+    expect(() => normalize(snapshot([flag]))).toThrow(
+      new CodegenError(`flag limit: codegen.number is int but variation value ${shown} is not a 32-bit integer`),
+    );
+  });
+
+  it('fails codegen.number with more than one value, naming the flag and property', () => {
+    const flag = mvFlag('limit', [1], { customProperties: numberProp(['int', 'double']) });
+    expect(() => normalize(snapshot([flag]))).toThrow(
+      new CodegenError('flag limit: custom property codegen.number must have exactly one value, got 2'),
+    );
+  });
+
+  it('fails codegen.number with a value other than int', () => {
+    const flag = mvFlag('limit', [1], { customProperties: numberProp(['long']) });
+    expect(() => normalize(snapshot([flag]))).toThrow(
+      new CodegenError('flag limit: custom property codegen.number must be "int", got "long"'),
+    );
+  });
+
+  it('keeps boolean flags boolean', () => {
+    const [flag] = normalize(snapshot([boolFlag('on')])).flags;
+    expect(flag?.kind).toBe('boolean');
+  });
+
+  it('fails a boolean flag with a non-boolean value, naming the flag', () => {
+    const bad = boolFlag('bad-bool', { variations: [{ value: true }, { value: 'no' }] });
+    expect(() => normalize(snapshot([bad]))).toThrow(
+      new CodegenError('flag bad-bool: boolean flag has a non-boolean variation value "no"'),
+    );
   });
 });

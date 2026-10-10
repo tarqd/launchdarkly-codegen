@@ -10,6 +10,7 @@ import {
   Writer,
   type Emitter,
   type Flag,
+  type FlagKind,
 } from '@launchtarqly/core';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';
@@ -43,20 +44,29 @@ function deprecationText(flag: Flag): string | undefined {
   return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
 }
 
+/** The SDK method prefix and TypeScript type for each Flag kind. */
+const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = {
+  boolean: { method: 'boolVariation', type: 'boolean' },
+  string: { method: 'stringVariation', type: 'string' },
+  number: { method: 'numberVariation', type: 'number' },
+  json: { method: 'jsonVariation', type: 'unknown' },
+};
+
 function emitFlagMethods(w: Writer, flag: Flag): void {
   const name = lowerCamel(flag.key);
   const key = tsString(flag.key);
+  const { method, type } = KIND_METHODS[flag.kind];
   const doc = docLines(flag);
   w.docComment(doc);
-  w.block(`${name}(context: LDContext, fallback: boolean): Promise<boolean> {`, '}', () => {
-    w.line(`return this.client.boolVariation(${key}, context, fallback);`);
+  w.block(`${name}(context: LDContext, fallback: ${type}): Promise<${type}> {`, '}', () => {
+    w.line(`return this.client.${method}(${key}, context, fallback);`);
   });
   w.docComment(doc);
   w.block(
-    `${name}Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {`,
+    `${name}Detail(context: LDContext, fallback: ${type}): Promise<LDEvaluationDetailTyped<${type}>> {`,
     '}',
     () => {
-      w.line(`return this.client.boolVariationDetail(${key}, context, fallback);`);
+      w.line(`return this.client.${method}Detail(${key}, context, fallback);`);
     },
   );
 }

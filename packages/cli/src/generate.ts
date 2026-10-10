@@ -5,13 +5,13 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { normalize, type GeneratedFile, type Snapshot } from '@launchtarqly/core';
+import { normalize, type GeneratedFile, type NormalizeOptions, type Snapshot } from '@launchtarqly/core';
 import type { Config } from './config.js';
 import { emitterFor } from './emitters.js';
 import { GENERATOR_VERSION } from './version.js';
 
-export function generateFiles(config: Config, snapshot: Snapshot): GeneratedFile[] {
-  const model = normalize(snapshot);
+export function generateFiles(config: Config, snapshot: Snapshot, options: NormalizeOptions = {}): GeneratedFile[] {
+  const model = normalize(snapshot, options);
   const ctx = { generatorVersion: GENERATOR_VERSION };
   return config.targets.flatMap((target) => emitterFor(target.id).emit(model, target, ctx));
 }
