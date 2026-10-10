@@ -3,5 +3,8 @@ export * from './model.js';
 export * from './snapshot.js';
 export * from './normalize.js';
 export * from './naming.js';
+export * from './properties.js';
+export * from './aliases.js';
+export * from './identifiers.js';
 export * from './writer.js';
 export * from './emitter.js';
