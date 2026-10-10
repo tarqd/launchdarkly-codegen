@@ -3,7 +3,14 @@
  * (DESIGN.md → Generated code by target → ts-server).
  */
 
-import { CodegenError, lowerCamel, Writer, type Emitter, type Flag } from '@launchtarqly/core';
+import {
+  CodegenError,
+  escapeBlockCommentEnd,
+  lowerCamel,
+  Writer,
+  type Emitter,
+  type Flag,
+} from '@launchtarqly/core';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';
 const SUPPORTED_SDK_MAJORS = [9];
@@ -13,12 +20,38 @@ function tsString(value: string): string {
   return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
+/** The doc-comment lines for a flag's methods (DESIGN.md → Doc comments). */
+function docLines(flag: Flag): string[] {
+  const lines = [flag.name, ''];
+  if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
+  const trailer = [`key: \`${flag.key}\``];
+  if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
+  if (flag.maintainer) {
+    trailer.push(
+      `maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`,
+    );
+  }
+  lines.push(trailer.join(' · '), flag.uiUrl);
+  const deprecation = deprecationText(flag);
+  if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
+  return lines;
+}
+
+/** The `@deprecated` text: the flag's message, else a generic one. No date, so output doesn't churn. */
+function deprecationText(flag: Flag): string | undefined {
+  if (!flag.deprecated) return undefined;
+  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
+}
+
 function emitFlagMethods(w: Writer, flag: Flag): void {
   const name = lowerCamel(flag.key);
   const key = tsString(flag.key);
+  const doc = docLines(flag);
+  w.docComment(doc);
   w.block(`${name}(context: LDContext, fallback: boolean): Promise<boolean> {`, '}', () => {
     w.line(`return this.client.boolVariation(${key}, context, fallback);`);
   });
+  w.docComment(doc);
   w.block(
     `${name}Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {`,
     '}',
@@ -51,6 +84,8 @@ export const tsServerEmitter: Emitter = {
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
+        const deprecation = deprecationText(flag);
+        if (deprecation !== undefined) w.line(`/** @deprecated ${escapeBlockCommentEnd(deprecation)} */`);
         w.line(`${lowerCamel(flag.key)}: ${tsString(flag.key)},`);
       }
     });

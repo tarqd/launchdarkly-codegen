@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CodegenError, type Flag, type FlagModel } from '@launchtarqly/core';
 import { tsServerEmitter } from '../src/index.js';
 
-function boolFlag(key: string): Flag {
+function boolFlag(key: string, extra: Partial<Flag> = {}): Flag {
   return {
     key,
     name: key,
@@ -14,6 +14,7 @@ function boolFlag(key: string): Flag {
     archived: false,
     aliases: {},
     uiUrl: `https://app.launchdarkly.com/projects/my-project/flags/${key}`,
+    ...extra,
   };
 }
 
@@ -38,16 +39,40 @@ import type { LDClient, LDContext, LDEvaluationDetailTyped } from '@launchdarkly
 export class Flags {
   constructor(private readonly client: LDClient) {}
 
+  /**
+   * checkout-v2
+   *
+   * key: \`checkout-v2\`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
   checkoutV2(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('checkout-v2', context, fallback);
   }
+  /**
+   * checkout-v2
+   *
+   * key: \`checkout-v2\`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
   checkoutV2Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('checkout-v2', context, fallback);
   }
 
+  /**
+   * dark_mode
+   *
+   * key: \`dark_mode\`
+   * https://app.launchdarkly.com/projects/my-project/flags/dark_mode
+   */
   darkMode(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('dark_mode', context, fallback);
   }
+  /**
+   * dark_mode
+   *
+   * key: \`dark_mode\`
+   * https://app.launchdarkly.com/projects/my-project/flags/dark_mode
+   */
   darkModeDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('dark_mode', context, fallback);
   }
@@ -67,5 +92,130 @@ export const FlagKeys = {
     expect(() => tsServerEmitter.emit(model, { ...cfg, sdkMajor: 8 }, ctx)).toThrow(
       new CodegenError('target ts-server: unsupported sdkMajor 8 (supported: 9)'),
     );
+  });
+
+  describe('doc comments', () => {
+    /** The Flags class body for one flag, without the file header and FlagKeys. */
+    function classBody(flag: Flag): string {
+      const [file] = tsServerEmitter.emit({ projectKey: 'my-project', flags: [flag] }, cfg, ctx);
+      const text = file!.contents;
+      return text.slice(text.indexOf('  constructor'), text.indexOf('}\n\nexport const FlagKeys'));
+    }
+
+    it('documents each method with name, description, key, tags, maintainer and UI link', () => {
+      const flag = boolFlag('checkout-v2', {
+        name: 'Checkout V2',
+        description: 'Routes eligible users to the rewritten checkout flow.',
+        tags: ['checkout', 'q3'],
+        maintainer: { kind: 'member', email: 'ada@example.com', name: 'Ada Lovelace' },
+      });
+      expect(classBody(flag)).toBe(`  constructor(private readonly client: LDClient) {}
+
+  /**
+   * Checkout V2
+   *
+   * Routes eligible users to the rewritten checkout flow.
+   *
+   * key: \`checkout-v2\` · tags: checkout, q3 · maintainer: ada@example.com
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
+  checkoutV2(context: LDContext, fallback: boolean): Promise<boolean> {
+    return this.client.boolVariation('checkout-v2', context, fallback);
+  }
+  /**
+   * Checkout V2
+   *
+   * Routes eligible users to the rewritten checkout flow.
+   *
+   * key: \`checkout-v2\` · tags: checkout, q3 · maintainer: ada@example.com
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
+  checkoutV2Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
+    return this.client.boolVariationDetail('checkout-v2', context, fallback);
+  }
+`);
+    });
+
+    /** The first doc comment in the file (the flag's main method). */
+    function firstDoc(flag: Flag): string {
+      const [file] = tsServerEmitter.emit({ projectKey: 'my-project', flags: [flag] }, cfg, ctx);
+      const text = file!.contents;
+      const start = text.indexOf('  /**');
+      return text.slice(start, text.indexOf('*/\n', start) + 3);
+    }
+
+    it('shows a team maintainer as "team <name>"', () => {
+      const flag = boolFlag('checkout-v2', { maintainer: { kind: 'team', key: 'payments', name: 'Payments' } });
+      expect(firstDoc(flag)).toContain(' * key: `checkout-v2` · maintainer: team Payments\n');
+    });
+
+    it('escapes */ in the name and description', () => {
+      const flag = boolFlag('a', { name: 'Glob */ name', description: 'Matches src/**/*.ts */ and more' });
+      expect(firstDoc(flag)).toBe(`  /**
+   * Glob *\\/ name
+   *
+   * Matches src/**\\/*.ts *\\/ and more
+   *
+   * key: \`a\`
+   * https://app.launchdarkly.com/projects/my-project/flags/a
+   */
+`);
+    });
+
+    it('writes each line of a multi-line description as its own comment line', () => {
+      const flag = boolFlag('a', { name: 'A', description: 'First line.\n\nSecond paragraph.' });
+      expect(firstDoc(flag)).toBe(`  /**
+   * A
+   *
+   * First line.
+   *
+   * Second paragraph.
+   *
+   * key: \`a\`
+   * https://app.launchdarkly.com/projects/my-project/flags/a
+   */
+`);
+    });
+  });
+
+  describe('deprecation', () => {
+    function emitOne(flag: Flag): string {
+      return tsServerEmitter.emit({ projectKey: 'my-project', flags: [flag] }, cfg, ctx)[0]!.contents;
+    }
+
+    it('marks the method, its Detail variant and its FlagKeys entry @deprecated with the message', () => {
+      const text = emitOne(
+        boolFlag('old-checkout', { name: 'Old checkout', deprecated: true, deprecationMessage: 'Use checkout-v2.' }),
+      );
+      expect(text).toContain(`   * https://app.launchdarkly.com/projects/my-project/flags/old-checkout
+   *
+   * @deprecated Use checkout-v2.
+   */
+  oldCheckout(context`);
+      expect(text).toContain(`   * @deprecated Use checkout-v2.
+   */
+  oldCheckoutDetail(context`);
+      expect(text).toContain(`export const FlagKeys = {
+  /** @deprecated Use checkout-v2. */
+  oldCheckout: 'old-checkout',
+} as const;
+`);
+    });
+
+    it('uses a generic message naming the flag, with no date, when there is no message', () => {
+      const text = emitOne(boolFlag('old-checkout', { name: 'Old checkout', deprecated: true }));
+      expect(text).toContain('   * @deprecated The `old-checkout` flag is deprecated.\n');
+      expect(text).toContain('  /** @deprecated The `old-checkout` flag is deprecated. */\n');
+      expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    });
+
+    it('escapes */ in the deprecation message', () => {
+      const text = emitOne(boolFlag('a', { deprecated: true, deprecationMessage: 'see */ docs' }));
+      expect(text).toContain('  /** @deprecated see *\\/ docs */\n');
+    });
+
+    it('adds no @deprecated to flags that are not deprecated', () => {
+      expect(emitOne(boolFlag('a'))).not.toContain('@deprecated');
+    });
   });
 });

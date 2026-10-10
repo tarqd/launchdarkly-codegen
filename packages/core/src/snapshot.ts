@@ -23,6 +23,8 @@ export interface ApiFlag {
   clientSideAvailability?: { usingEnvironmentId: boolean; usingMobileKey: boolean };
   includeInSnippet?: boolean;
   customProperties?: Record<string, { name: string; value: string[] }>;
+  _maintainer?: { email: string; firstName?: string; lastName?: string; [field: string]: unknown };
+  _maintainerTeam?: { key: string; name: string; [field: string]: unknown };
   [field: string]: unknown;
 }
 
