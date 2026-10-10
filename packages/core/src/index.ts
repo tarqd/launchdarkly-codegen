@@ -6,6 +6,7 @@ export * from './naming.js';
 export * from './properties.js';
 export * from './aliases.js';
 export * from './identifiers.js';
+export * from './doc-text.js';
 export * from './writer.js';
 export * from './emitter.js';
 export * from './fetcher.js';

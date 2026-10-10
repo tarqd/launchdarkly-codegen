@@ -5,6 +5,8 @@
 
 import {
   checkIdentifiers,
+  defaultDeprecationMessage,
+  docTrailer,
   ECMASCRIPT_RESERVED_WORDS,
   flagIdentifier,
   lowerCamel,
@@ -57,23 +59,21 @@ function tsString(value: string): string {
 function docLines(flag: Flag): string[] {
   const lines = [flag.name, ''];
   if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
-  const trailer = [`key: \`${flag.key}\``];
-  if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
-  if (flag.maintainer) {
-    trailer.push(
-      `maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`,
-    );
-  }
-  lines.push(trailer.join(' · '), flag.uiUrl);
+  lines.push(docTrailer(flag, inlineCode), flag.uiUrl);
   const deprecation = deprecationText(flag);
   if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
   return lines;
 }
 
-/** The `@deprecated` text: the flag's message, else a generic one. No date, so output doesn't churn. */
+/** TSDoc inline code. */
+function inlineCode(text: string): string {
+  return `\`${text}\``;
+}
+
+/** The `@deprecated` text: the flag's message, else a generic one. */
 function deprecationText(flag: Flag): string | undefined {
   if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
+  return flag.deprecationMessage ?? defaultDeprecationMessage(flag, inlineCode);
 }
 
 /** The SDK method prefix and TypeScript type for each Flag kind. */
