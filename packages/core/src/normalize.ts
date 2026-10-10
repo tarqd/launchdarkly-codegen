@@ -5,7 +5,7 @@
 
 import { aliasesFor } from './aliases.js';
 import { CodegenError } from './errors.js';
-import type { Flag, FlagKind, FlagModel } from './model.js';
+import type { Flag, FlagKind, FlagModel, Maintainer } from './model.js';
 import { singlePropertyValue } from './properties.js';
 import type { ApiFlag, Snapshot } from './snapshot.js';
 
@@ -37,10 +37,35 @@ function normalizeFlag(item: ApiFlag, snapshot: Snapshot, warn: (message: string
       usingMobileKey: true,
     },
     tags: item.tags,
-    deprecated: item.deprecated,
+    ...maintainerOf(item),
+    ...deprecationOf(item),
     archived: item.archived,
     aliases: aliasesFor(item),
     uiUrl: `${snapshot.baseUri}/projects/${snapshot.projectKey}/flags/${item.key}`,
+  };
+}
+
+function maintainerOf(item: ApiFlag): { maintainer?: Maintainer } {
+  const member = item._maintainer;
+  if (member) {
+    const name = [member.firstName, member.lastName].filter((part) => part).join(' ');
+    return { maintainer: { kind: 'member', email: member.email, ...(name ? { name } : {}) } };
+  }
+  const team = item._maintainerTeam;
+  if (team) return { maintainer: { kind: 'team', key: team.key, name: team.name } };
+  return {};
+}
+
+/** LaunchDarkly's marker OR any `codegen.deprecated` value; the message joins the non-blank values. */
+function deprecationOf(item: ApiFlag): { deprecated: boolean; deprecationMessage?: string } {
+  const values = item.customProperties?.['codegen.deprecated']?.value ?? [];
+  const message = values
+    .map((v) => v.trim())
+    .filter((v) => v !== '')
+    .join(' ');
+  return {
+    deprecated: item.deprecated || values.length > 0,
+    ...(message ? { deprecationMessage: message } : {}),
   };
 }
 

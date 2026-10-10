@@ -1,0 +1,111 @@
+{
+  "snapshotVersion": 1,
+  "projectKey": "storefront",
+  "baseUri": "https://app.eu.launchdarkly.com",
+  "flagPages": [
+    {
+      "items": [
+        {
+          "key": "checkout-v2",
+          "name": "Checkout V2",
+          "description": "Routes eligible users to the rewritten checkout flow.\n\nMatches paths like /cart/**/*.json */ and more.",
+          "kind": "boolean",
+          "creationDate": 1720000000000,
+          "includeInSnippet": false,
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "variations": [
+            { "_id": "a1", "value": true },
+            { "_id": "a2", "value": false }
+          ],
+          "temporary": true,
+          "tags": ["checkout", "q3"],
+          "maintainerTeamKey": "payments",
+          "_maintainerTeam": {
+            "key": "payments",
+            "name": "Payments",
+            "_links": { "self": { "href": "/api/v2/teams/payments", "type": "application/json" } }
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false,
+          "defaults": { "onVariation": 0, "offVariation": 1 }
+        },
+        {
+          "key": "legacy-cart",
+          "name": "Legacy cart",
+          "description": "The pre-2024 cart.",
+          "kind": "boolean",
+          "creationDate": 1700000000000,
+          "includeInSnippet": false,
+          "variations": [
+            { "_id": "b1", "value": true },
+            { "_id": "b2", "value": false }
+          ],
+          "temporary": true,
+          "tags": ["checkout"],
+          "maintainerId": "507f1f77bcf86cd799439011",
+          "_maintainer": {
+            "_id": "507f1f77bcf86cd799439011",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "role": "writer",
+            "email": "ada@example.com"
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": true,
+          "deprecatedDate": 1725000000000,
+          "defaults": { "onVariation": 0, "offVariation": 1 }
+        },
+        {
+          "key": "old-search",
+          "name": "Old search",
+          "kind": "boolean",
+          "creationDate": 1700000001000,
+          "includeInSnippet": true,
+          "clientSideAvailability": { "usingEnvironmentId": true, "usingMobileKey": false },
+          "variations": [
+            { "_id": "c1", "value": true },
+            { "_id": "c2", "value": false }
+          ],
+          "temporary": false,
+          "tags": [],
+          "customProperties": {
+            "codegen.deprecated": {
+              "name": "codegen.deprecated",
+              "value": ["Use search-v2.", " ", "Removal planned for Q4 */ 2026."]
+            }
+          },
+          "archived": false,
+          "deprecated": false,
+          "defaults": { "onVariation": 0, "offVariation": 1 }
+        },
+        {
+          "key": "promo-banner",
+          "name": "Promo banner",
+          "description": "Shows the seasonal promo banner.",
+          "kind": "boolean",
+          "creationDate": 1700000002000,
+          "includeInSnippet": false,
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "variations": [
+            { "_id": "d1", "value": true },
+            { "_id": "d2", "value": false }
+          ],
+          "temporary": true,
+          "tags": ["marketing"],
+          "customProperties": {
+            "codegen.deprecated": { "name": "codegen.deprecated", "value": ["Use the CMS banner slot."] }
+          },
+          "archived": false,
+          "deprecated": true,
+          "defaults": { "onVariation": 0, "offVariation": 1 }
+        }
+      ],
+      "totalCount": 4,
+      "_links": {
+        "self": { "href": "/api/v2/flags/storefront?limit=20&offset=0&sort=key", "type": "application/json" }
+      }
+    }
+  ]
+}

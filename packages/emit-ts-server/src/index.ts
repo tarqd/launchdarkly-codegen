@@ -7,6 +7,7 @@ import {
   checkIdentifiers,
   CodegenError,
   ECMASCRIPT_RESERVED_WORDS,
+  escapeBlockCommentEnd,
   flagIdentifier,
   lowerCamel,
   Writer,
@@ -48,6 +49,29 @@ function tsString(value: string): string {
   return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
+/** The doc-comment lines for a flag's methods (DESIGN.md → Doc comments). */
+function docLines(flag: Flag): string[] {
+  const lines = [flag.name, ''];
+  if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
+  const trailer = [`key: \`${flag.key}\``];
+  if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
+  if (flag.maintainer) {
+    trailer.push(
+      `maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`,
+    );
+  }
+  lines.push(trailer.join(' · '), flag.uiUrl);
+  const deprecation = deprecationText(flag);
+  if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
+  return lines;
+}
+
+/** The `@deprecated` text: the flag's message, else a generic one. No date, so output doesn't churn. */
+function deprecationText(flag: Flag): string | undefined {
+  if (!flag.deprecated) return undefined;
+  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
+}
+
 /** The SDK method prefix and TypeScript type for each Flag kind. */
 const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = {
   boolean: { method: 'boolVariation', type: 'boolean' },
@@ -59,9 +83,12 @@ const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = {
 function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const key = tsString(flag.key);
   const { method, type } = KIND_METHODS[flag.kind];
+  const doc = docLines(flag);
+  w.docComment(doc);
   w.block(`${name}(context: LDContext, fallback: ${type}): Promise<${type}> {`, '}', () => {
     w.line(`return this.client.${method}(${key}, context, fallback);`);
   });
+  w.docComment(doc);
   w.block(
     `${name}Detail(context: LDContext, fallback: ${type}): Promise<LDEvaluationDetailTyped<${type}>> {`,
     '}',
@@ -95,6 +122,8 @@ export const tsServerEmitter: Emitter = {
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
+        const deprecation = deprecationText(flag);
+        if (deprecation !== undefined) w.line(`/** @deprecated ${escapeBlockCommentEnd(deprecation)} */`);
         w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }
     });

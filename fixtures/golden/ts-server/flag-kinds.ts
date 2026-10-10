@@ -6,44 +6,120 @@ import type { LDClient, LDContext, LDEvaluationDetailTyped } from '@launchdarkly
 export class Flags {
   constructor(private readonly client: LDClient) {}
 
+  /**
+   * Banner ids
+   *
+   * key: `banner-ids`
+   * https://app.launchdarkly.com/projects/my-project/flags/banner-ids
+   */
   bannerIds(context: LDContext, fallback: unknown): Promise<unknown> {
     return this.client.jsonVariation('banner-ids', context, fallback);
   }
+  /**
+   * Banner ids
+   *
+   * key: `banner-ids`
+   * https://app.launchdarkly.com/projects/my-project/flags/banner-ids
+   */
   bannerIdsDetail(context: LDContext, fallback: unknown): Promise<LDEvaluationDetailTyped<unknown>> {
     return this.client.jsonVariationDetail('banner-ids', context, fallback);
   }
 
+  /**
+   * Checkout config
+   *
+   * key: `checkout-config`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+   */
   checkoutConfig(context: LDContext, fallback: unknown): Promise<unknown> {
     return this.client.jsonVariation('checkout-config', context, fallback);
   }
+  /**
+   * Checkout config
+   *
+   * key: `checkout-config`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+   */
   checkoutConfigDetail(context: LDContext, fallback: unknown): Promise<LDEvaluationDetailTyped<unknown>> {
     return this.client.jsonVariationDetail('checkout-config', context, fallback);
   }
 
+  /**
+   * Checkout V2
+   *
+   * key: `checkout-v2`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
   checkoutV2(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('checkout-v2', context, fallback);
   }
+  /**
+   * Checkout V2
+   *
+   * key: `checkout-v2`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   */
   checkoutV2Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('checkout-v2', context, fallback);
   }
 
+  /**
+   * Max cart items
+   *
+   * key: `max-cart-items`
+   * https://app.launchdarkly.com/projects/my-project/flags/max-cart-items
+   */
   maxCartItems(context: LDContext, fallback: number): Promise<number> {
     return this.client.numberVariation('max-cart-items', context, fallback);
   }
+  /**
+   * Max cart items
+   *
+   * key: `max-cart-items`
+   * https://app.launchdarkly.com/projects/my-project/flags/max-cart-items
+   */
   maxCartItemsDetail(context: LDContext, fallback: number): Promise<LDEvaluationDetailTyped<number>> {
     return this.client.numberVariationDetail('max-cart-items', context, fallback);
   }
 
+  /**
+   * Pricing tier
+   *
+   * Which pricing tier a customer sees.
+   *
+   * key: `pricing-tier` · tags: billing
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+   */
   pricingTier(context: LDContext, fallback: string): Promise<string> {
     return this.client.stringVariation('pricing-tier', context, fallback);
   }
+  /**
+   * Pricing tier
+   *
+   * Which pricing tier a customer sees.
+   *
+   * key: `pricing-tier` · tags: billing
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+   */
   pricingTierDetail(context: LDContext, fallback: string): Promise<LDEvaluationDetailTyped<string>> {
     return this.client.stringVariationDetail('pricing-tier', context, fallback);
   }
 
+  /**
+   * Sample rate
+   *
+   * key: `sample-rate`
+   * https://app.launchdarkly.com/projects/my-project/flags/sample-rate
+   */
   sampleRate(context: LDContext, fallback: number): Promise<number> {
     return this.client.numberVariation('sample-rate', context, fallback);
   }
+  /**
+   * Sample rate
+   *
+   * key: `sample-rate`
+   * https://app.launchdarkly.com/projects/my-project/flags/sample-rate
+   */
   sampleRateDetail(context: LDContext, fallback: number): Promise<LDEvaluationDetailTyped<number>> {
     return this.client.numberVariationDetail('sample-rate', context, fallback);
   }

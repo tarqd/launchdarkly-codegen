@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // `pnpm test` and run in CI via `pnpm test:compile`.
 export default defineConfig({
   resolve: { conditions: ['source'] },
+  ssr: { resolve: { conditions: ['source'] } },
   test: {
     include: ['packages/*/test/**/*.compile.test.ts'],
     testTimeout: 120_000,
