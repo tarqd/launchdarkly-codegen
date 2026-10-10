@@ -1,0 +1,71 @@
+package com.example.flags;
+
+import com.launchdarkly.sdk.EvaluationDetail;
+import com.launchdarkly.sdk.LDContext;
+import com.launchdarkly.sdk.LDValue;
+import com.launchdarkly.sdk.server.interfaces.LDClientInterface;
+
+/** Stress. */
+public final class Stress {
+  /** The wrapped SDK client. */
+  private final LDClientInterface client;
+
+  /**
+   * Wraps.
+   *
+   * @param client c
+   */
+  public Stress(LDClientInterface client) {
+    this.client = client;
+  }
+
+  /**
+   * Checkout V2
+   *
+   * <p>This is a very long description that keeps going well past the one hundred column limit so that we can see exactly how the formatter chooses to wrap words across lines in a paragraph.
+   * A second source line that should join the first.
+   *
+   * <p>Ünïcödé wörds ünïcödé wörds ünïcödé wörds ünïcödé wörds ünïcödé wörds ünïcödé wörds ünïcödé.
+   *
+   * <p>key: {@code checkout-v2-with-an-extremely-long-key-name} · tags: checkout, q3, another-tag, yet-another-tag · maintainer: team Payments Platform Engineering<br>
+   * https://app.eu.launchdarkly.com/projects/storefront-with-a-long-name/flags/checkout-v2-with-an-extremely-long-key-name
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen, and more words so this wraps
+   * @deprecated Use search-v2 instead. Removal planned for Q4 2026, after which this accessor will stop compiling.
+   */
+  @Deprecated
+  public EvaluationDetail<LDValue> checkoutV2WithAnExtremelyLongKeyNameDetail(LDContext context, LDValue fallback) {
+    return client.jsonValueVariationDetail(Keys.CHECKOUT_V2_WITH_AN_EXTREMELY_LONG_KEY_NAME, context, fallback);
+  }
+
+  /**
+   * a
+   *
+   * @param context c
+   * @param fallback f
+   * @return r
+   */
+  public EvaluationDetail<LDValue> aReallyReallyReallyReallyReallyReallyReallyLongNameDetailDetail(LDContext context, LDValue fallback) {
+    return client.jsonValueVariationDetail(Keys.CHECKOUT_V2_WITH_AN_EXTREMELY_LONG_KEY_NAME_AND_SOME_MORE_TEXT_HERE, context, fallback);
+  }
+
+  /** Keys. */
+  public static final class Keys {
+    private Keys() {}
+
+    /** {@code checkout-v2-with-an-extremely-long-key-name-and-yet-more-text-to-pass-a-hundred-cols} */
+    public static final String CHECKOUT_V2_WITH_AN_EXTREMELY_LONG_KEY_NAME = "checkout-v2-with-an-extremely-long-key-name";
+
+    /** k */
+    public static final String CHECKOUT_V2_WITH_AN_EXTREMELY_LONG_KEY_NAME_AND_SOME_MORE_TEXT_HERE = "checkout-v2-with-an-extremely-long-key-name-and-some-more-text-here";
+
+    /**
+     * {@code legacy-cart}
+     *
+     * @deprecated Use search-v2. Removal planned for Q4 2026 and later, with more words to wrap the line.
+     */
+    @Deprecated public static final String LEGACY_CART = "legacy-cart";
+  }
+}

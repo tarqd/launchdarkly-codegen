@@ -1,0 +1,13 @@
+// PROTOTYPE: must raise a deprecation warning (compiled separately, not under -Werror).
+package com.example.app;
+
+import com.example.flags.Flags;
+import com.launchdarkly.sdk.LDContext;
+
+final class DeprecatedUse {
+  private DeprecatedUse() {}
+
+  static boolean use(Flags flags, LDContext c) {
+    return flags.legacyCart(c, false) && Flags.Keys.LEGACY_CART.isEmpty();
+  }
+}
