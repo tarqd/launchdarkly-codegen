@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeFlagChanges, type GeneratedFlag } from '../src/index.js';
+import { summarizeFlagChanges, summarizeReadBack, type GeneratedFlag } from '../src/index.js';
 
 const flags: GeneratedFlag[] = [
   { key: 'checkout-v2', identifier: 'checkoutV2', kind: 'boolean' },
@@ -37,5 +37,33 @@ describe('summarizeFlagChanges', () => {
 
   it('says so when no flag changed (for example a generator upgrade)', () => {
     expect(summarizeFlagChanges(flags, [...flags].reverse())).toBe('flags: no changes');
+  });
+});
+
+describe('summarizeReadBack', () => {
+  // A stand-in for an emitter whose output is one `key identifier kind` line per flag.
+  const target = {
+    readFlags: (text: string): GeneratedFlag[] | undefined =>
+      text === 'garbage'
+        ? undefined
+        : text.split('\n').map((line) => {
+            const [key, identifier, kind] = line.split(' ') as [string, string, GeneratedFlag['kind']];
+            return { key, identifier, kind };
+          }),
+  };
+
+  it('summarizes the flags read back from both sides', () => {
+    expect(summarizeReadBack(target, 'a aOld boolean', 'a aNew boolean\nb b string')).toBe(
+      'flags: 1 added (b), 1 renamed (a: aOld → aNew)',
+    );
+  });
+
+  it('returns undefined when either side cannot be read back', () => {
+    expect(summarizeReadBack(target, 'garbage', 'a a boolean')).toBeUndefined();
+    expect(summarizeReadBack(target, 'a a boolean', 'garbage')).toBeUndefined();
+  });
+
+  it('returns undefined for a target that cannot read its output back', () => {
+    expect(summarizeReadBack({}, 'a a boolean', 'a b boolean')).toBeUndefined();
   });
 });

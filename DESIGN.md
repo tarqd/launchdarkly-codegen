@@ -297,7 +297,7 @@ interface Emitter {
   id: TargetId;
   sdkMajors: readonly number[];          // config validation checks `sdkMajor` against this
   emit(model: FlagModel, cfg: TargetConfig, ctx: EmitContext): GeneratedFile[];
-  summarizeChanges?(oldText: string, newText: string): string | undefined;
+  readFlags?(text: string): GeneratedFlag[] | undefined;
 }
 
 interface EmitContext {
@@ -307,13 +307,20 @@ interface EmitContext {
 
 `sdkMajors` is the one place a target's supported SDK majors are listed;
 config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
-one. `summarizeChanges` is optional and only used by `check`: it reads the
-file on disk and the new output back into flags (key, identifier, kind, and
-for a number flag the `int` or `double` type when the output shows it) and
-returns the one-line summary from core's `summarizeFlagChanges`, or
-`undefined` when the old file can't be read back, in which case `check`
-prints the diff alone. Only the emitter knows its own output format, so the
-parsing lives in the emitter package, not in `core` or the CLI.
+one. `readFlags` is optional and only used by `check`: it reads the
+emitter's own output back into flags (key, identifier, kind, and for a
+number flag the `int` or `double` type when the output shows it), or returns
+`undefined` when the text doesn't look like that output. For a stale file,
+`check` hands the emitter to core's `summarizeReadBack`, which reads both the
+file on disk and the new output and compares them with
+`summarizeFlagChanges`. When either side can't be read back, or the emitter
+has no `readFlags`, `check` prints the diff alone. Only the emitter knows its own output format,
+so the parsing lives in the emitter package, not in `core` or the CLI. Each
+emitter keeps the strings and patterns its writer and parser both rely on
+(class and field names, SDK method names, how the key constants are
+declared) in one `src/output.ts`, so the two can't drift apart; java keeps
+its per-kind types and SDK methods in `src/kinds.ts`, which both sides read
+as well.
 
 Emitters are code, not text templates. The OpenFeature CLI uses Go text
 templates per language, and the experience there is that templates stop being
@@ -555,7 +562,7 @@ against gofmt. The original prototype is on the
 [`prototype/go-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/go-emitter/prototypes/go-emitter)
 branch.
 
-**Check summary.** `summarizeChanges` reads a go file back from the `Key…`
+**Check summary.** `readFlags` reads a go file back from the `Key…`
 constants (identifier and key) and the primary methods' signatures (kind).
 `int` and `float64` read back as a number flag's number type, so switching
 `codegen.number` shows as a changed kind, e.g.
@@ -1018,7 +1025,7 @@ public final class Flags {
 }
 ```
 
-**`check` summary.** `summarizeChanges` (`packages/emit-java/src/flag-changes.ts`)
+**`check` summary.** `readFlags` (`packages/emit-java/src/flag-changes.ts`)
 reads a `Flags.java` back into flags. Comments are dropped and whitespace is
 squeezed out of the code (kept only between two words), so every line break
 above reads the same as the one-line form. Each `Keys` constant gives the

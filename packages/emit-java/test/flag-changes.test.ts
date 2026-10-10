@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { normalize, parseSnapshot, type GeneratedFlag } from '@launchtarqly/core';
-import { parseJavaFlags, summarizeJavaChanges } from '../src/index.js';
+import { parseJavaFlags } from '../src/index.js';
 import { flagNames } from '../src/naming.js';
 import { generatedKind, javaKind } from '../src/kinds.js';
 
@@ -61,8 +61,8 @@ describe('parseJavaFlags on hand-edited files', () => {
   });
 });
 
-describe('summarizeJavaChanges', () => {
-  it('reports added, removed, renamed and changed-kind flags, telling int from double', () => {
+describe('parseJavaFlags on edited output', () => {
+  it('reads renamed, re-typed and replaced flags, telling int from double', () => {
     const next = FLAG_KINDS
       // max-cart-items moves from int to double (codegen.number removed).
       .replace(
@@ -75,24 +75,26 @@ describe('summarizeJavaChanges', () => {
       // banner-ids is replaced by hero-ids.
       .replaceAll('BANNER_IDS', 'HERO_IDS')
       .replace('"banner-ids"', '"hero-ids"');
-    expect(summarizeJavaChanges(FLAG_KINDS, next)).toBe(
-      'flags: 1 added (hero-ids), 1 removed (banner-ids), 1 renamed (pricing-tier: pricingTier → tier), 1 changed kind (max-cart-items: number (int) → number (double))',
-    );
+    expect(parseJavaFlags(next)).toEqual([
+      { key: 'hero-ids', identifier: 'bannerIds', kind: 'json' },
+      { key: 'checkout-config', identifier: 'checkoutConfig', kind: 'json' },
+      { key: 'checkout-v2', identifier: 'checkoutV2', kind: 'boolean' },
+      { key: 'max-cart-items', identifier: 'maxCartItems', kind: 'number', numberType: 'double' },
+      { key: 'pricing-tier', identifier: 'tier', kind: 'string' },
+      { key: 'sample-rate', identifier: 'sampleRate', kind: 'number', numberType: 'double' },
+    ]);
   });
 
-  it('reports an alias rename that keeps the Keys constant', () => {
+  it('reads the method name, not the Keys constant, so an alias rename that keeps the constant shows', () => {
     // apiUrlId and apiURLId both give the constant API_URL_ID.
     const before = FLAG_KINDS.replaceAll('sampleRate', 'apiUrlId').replaceAll('SAMPLE_RATE', 'API_URL_ID');
     const after = FLAG_KINDS.replaceAll('sampleRate', 'apiURLId').replaceAll('SAMPLE_RATE', 'API_URL_ID');
-    expect(summarizeJavaChanges(before, after)).toBe('flags: 1 renamed (sample-rate: apiUrlId → apiURLId)');
+    const sampleRate = (text: string) => parseJavaFlags(text)?.find((f) => f.key === 'sample-rate')?.identifier;
+    expect(sampleRate(before)).toBe('apiUrlId');
+    expect(sampleRate(after)).toBe('apiURLId');
   });
 
-  it('says so when no flag changed (for example a generator upgrade)', () => {
-    expect(summarizeJavaChanges(FLAG_KINDS.replace('0.1.0', '0.0.9'), FLAG_KINDS)).toBe('flags: no changes');
-  });
-
-  it('returns undefined when either side cannot be parsed', () => {
-    expect(summarizeJavaChanges('garbage', FLAG_KINDS)).toBeUndefined();
-    expect(summarizeJavaChanges(FLAG_KINDS, 'garbage')).toBeUndefined();
+  it('reads the same flags whatever generator version wrote the file', () => {
+    expect(parseJavaFlags(FLAG_KINDS.replace('0.1.0', '0.0.9'))).toEqual(parseJavaFlags(FLAG_KINDS));
   });
 });

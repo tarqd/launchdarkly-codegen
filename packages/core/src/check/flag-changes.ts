@@ -1,7 +1,7 @@
 /**
  * The one-line flag summary `check` prints for a stale file (DESIGN.md → CLI).
  * The old side is whatever is on disk, so each emitter reads its own output
- * back into `GeneratedFlag`s (`Emitter.summarizeChanges`); this compares them.
+ * back into `GeneratedFlag`s (`Emitter.readFlags`); this compares them.
  */
 
 import type { Flag, FlagKind } from '../model.js';
@@ -61,4 +61,19 @@ export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlag
     part(changedKind.length, 'changed kind', changedKind),
   ].filter((p) => p !== undefined);
   return `flags: ${parts.length === 0 ? 'no changes' : parts.join(', ')}`;
+}
+
+/**
+ * `check`'s summary for a stale file: both sides read back with the target's
+ * `readFlags`, then compared. `undefined` when the target has no `readFlags`
+ * or either side can't be read back; the diff then stands alone.
+ */
+export function summarizeReadBack(
+  target: { readFlags?(text: string): readonly GeneratedFlag[] | undefined },
+  oldText: string,
+  newText: string,
+): string | undefined {
+  const oldFlags = target.readFlags?.(oldText);
+  const newFlags = target.readFlags?.(newText);
+  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }

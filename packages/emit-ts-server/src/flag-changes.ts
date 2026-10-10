@@ -1,16 +1,24 @@
 /**
  * Reads ts-server output back into flags, for `check`'s summary
- * (`Emitter.summarizeChanges`). The old side is whatever is on disk, so this
+ * (`Emitter.readFlags`). The old side is whatever is on disk, so this
  * parses text rather than trusting a Flag model.
  */
 
-import { summarizeFlagChanges, type FlagKind, type GeneratedFlag } from '@launchtarqly/core';
+import type { FlagKind, GeneratedFlag } from '@launchtarqly/core';
+import { AS_CONST, CLIENT_FIELD, FLAG_KEYS_OPEN, kindOfSdkMethod, SDK_METHODS } from './output.js';
 
-const SDK_KINDS: Record<string, FlagKind> = { bool: 'boolean', string: 'string', number: 'number', json: 'json' };
+/** `text` matched literally inside a RegExp. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // `name(...): Promise<...> {` followed by `return this.client.<kind>Variation(`.
 // `Variation\s*\(` skips the `...VariationDetail(` methods. Signatures may wrap.
-const METHOD = /(?:^|\n)[ \t]*(\w+)[ \t]*\([^{;]*?\{\s*return\s+this\.client\.(bool|string|number|json)Variation\s*\(/g;
+const METHOD = new RegExp(
+  String.raw`(?:^|\n)[ \t]*(\w+)[ \t]*\([^{;]*?\{\s*return\s+this\.${escapeRegExp(CLIENT_FIELD)}\.(${SDK_METHODS.join('|')})\s*\(`,
+  'g',
+);
+const KEYS = new RegExp(String.raw`\n${escapeRegExp(FLAG_KEYS_OPEN)}\n([\s\S]*?)\n\}(?:${escapeRegExp(AS_CONST)})?;`);
 
 const STRING = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
 const ENTRY = new RegExp(String.raw`^(\w+|${STRING})\s*:\s*(${STRING})\s*,?$`);
@@ -27,11 +35,11 @@ function unquote(literal: string): string {
  * it unparseable.
  */
 export function parseTsServerFlags(text: string): GeneratedFlag[] | undefined {
-  const block = /\nexport const FlagKeys = \{\n([\s\S]*?)\n\}(?: as const)?;/.exec(text);
+  const block = KEYS.exec(text);
   if (!block) return undefined;
 
   const kinds = new Map<string, FlagKind>();
-  for (const [, name, sdkKind] of text.matchAll(METHOD)) kinds.set(name!, SDK_KINDS[sdkKind!]!);
+  for (const [, name, method] of text.matchAll(METHOD)) kinds.set(name!, kindOfSdkMethod(method!)!);
 
   const body = block[1]!.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const flags: GeneratedFlag[] = [];
@@ -46,11 +54,4 @@ export function parseTsServerFlags(text: string): GeneratedFlag[] | undefined {
     flags.push({ key: unquote(entry[2]!), identifier, kind });
   }
   return flags;
-}
-
-/** `check`'s flag summary for a stale ts-server file; `undefined` if either side can't be parsed. */
-export function summarizeTsServerChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseTsServerFlags(oldText);
-  const newFlags = parseTsServerFlags(newText);
-  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }
