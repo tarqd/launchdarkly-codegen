@@ -8,7 +8,7 @@ import { modelFlag } from '../../core/test/builders.js';
 const FIXTURES = resolve(import.meta.dirname, '../../../fixtures');
 const GOLDEN = join(FIXTURES, 'golden/go');
 
-const cfg = { id: 'go', out: 'flags_gen.go', sdkMajor: 7, package: 'ldflags' } as const;
+const cfg = { id: 'go', out: 'flags_gen.go', sdkMajor: 7, options: { package: 'ldflags' } } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 /** Go output for one flag of every kind (both number types), one of them deprecated. */

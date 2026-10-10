@@ -2,8 +2,8 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Emitter, TargetId } from '@launchtarqly/core';
-import { BUILT_IN_EMITTERS, CONFIG_FILENAMES, resolveConfig } from '../src/index.js';
+import { CodegenError } from '@launchtarqly/core';
+import { CONFIG_FILENAMES, resolveConfig } from '../src/index.js';
 import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
 
 const snapshot = join(SNAPSHOTS_DIR, 'boolean-flags.json');
@@ -123,16 +123,75 @@ describe('validation', () => {
   });
 });
 
+describe('target options', () => {
+  const goTarget = { id: 'go', out: 'flags_gen.go', sdkMajor: 7, package: 'ldflags' };
+  const load = async (...targets: Record<string, unknown>[]) =>
+    resolveConfig({ cwd: await projectDir({ project: 'my-project', targets }), env: {}, cli: {}, warn: () => {} });
+  const loadError = async (...targets: Record<string, unknown>[]) => {
+    const error = await load(...targets).then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+    expect(error).toBeInstanceOf(CodegenError);
+    return (error as CodegenError).message;
+  };
+
+  it("hands each target its options, parsed by the target's emitter", async () => {
+    const { config } = await load(target, goTarget);
+    expect(config.targets).toEqual([
+      { id: 'ts-server', out: 'flags.ts', sdkMajor: 9, options: {} },
+      { id: 'go', out: 'flags_gen.go', sdkMajor: 7, options: { package: 'ldflags' } },
+    ]);
+  });
+
+  it('names the config file and the target position in an option error', async () => {
+    const message = await loadError(target, { ...goTarget, package: 'LdFlags' });
+    expect(message).toMatch(/launchdarkly-codegen\.config\.json: targets\[1\]\.package must be a lowercase Go identifier/);
+  });
+
+  it('gives a missing required option its example', async () => {
+    const { package: _omitted, ...noPackage } = goTarget;
+    expect(await loadError(noPackage)).toMatch(/: targets\[0\]\.package is required \(for example ldflags\)$/);
+  });
+
+  it('rejects a key that is neither common to targets nor one of its options', async () => {
+    expect(await loadError({ ...goTarget, pakage: 'ldflags' })).toMatch(
+      /: targets\[0\]: unknown key `pakage` for go \(known keys: id, out, sdkMajor, package\)$/,
+    );
+    expect(await loadError({ ...target, package: 'ldflags' })).toMatch(/: targets\[0\]: unknown key `package` for ts-server/);
+  });
+
+  it.each([
+    ['ts-server', target, 'flags.js', '.ts, .mts or .cts'],
+    ['go', goTarget, 'internal/ldflags/', '.go'],
+    ['dotnet', { id: 'dotnet', sdkMajor: 8, namespace: 'MyApp' }, 'Flags.txt', '.cs'],
+  ])("rejects a %s out that doesn't end in its extension", async (_id, t, out, extensions) => {
+    expect(await loadError({ ...t, out })).toContain(`: targets[0].out must end in ${extensions}, got ${JSON.stringify(out)}`);
+  });
+
+  it.each(['flags.ts', 'flags.mts', 'flags.cts'])('accepts a ts-server out of %s', async (out) => {
+    await expect(load({ ...target, out })).resolves.toBeDefined();
+  });
+
+  it('accepts any java out, which is a directory', async () => {
+    await expect(load({ id: 'java', out: 'src/main/java/com/example/flags', sdkMajor: 7, package: 'com.example.flags' })).resolves.toBeDefined();
+  });
+
+  it('validates every target, including those --target leaves out', async () => {
+    const cwd = await projectDir({ project: 'my-project', targets: [target, { ...goTarget, package: 'type' }] });
+    const run = resolveConfig({ cwd, env: {}, cli: { target: ['ts-server'] }, warn: () => {} });
+    await expect(run).rejects.toThrow(/targets\[1\]\.package must be/);
+  });
+});
+
 describe('--target', () => {
-  const goEmitter: Emitter = { id: 'go' as TargetId, sdkMajors: [7], emit: () => [] };
-  const twoTargets = { ...minimal, targets: [target, { id: 'go', out: 'internal/ldflags/', sdkMajor: 7 }] };
+  const twoTargets = { ...minimal, targets: [target, { id: 'go', out: 'flags_gen.go', sdkMajor: 7, package: 'ldflags' }] };
 
   it('narrows the run to the named targets', async () => {
     const cwd = await projectDir(twoTargets);
-    const emitters = [...BUILT_IN_EMITTERS, goEmitter];
-    const all = await resolveConfig({ cwd, env: {}, cli: {}, warn: () => {}, emitters });
+    const all = await resolveConfig({ cwd, env: {}, cli: {}, warn: () => {} });
     expect(all.config.targets.map((t) => t.id)).toEqual(['ts-server', 'go']);
-    const one = await resolveConfig({ cwd, env: {}, cli: { target: ['go'] }, warn: () => {}, emitters });
+    const one = await resolveConfig({ cwd, env: {}, cli: { target: ['go'] }, warn: () => {} });
     expect(one.config.targets.map((t) => t.id)).toEqual(['go']);
   });
 

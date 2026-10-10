@@ -3,7 +3,7 @@ import type { FlagModel } from '@launchtarqly/core';
 import { goEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
-const cfg = { id: 'go', out: 'internal/ldflags/flags_gen.go', sdkMajor: 7, package: 'ldflags' } as const;
+const cfg = { id: 'go', out: 'internal/ldflags/flags_gen.go', sdkMajor: 7, options: { package: 'ldflags' } } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 /** Everything the file holds before the first flag method (DESIGN.md → go sample). */
@@ -210,34 +210,6 @@ const (
 \tKeyBetaDarkMode     = "beta.dark_mode"
 )
 `);
-  });
-
-  describe('target options', () => {
-    const model: FlagModel = { projectKey: 'my-project', flags: [modelFlag('checkout-v2')] };
-    const emitWith = (options: Record<string, unknown>) => () =>
-      goEmitter.emit(model, { ...cfg, ...options } as typeof cfg, ctx);
-
-    it.each([
-      ['missing', undefined],
-      ['not a string', 7],
-      ['empty', ''],
-      ['not lowercase', 'LdFlags'],
-      ['not an identifier', 'ld-flags'],
-      ['starting with a digit', '1flags'],
-      ['a Go keyword', 'type'],
-    ])('rejects a package that is %s, naming the key', (_name, pkg) => {
-      expect(emitWith({ package: pkg })).toThrow(expect.objectContaining({ name: 'CodegenError', message: expect.stringContaining('package') }));
-    });
-
-    it('accepts a lowercase package with digits and underscores', () => {
-      expect(emitWith({ package: 'ld_flags2' })()[0]!.contents).toContain('\npackage ld_flags2\n');
-    });
-
-    it('rejects an out that does not end in .go, naming the key', () => {
-      expect(emitWith({ out: 'internal/ldflags/flags.ts' })).toThrow(
-        expect.objectContaining({ name: 'CodegenError', message: expect.stringContaining('out') }),
-      );
-    });
   });
 
   it.each([

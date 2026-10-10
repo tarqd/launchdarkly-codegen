@@ -68,11 +68,11 @@ describe('generate --from-snapshot', () => {
   });
 
   it.each([
-    ['namespace is missing', { out: 'Flags.g.cs' }, '`namespace`'],
-    ['namespace is not dotted identifiers', { out: 'Flags.g.cs', namespace: 'My App' }, '`namespace`'],
-    ['out is not a .cs file', { out: 'Flags.txt', namespace: 'MyApp' }, '`out`'],
-    ['namespace has a C# keyword segment', { out: 'Flags.g.cs', namespace: 'MyApp.class' }, '"class" is a C# keyword'],
-    ['namespace ends in a generated class name', { out: 'Flags.g.cs', namespace: 'MyApp.Flags' }, 'must not end in Flags'],
+    ['namespace is missing', { out: 'Flags.g.cs' }, 'targets[0].namespace is required'],
+    ['namespace is not dotted identifiers', { out: 'Flags.g.cs', namespace: 'My App' }, 'targets[0].namespace must be dotted C# identifiers'],
+    ['out is not a .cs file', { out: 'Flags.txt', namespace: 'MyApp' }, 'targets[0].out must end in .cs'],
+    ['namespace has a C# keyword segment', { out: 'Flags.g.cs', namespace: 'MyApp.class' }, 'targets[0].namespace segment "class" is a C# keyword'],
+    ['namespace ends in a generated class name', { out: 'Flags.g.cs', namespace: 'MyApp.Flags' }, 'targets[0].namespace must not end in Flags'],
   ])('exits 2 naming the key when the dotnet %s', async (_name, options, key) => {
     const dir = await projectDir({ project: 'my-project', targets: [{ id: 'dotnet', sdkMajor: 8, ...options }] });
     const result = await runCli(['generate', '--from-snapshot', snapshot], dir);

@@ -9,6 +9,7 @@ export * from './identifiers.js';
 export * from './doc-text.js';
 export * from './writer.js';
 export * from './emitter.js';
+export * from './target-options.js';
 export * from './fetcher.js';
 export * from './check/diff.js';
 export * from './check/flag-changes.js';

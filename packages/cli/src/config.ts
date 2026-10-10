@@ -5,7 +5,7 @@
 
 import { dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { CodegenError, type Emitter, type TargetConfig, type TargetId } from '@launchtarqly/core';
+import { CodegenError, parseTargetOptions, type Emitter, type TargetConfig, type TargetId } from '@launchtarqly/core';
 import { parse as parseYaml } from 'yaml';
 import { BUILT_IN_EMITTERS } from './emitters.js';
 import { readIfExists } from './fs.js';
@@ -239,6 +239,13 @@ function normalizeBaseUri(baseUri: string): string {
   return baseUri.replace(/\/+$/, '');
 }
 
+/** The keys every target has; any other key must be one of its emitter's options. */
+const TARGET_KEYS = ['id', 'out', 'sdkMajor'];
+
+/**
+ * Every configured target, validated, its options parsed by its own emitter.
+ * Runs before `--target` narrows the list, so a bad target fails every run.
+ */
 function parseTargets(value: unknown, emitters: readonly Emitter[], fail: (msg: string) => never): TargetConfig[] {
   if (!Array.isArray(value) || value.length === 0) fail('`targets` must be a non-empty list');
   return (value as unknown[]).map((t, i): TargetConfig => {
@@ -257,8 +264,23 @@ function parseTargets(value: unknown, emitters: readonly Emitter[], fail: (msg: 
     if (!emitter.sdkMajors.includes(sdkMajor)) {
       fail(`${at}.sdkMajor: ${id} does not support ${sdkMajor} (supported: ${emitter.sdkMajors.join(', ')})`);
     }
-    return { ...target, id: id as TargetId, out, sdkMajor };
+    const declarations = emitter.options ?? {};
+    const known = [...TARGET_KEYS, ...Object.keys(declarations)];
+    for (const key of Object.keys(target)) {
+      if (!known.includes(key)) fail(`${at}: unknown key \`${key}\` for ${id} (known keys: ${known.join(', ')})`);
+    }
+    const extensions = emitter.outExtensions;
+    if (extensions && !extensions.some((ext) => out.endsWith(ext))) {
+      fail(`${at}.out must end in ${orList(extensions)}, got ${JSON.stringify(out)}`);
+    }
+    const options = parseTargetOptions(declarations, target, (key, message) => fail(`${at}.${key} ${message}`));
+    return { id: id as TargetId, out, sdkMajor, options };
   });
+}
+
+/** `a`, `a or b`, `a, b or c`. */
+function orList(items: readonly string[]): string {
+  return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
 }
 
 /** Narrows to the `--target` ids, keeping config order. An id not in the config is an error. */

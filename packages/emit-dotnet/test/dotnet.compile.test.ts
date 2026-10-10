@@ -167,7 +167,7 @@ describe('dotnet output compiles against LaunchDarkly.ServerSdk 8.x', () => {
           modelFlag('size', { kind: 'json', aliases: { dotnet: 'Größe' } }),
         ],
       },
-      { id: 'dotnet', out: 'Flags.g.cs', sdkMajor: 8, namespace: 'Ünïcode.Flägs' },
+      { id: 'dotnet', out: 'Flags.g.cs', sdkMajor: 8, options: { namespace: 'Ünïcode.Flägs' } },
       { generatorVersion: '0.0.0' },
     );
     const generated = file!.contents;

@@ -4,16 +4,15 @@
  */
 
 import {
-  CodegenError,
   deprecationText,
   docTrailer,
   nameFlags,
+  targetOption,
   upperCamel,
   Writer,
   type Emitter,
   type Flag,
   type NamingRules,
-  type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
 import { parseDotnetFlags } from './flag-changes.js';
@@ -61,35 +60,34 @@ const NAMING: NamingRules = {
 
 const NAMESPACE = new RegExp(`^${IDENTIFIER}(?:\\.${IDENTIFIER})*$`, 'u');
 
-/** The `namespace` option, checked; `out` must name a .cs file. Throws CodegenError (exit 2). */
-function targetOptions(cfg: TargetConfig): { namespace: string } {
-  const { namespace, out } = cfg;
-  if (typeof namespace !== 'string' || !NAMESPACE.test(namespace)) {
-    const got = namespace === undefined ? 'it is missing' : `got ${JSON.stringify(namespace)}`;
-    throw new CodegenError(
-      `dotnet target: \`namespace\` is required and must be dotted C# identifiers (for example MyApp.FeatureFlags); ${got}`,
-    );
-  }
-  const segments = namespace.split('.');
-  const keyword = segments.find((segment) => CSHARP_KEYWORDS.has(segment));
-  if (keyword !== undefined) {
-    throw new CodegenError(
-      `dotnet target: \`namespace\` segment "${keyword}" is a C# keyword; got ${JSON.stringify(namespace)}`,
-    );
-  }
-  const last = segments[segments.length - 1]!;
-  if (CLASS_NAMES.includes(last)) {
-    throw new CodegenError(
-      `dotnet target: \`namespace\` must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
-    );
-  }
-  if (!out.endsWith('.cs')) {
-    throw new CodegenError(
-      `dotnet target: \`out\` must be the path of a .cs file (for example Flags.g.cs), got ${JSON.stringify(out)}`,
-    );
-  }
-  return { namespace };
-}
+/**
+ * The dotnet target's own config keys (DESIGN.md → dotnet → Config). Its
+ * `namespace` must not end in a generated class's name: code in the parent
+ * namespace would then resolve that name to the namespace (CS0118).
+ */
+const OPTIONS = {
+  namespace: targetOption({
+    type: 'string',
+    required: true,
+    description: "The generated classes' namespace: dotted C# identifiers, none a keyword, not ending in Flags or FlagKeys.",
+    example: 'MyApp.FeatureFlags',
+    parse: (namespace, fail) => {
+      if (!NAMESPACE.test(namespace)) {
+        fail(`must be dotted C# identifiers (for example MyApp.FeatureFlags), got ${JSON.stringify(namespace)}`);
+      }
+      const segments = namespace.split('.');
+      const keyword = segments.find((segment) => CSHARP_KEYWORDS.has(segment));
+      if (keyword !== undefined) fail(`segment "${keyword}" is a C# keyword; got ${JSON.stringify(namespace)}`);
+      const last = segments[segments.length - 1]!;
+      if (CLASS_NAMES.includes(last)) {
+        fail(
+          `must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
+        );
+      }
+      return namespace;
+    },
+  }),
+};
 
 /**
  * A C# new-line (C# spec → Lexical structure → Line terminators): it ends a
@@ -207,13 +205,15 @@ function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   w.block('{', '}', () => w.line(`return ${CLIENT_FIELD}.${method}Detail(${FLAG_KEYS_CLASS}.${name}, context, fallback);`));
 }
 
-export const dotnetEmitter: Emitter = {
+export const dotnetEmitter: Emitter<typeof OPTIONS> = {
   id: DOTNET,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [8],
+  outExtensions: ['.cs'],
+  options: OPTIONS,
   readFlags: parseDotnetFlags,
   emit(model, cfg, ctx) {
-    const { namespace } = targetOptions(cfg);
+    const { namespace } = cfg.options;
     const names = nameFlags(model, NAMING);
     const w = new Writer({ indent: '    ', commentPrefix: '//' });
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });

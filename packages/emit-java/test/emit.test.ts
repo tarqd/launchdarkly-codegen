@@ -3,7 +3,7 @@ import type { Flag, FlagModel } from '@launchtarqly/core';
 import { javaEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
-const cfg = { id: 'java', out: 'src/main/java/com/example/flags', package: 'com.example.flags', sdkMajor: 7 } as const;
+const cfg = { id: 'java', out: 'src/main/java/com/example/flags', sdkMajor: 7, options: { package: 'com.example.flags' } } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 function emit(...flags: Flag[]): string {
@@ -236,10 +236,5 @@ public final class Flags {
 
   it('marks nothing deprecated for a live flag', () => {
     expect(emit(modelFlag('on'))).not.toMatch(/@[Dd]eprecated/);
-  });
-
-  it('rejects a missing package', () => {
-    const { package: _omitted, ...noPackage } = cfg;
-    expect(() => javaEmitter.emit({ projectKey: 'p', flags: [] }, noPackage, ctx)).toThrow(/java target: `package` is required/);
   });
 });

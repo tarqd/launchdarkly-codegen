@@ -4,15 +4,14 @@
  */
 
 import {
-  CodegenError,
   GO_INITIALISMS,
   nameFlags,
+  targetOption,
   upperCamel,
   Writer,
   type Emitter,
   type Flag,
   type NamingRules,
-  type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
 import { deprecation, methodDoc } from './doc.js';
@@ -33,23 +32,19 @@ const GO_KEYWORDS: ReadonlySet<string> = new Set([
   'struct', 'switch', 'type', 'var',
 ]);
 
-/**
- * The target's `package`, after checking it and `out` (DESIGN.md → go →
- * Config). Config loading passes these keys through unchecked, so a bad
- * value is a CodegenError (exit 2) naming the key.
- */
-function packageName(cfg: TargetConfig): string {
-  if (!cfg.out.endsWith('.go')) {
-    throw new CodegenError(`go target: out must be the path of a .go file, got ${JSON.stringify(cfg.out)}`);
-  }
-  const pkg = cfg.package;
-  if (typeof pkg !== 'string' || !/^[a-z][a-z0-9_]*$/.test(pkg) || GO_KEYWORDS.has(pkg)) {
-    throw new CodegenError(
-      `go target: package must be a lowercase Go identifier that is not a keyword, got ${JSON.stringify(pkg)}`,
-    );
-  }
-  return pkg;
-}
+/** The go target's own config keys (DESIGN.md → go → Config). */
+const OPTIONS = {
+  package: targetOption({
+    type: 'string',
+    required: true,
+    description: "The generated file's Go package name: a lowercase Go identifier that is not a keyword.",
+    example: 'ldflags',
+    parse: (pkg, fail) =>
+      /^[a-z][a-z0-9_]*$/.test(pkg) && !GO_KEYWORDS.has(pkg)
+        ? pkg
+        : fail(`must be a lowercase Go identifier that is not a keyword, got ${JSON.stringify(pkg)}`),
+  }),
+};
 
 /** Each flag's name is its method; the other method forms and its key constant are built from it. */
 const NAMING: NamingRules = {
@@ -145,12 +140,14 @@ function emitKeys(w: Writer, flags: readonly NamedFlag[]): void {
   });
 }
 
-export const goEmitter: Emitter = {
+export const goEmitter: Emitter<typeof OPTIONS> = {
   id: GO,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [7],
+  outExtensions: ['.go'],
+  options: OPTIONS,
   emit(model, cfg, ctx) {
-    const pkg = packageName(cfg);
+    const pkg = cfg.options.package;
     // The Flag model is sorted by key, so methods and constants are too.
     const flags = [...nameFlags(model, NAMING)].map(([flag, name]): NamedFlag => ({ flag, name }));
     const w = new Writer({ indent: '\t', commentPrefix: '//' });

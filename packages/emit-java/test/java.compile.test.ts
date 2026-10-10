@@ -136,7 +136,7 @@ describe('java golden output compiles against java-server-sdk 7.17.2', () => {
         }),
       ],
     };
-    const cfg = { id: 'java', out: 'out', package: 'com.example.flags', sdkMajor: 7 } as const;
+    const cfg = { id: 'java', out: 'out', sdkMajor: 7, options: { package: 'com.example.flags' } } as const;
     await checkAll(javaEmitter.emit(model, cfg, { generatorVersion: '0.0.0' })[0]!.contents);
   });
 });
