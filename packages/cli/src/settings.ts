@@ -65,8 +65,15 @@ function listOf(values: readonly string[]): string[] | undefined {
   return list.length > 0 ? list : undefined;
 }
 
-export function resolveSettings({ cli, env, file, filePath, warn }: SettingLayers): Settings {
+export interface ResolvedSettings {
+  values: Settings;
+  /** Settings no layer set, whose value is the `default` from `SETTINGS`. */
+  defaulted: ReadonlySet<SettingKey>;
+}
+
+export function resolveSettings({ cli, env, file, filePath, warn }: SettingLayers): ResolvedSettings {
   const settings: Record<string, string | string[]> = {};
+  const defaulted = new Set<SettingKey>();
   for (const spec of SETTINGS as readonly SettingSpec[]) {
     let fromFile: unknown;
     if (file[spec.key] !== undefined) {
@@ -82,10 +89,15 @@ export function resolveSettings({ cli, env, file, filePath, warn }: SettingLayer
           listOf(env[spec.env]?.split(',') ?? []),
           fromFile as string[] | undefined,
         ].find((v) => v !== undefined)
-      : [cli[spec.flag], env[spec.env], fromFile, spec.default].find(nonEmpty);
-    if (value !== undefined) settings[spec.key] = value;
+      : [cli[spec.flag], env[spec.env], fromFile].find(nonEmpty);
+    if (value !== undefined) {
+      settings[spec.key] = value;
+    } else if (spec.default !== undefined) {
+      settings[spec.key] = spec.default;
+      defaulted.add(spec.key as SettingKey);
+    }
   }
-  return settings as Settings;
+  return { values: settings as Settings, defaulted };
 }
 
 function checkFileValue(spec: SettingSpec, value: unknown, filePath: string): string | string[] {

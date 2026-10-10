@@ -2,7 +2,8 @@
  * `generate` and `snapshot` against the API, through a fake transport that
  * replays the flags-list pages recorded in fixtures/snapshots.
  */
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
@@ -145,5 +146,51 @@ describe('live fetch from the CLI', () => {
     const result = await runCli(['snapshot'], await projectDir(config), { env: { LD_ACCESS_TOKEN: 't' } });
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('--write-snapshot');
+  });
+
+  it('snapshot needs no config file: connection and selection flags are enough', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ld-codegen-empty-'));
+    const api = recordedApi();
+    const args = ['snapshot', '--write-snapshot', 's.json', '--project', 'my-project'];
+    const result = await runCli(args, dir, { env: { LD_ACCESS_TOKEN: 't' }, fetch: api.fetch });
+    expect(result).toMatchObject({ exitCode: 0, stderr: '' });
+    const written = JSON.parse(await readFile(join(dir, 's.json'), 'utf8'));
+    expect(written.flagPages).toEqual(recorded.flagPages);
+  });
+
+  it('snapshot reads a config file that has no targets', async () => {
+    const dir = await projectDir({ project: 'my-project' });
+    const io = { env: { LD_ACCESS_TOKEN: 't' }, fetch: recordedApi().fetch };
+    expect(await runCli(['snapshot', '--write-snapshot', 's.json'], dir, io)).toMatchObject({ exitCode: 0, stderr: '' });
+  });
+
+  it('snapshot without a config file still needs a project', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ld-codegen-empty-'));
+    const result = await runCli(['snapshot', '--write-snapshot', 's.json'], dir, { env: { LD_ACCESS_TOKEN: 't' } });
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain('`project` is not set');
+  });
+
+  it('snapshot still exits 2 when an explicit --config is missing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ld-codegen-empty-'));
+    const args = ['snapshot', '--write-snapshot', 's.json', '--project', 'p', '--config', 'nope.json'];
+    const result = await runCli(args, dir, { env: { LD_ACCESS_TOKEN: 't' } });
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain('config file not found');
+  });
+});
+
+describe('options each command takes', () => {
+  it.each([
+    ['generate', '--write-snapshot', ['generate', '--from-snapshot', fixture, '--write-snapshot', 'x.json']],
+    ['check', '--write-snapshot', ['check', '--from-snapshot', fixture, '--write-snapshot', 'x.json']],
+    ['snapshot', '--from-snapshot', ['snapshot', '--write-snapshot', 'x.json', '--from-snapshot', fixture]],
+    ['snapshot', '--target', ['snapshot', '--write-snapshot', 'x.json', '--target', 'ts-server']],
+  ])('%s rejects %s as an unknown option with exit 2', async (_command, option, argv) => {
+    const dir = await projectDir(config);
+    const result = await runCli(argv, dir, { env: { LD_ACCESS_TOKEN: 't' }, fetch: recordedApi().fetch });
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain(`Unknown option '${option}'`);
+    await expect(readFile(join(dir, 'x.json'))).rejects.toThrow();
   });
 });

@@ -3,13 +3,13 @@
  * The file is one layer of settings; `settings.ts` layers env and CLI on top.
  */
 
-import { readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CodegenError, type Emitter, type TargetConfig, type TargetId } from '@launchtarqly/core';
 import { parse as parseYaml } from 'yaml';
 import { BUILT_IN_EMITTERS } from './emitters.js';
-import { resolveSettings, SETTINGS } from './settings.js';
+import { readIfExists } from './fs.js';
+import { resolveSettings, SETTINGS, type SettingKey } from './settings.js';
 
 export const CONFIG_FILENAMES = [
   'launchdarkly-codegen.config.json',
@@ -17,8 +17,8 @@ export const CONFIG_FILENAMES = [
   'launchdarkly-codegen.config.js',
 ] as const;
 
-/** The resolved config: file, env and CLI layered (see settings.ts). */
-export interface Config {
+/** The resolved settings `snapshot` needs: what to fetch and how to connect. */
+export interface ConnectionConfig {
   project: string;
   baseUri: string;
   /** Only ever from env or CLI, never the config file. */
@@ -27,6 +27,10 @@ export interface Config {
   tags?: string[];
   /** View key: only flags linked to this view. Never set together with `tags`. */
   view?: string;
+}
+
+/** The resolved config for `generate` and `check`: file, env and CLI layered (see settings.ts). */
+export interface Config extends ConnectionConfig {
   targets: TargetConfig[];
   check?: CheckConfig;
 }
@@ -36,8 +40,8 @@ export interface CheckConfig {
   failOnMissingOutput?: boolean;
 }
 
-export interface LoadedConfig {
-  config: Config;
+/** Where a config file is. */
+export interface ConfigLocation {
   /** Absolute path of the config file. */
   path: string;
   /** Directory the config's relative paths (`out`) resolve against. */
@@ -45,21 +49,21 @@ export interface LoadedConfig {
 }
 
 /** A config file read from disk but not yet validated. */
-export interface ConfigFile {
+export interface ConfigFile extends ConfigLocation {
   data: unknown;
-  /** Absolute path of the config file. */
-  path: string;
-  /** Directory the config's relative paths (`out`) resolve against. */
-  dir: string;
 }
 
-async function readIfExists(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw new CodegenError(`cannot read config ${path}: ${(err as Error).message}`);
-  }
+export interface ResolvedConnection {
+  config: ConnectionConfig;
+  /** The config file, if one was read. */
+  file?: ConfigLocation;
+  /** Settings that no layer set, so they hold their default (see settings.ts). */
+  defaulted: ReadonlySet<SettingKey>;
+}
+
+export interface LoadedConfig extends ResolvedConnection {
+  config: Config;
+  file: ConfigLocation;
 }
 
 async function parseFile(text: string, path: string): Promise<unknown> {
@@ -89,22 +93,41 @@ async function parseFile(text: string, path: string): Promise<unknown> {
   }
 }
 
-/** Reads `--config <path>` if given, otherwise the one default file in `cwd`. */
-export async function readConfigFile(cwd: string, explicitPath?: string): Promise<ConfigFile> {
+async function readText(path: string): Promise<string | undefined> {
+  return (await readIfExists(path, 'config'))?.toString('utf8');
+}
+
+/**
+ * Reads `--config <path>` if given, otherwise the one default file in `cwd`.
+ * With `optional`, a missing default file returns `undefined` instead of
+ * failing; a missing `--config` file always fails.
+ */
+export async function readConfigFile(cwd: string, explicitPath?: string): Promise<ConfigFile>;
+export async function readConfigFile(
+  cwd: string,
+  explicitPath: string | undefined,
+  options: { optional: true },
+): Promise<ConfigFile | undefined>;
+export async function readConfigFile(
+  cwd: string,
+  explicitPath?: string,
+  { optional = false }: { optional?: boolean } = {},
+): Promise<ConfigFile | undefined> {
   if (explicitPath !== undefined) {
     const path = resolve(cwd, explicitPath);
-    const text = await readIfExists(path);
+    const text = await readText(path);
     if (text === undefined) throw new CodegenError(`config file not found: ${path}`);
     return { data: await parseFile(text, path), path, dir: dirname(path) };
   }
   const found: { path: string; text: string }[] = [];
   for (const name of CONFIG_FILENAMES) {
     const path = resolve(cwd, name);
-    const text = await readIfExists(path);
+    const text = await readText(path);
     if (text !== undefined) found.push({ path, text });
   }
   const [first, ...others] = found;
   if (first === undefined) {
+    if (optional) return undefined;
     throw new CodegenError(`no config file found in ${cwd} (looked for ${CONFIG_FILENAMES.join(', ')})`);
   }
   if (others.length > 0) {
@@ -127,21 +150,50 @@ export interface ResolveOptions {
 const STRUCTURED_KEYS = ['targets', 'check'];
 
 /**
- * Reads the config file, layers env and CLI settings over it, validates the
- * result and narrows `targets` to `--target` if given. Errors exit 2.
+ * The config for `generate` and `check`: reads the config file (which must
+ * exist), layers env and CLI settings over it, validates the result and
+ * narrows `targets` to `--target` if given. Errors exit 2.
  */
-export async function resolveConfig({
-  cwd,
-  env,
-  cli,
-  warn,
-  emitters = BUILT_IN_EMITTERS,
-}: ResolveOptions): Promise<LoadedConfig> {
-  const file = await readConfigFile(cwd, typeof cli.config === 'string' ? cli.config : undefined);
-  const { path, data } = file;
+export async function resolveConfig(options: ResolveOptions): Promise<LoadedConfig> {
+  const { cli, emitters = BUILT_IN_EMITTERS } = options;
+  const file = await readConfigFile(options.cwd, configFlag(cli));
+  const { raw, fail, ...connection } = resolveLayers(options, file);
+  const targets = selectTargets(parseTargets(raw.targets, emitters, fail), cli.target);
+  const config: Config = { ...connection.config, targets };
+  if (raw.check !== undefined) config.check = parseCheckConfig(raw.check, fail);
+  return { config, file: locationOf(file), defaulted: connection.defaulted };
+}
+
+/**
+ * The settings for `snapshot`: like `resolveConfig`, but the config file is
+ * optional and `targets` and `check` are not read, since nothing is generated.
+ */
+export async function resolveConnection(options: ResolveOptions): Promise<ResolvedConnection> {
+  const file = await readConfigFile(options.cwd, configFlag(options.cli), { optional: true });
+  const { config, defaulted } = resolveLayers(options, file);
+  return { config, defaulted, ...(file && { file: locationOf(file) }) };
+}
+
+function configFlag(cli: Record<string, unknown>): string | undefined {
+  return typeof cli.config === 'string' ? cli.config : undefined;
+}
+
+function locationOf({ path, dir }: ConfigLocation): ConfigLocation {
+  return { path, dir };
+}
+
+/**
+ * The settings layered over `file` (or over nothing), validated, plus the
+ * file's raw object and its error helper for the structured keys.
+ */
+function resolveLayers(
+  { env, cli, warn }: ResolveOptions,
+  file: ConfigFile | undefined,
+): ResolvedConnection & { raw: Record<string, unknown>; fail: (msg: string) => never } {
   const fail = (msg: string): never => {
-    throw new CodegenError(`${path}: ${msg}`);
+    throw new CodegenError(file ? `${file.path}: ${msg}` : msg);
   };
+  const data = file ? file.data : {};
   if (typeof data !== 'object' || data === null || Array.isArray(data)) return fail('expected an object');
   const raw = data as Record<string, unknown>;
 
@@ -150,15 +202,13 @@ export async function resolveConfig({
     if (!known.includes(key)) fail(`unknown key \`${key}\` (known keys: ${known.join(', ')})`);
   }
 
-  const { project, baseUri, ...rest } = resolveSettings({ cli, env, file: raw, filePath: path, warn });
+  const { values, defaulted } = resolveSettings({ cli, env, file: raw, filePath: file?.path ?? '', warn });
+  const { project, baseUri, ...rest } = values;
   if (project === undefined) {
-    return fail('`project` is not set; set it in the config file, with LD_CODEGEN_PROJECT, or with --project');
+    const where = file ? 'in the config file, ' : '';
+    return fail(`\`project\` is not set; set it ${where}with LD_CODEGEN_PROJECT, or with --project`);
   }
-  if (rest.view !== undefined && rest.tags !== undefined) {
-    throw new CodegenError(
-      `\`view\` and \`tags\` cannot both be set (view ${JSON.stringify(rest.view)}, tags ${JSON.stringify(rest.tags)}); use one or the other`,
-    );
-  }
+  if (rest.view !== undefined && rest.tags !== undefined) throw viewAndTagsError(rest.view, rest.tags);
   for (const tag of rest.tags ?? []) {
     if (/[+,]/.test(tag)) {
       throw new CodegenError(
@@ -166,11 +216,19 @@ export async function resolveConfig({
       );
     }
   }
-  const targets = selectTargets(parseTargets(raw.targets, emitters, fail), cli.target);
   // baseUri always has a default in SETTINGS.
-  const config: Config = { ...rest, project, baseUri: normalizeBaseUri(baseUri!), targets };
-  if (raw.check !== undefined) config.check = parseCheckConfig(raw.check, fail);
-  return { config, path, dir: file.dir };
+  const config: ConnectionConfig = { ...rest, project, baseUri: normalizeBaseUri(baseUri!) };
+  return { config, defaulted, raw, fail };
+}
+
+/**
+ * `view` and `tags` are mutually exclusive, whether set in the config or
+ * recorded in a snapshot; `note` says where they came from if not the config.
+ */
+export function viewAndTagsError(view: string, tags: readonly string[], note = ''): CodegenError {
+  return new CodegenError(
+    `\`view\` and \`tags\` cannot both be set (view ${JSON.stringify(view)}, tags ${JSON.stringify(tags)}${note}); use one or the other`,
+  );
 }
 
 /** An http(s) URL without trailing slashes, so UI links and API paths join cleanly. */

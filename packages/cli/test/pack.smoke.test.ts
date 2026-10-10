@@ -62,7 +62,7 @@ beforeAll(async () => {
   await writeFile(join(project, 'package.json'), JSON.stringify({ name: 'scratch', private: true, type: 'module' }));
   await writeFile(
     join(project, 'launchdarkly-codegen.config.json'),
-    JSON.stringify({ project: 'demo', targets: [{ id: 'ts-server', out: OUT, sdkMajor: 9 }] }),
+    JSON.stringify({ project: 'my-project', targets: [{ id: 'ts-server', out: OUT, sdkMajor: 9 }] }),
   );
   await exec('npm', ['install', '--no-audit', '--no-fund', tarball], { cwd: project });
 }, 180_000);

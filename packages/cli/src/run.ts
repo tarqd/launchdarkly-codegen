@@ -2,12 +2,13 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
-import { parseArgs } from 'node:util';
+import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
 import { CodegenError, defaultFetchDeps, fetchSnapshot, readSnapshot, type Snapshot } from '@launchtarqly/core';
 import { checkFiles } from './check.js';
-import { resolveConfig, type Config } from './config.js';
+import { resolveConfig, resolveConnection, type ConnectionConfig } from './config.js';
 import { generateFiles, writeFiles } from './generate.js';
 import { writeStarterConfig } from './init.js';
+import { checkReplay } from './replay.js';
 import { settingOptions } from './settings.js';
 
 export interface RunIO {
@@ -57,39 +58,60 @@ export async function run(argv: string[], io: RunIO): Promise<number> {
   }
 }
 
-function parse(args: string[]) {
+/** The options `generate` and `check` take. */
+const GENERATE_OPTIONS = {
+  config: { type: 'string' },
+  target: { type: 'string', multiple: true },
+  'from-snapshot': { type: 'string' },
+  ...settingOptions(),
+} as const satisfies ParseArgsOptionsConfig;
+
+/** The options `snapshot` takes: connection and selection settings, no targets. */
+const SNAPSHOT_OPTIONS = {
+  config: { type: 'string' },
+  'write-snapshot': { type: 'string' },
+  ...settingOptions(),
+} as const satisfies ParseArgsOptionsConfig;
+
+const INIT_OPTIONS = { config: { type: 'string' } } as const satisfies ParseArgsOptionsConfig;
+
+/** Strict `parseArgs`; an unknown or malformed option is exit 2. */
+function parse<T extends ParseArgsOptionsConfig>(args: string[], options: T) {
   try {
-    return parseArgs({
-      args,
-      strict: true,
-      options: {
-        config: { type: 'string' },
-        target: { type: 'string', multiple: true },
-        'from-snapshot': { type: 'string' },
-        'write-snapshot': { type: 'string' },
-        ...settingOptions(),
-      },
-    }).values;
+    return parseArgs({ args, strict: true, options }).values;
   } catch (err) {
     throw new CodegenError((err as Error).message);
   }
 }
 
+function warner(io: RunIO): (message: string) => void {
+  return (message) => io.stderr(`warning: ${message}\n`);
+}
+
+function reportWritten(io: RunIO, path: string): void {
+  io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
+}
+
 /** Config and snapshot for `generate` and `check`, which take the same flags. */
 async function loadInputs(args: string[], io: RunIO) {
-  const opts = parse(args);
-  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
-  const { config, dir } = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
+  const opts = parse(args, GENERATE_OPTIONS);
+  const warn = warner(io);
+  const loaded = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
   const snapshotPath = opts['from-snapshot'];
-  const snapshot =
-    snapshotPath === undefined ? await fetchLive(config, io) : await readSnapshot(resolve(io.cwd, snapshotPath));
-  return { config, dir, snapshot, warn };
+  let snapshot: Snapshot;
+  if (snapshotPath === undefined) {
+    snapshot = await fetchLive(loaded.config, io);
+  } else {
+    snapshot = await readSnapshot(resolve(io.cwd, snapshotPath));
+    checkReplay(loaded, snapshot, warn);
+  }
+  return { config: loaded.config, dir: loaded.file.dir, snapshot, warn };
 }
 
 async function generateCommand(args: string[], io: RunIO): Promise<number> {
   const { config, dir, snapshot, warn } = await loadInputs(args, io);
   const written = await writeFiles(generateFiles(config, snapshot, { warn }), dir);
-  for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
+  for (const path of written) reportWritten(io, path);
   return 0;
 }
 
@@ -103,13 +125,12 @@ async function checkCommand(args: string[], io: RunIO): Promise<number> {
   return result.stale ? 1 : 0;
 }
 
-/** `snapshot --write-snapshot <file>`: fetch live and save the raw responses. */
+/** `snapshot --write-snapshot <file>`: fetch live and save the raw responses. No config file needed. */
 async function snapshotCommand(args: string[], io: RunIO): Promise<number> {
-  const opts = parse(args);
+  const opts = parse(args, SNAPSHOT_OPTIONS);
   const out = opts['write-snapshot'];
   if (out === undefined) throw new CodegenError(`snapshot needs --write-snapshot <file>\n${USAGE}`);
-  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
-  const { config } = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
+  const { config } = await resolveConnection({ cwd: io.cwd, env: io.env, cli: opts, warn: warner(io) });
   const snapshot = await fetchLive(config, io);
   const path = resolve(io.cwd, out);
   try {
@@ -118,12 +139,12 @@ async function snapshotCommand(args: string[], io: RunIO): Promise<number> {
   } catch (err) {
     throw new CodegenError(`cannot write snapshot ${path}: ${(err as Error).message}`);
   }
-  io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
+  reportWritten(io, path);
   return 0;
 }
 
 /** Fetches the flags list with the resolved connection settings. */
-function fetchLive(config: Config, io: RunIO): Promise<Snapshot> {
+function fetchLive(config: ConnectionConfig, io: RunIO): Promise<Snapshot> {
   const { project, baseUri, accessToken, tags, view } = config;
   if (accessToken === undefined) {
     throw new CodegenError(
@@ -137,13 +158,7 @@ function fetchLive(config: Config, io: RunIO): Promise<Snapshot> {
 }
 
 async function initCommand(args: string[], io: RunIO): Promise<number> {
-  let opts: { config?: string };
-  try {
-    opts = parseArgs({ args, strict: true, options: { config: { type: 'string' } } }).values;
-  } catch (err) {
-    throw new CodegenError((err as Error).message);
-  }
-  const path = await writeStarterConfig(io.cwd, opts.config);
-  io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
+  const opts = parse(args, INIT_OPTIONS);
+  reportWritten(io, await writeStarterConfig(io.cwd, opts.config));
   return 0;
 }
