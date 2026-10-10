@@ -21,15 +21,44 @@ import {
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const DOTNET: TargetId = 'dotnet';
 
+/** `System.Object` members, which a flag method would hide (CS0108) or confusingly overload. */
+const OBJECT_MEMBERS = ['Equals', 'GetHashCode', 'ToString', 'GetType', 'MemberwiseClone', 'Finalize', 'ReferenceEquals'];
+
+/**
+ * The C# reserved keywords (C# spec → Lexical structure → Keywords). They are
+ * all lowercase, so only an alias can hit one. Contextual keywords (`var`,
+ * `async`, …) are legal member names and aren't listed.
+ */
+const CSHARP_KEYWORDS = [
+  'abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class',
+  'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event',
+  'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if',
+  'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock', 'long', 'namespace', 'new', 'null',
+  'object', 'operator', 'out', 'override', 'params', 'private', 'protected', 'public', 'readonly',
+  'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct',
+  'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe',
+  'ushort', 'using', 'virtual', 'void', 'volatile', 'while',
+];
+
+/**
+ * A C# identifier (C# spec → Lexical structure → Identifiers), without the
+ * `@` prefix or Unicode escapes: a letter or `_`, then letters, digits,
+ * connecting, combining and formatting characters.
+ */
+const IDENTIFIER = '[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}\\p{Mn}\\p{Mc}\\p{Cf}]*';
+
 const NAMING: IdentifierRules = {
   target: DOTNET,
-  // C# keywords are lowercase, so an UpperCamel name can't hit one; the full
-  // rule set (keyword aliases, System.Object members) is #37's.
-  reserved: new Set(),
-  pattern: /^[A-Za-z_][A-Za-z0-9_]*$/,
+  reserved: new Set([...CSHARP_KEYWORDS, ...OBJECT_MEMBERS]),
+  pattern: new RegExp(`^${IDENTIFIER}$`, 'u'),
 };
-/** Type names the file declares, which flag members must not reuse. */
-const OWN_NAMES = ['Flags', 'FlagKeys'];
+/** The classes the file declares. */
+const CLASS_NAMES = ['Flags', 'FlagKeys'];
+/**
+ * Names the file declares, which flag members must not reuse: the classes
+ * (a member can't share its class's name, CS0542) and the wrapper's field.
+ */
+const OWN_NAMES = [...CLASS_NAMES, '_client'];
 
 /** Each flag's name, after checking every identifier the file will emit. */
 function flagNames(model: FlagModel): Map<Flag, string> {
@@ -45,8 +74,7 @@ function flagNames(model: FlagModel): Map<Flag, string> {
   return names;
 }
 
-const IDENTIFIER = '[A-Za-z_][A-Za-z0-9_]*';
-const NAMESPACE = new RegExp(`^${IDENTIFIER}(?:\\.${IDENTIFIER})*$`);
+const NAMESPACE = new RegExp(`^${IDENTIFIER}(?:\\.${IDENTIFIER})*$`, 'u');
 
 /** The `namespace` option, checked; `out` must name a .cs file. Throws CodegenError (exit 2). */
 function targetOptions(cfg: TargetConfig): { namespace: string } {
@@ -55,6 +83,19 @@ function targetOptions(cfg: TargetConfig): { namespace: string } {
     const got = namespace === undefined ? 'it is missing' : `got ${JSON.stringify(namespace)}`;
     throw new CodegenError(
       `dotnet target: \`namespace\` is required and must be dotted C# identifiers (for example MyApp.FeatureFlags); ${got}`,
+    );
+  }
+  const segments = namespace.split('.');
+  const keyword = segments.find((segment) => CSHARP_KEYWORDS.includes(segment));
+  if (keyword !== undefined) {
+    throw new CodegenError(
+      `dotnet target: \`namespace\` segment "${keyword}" is a C# keyword; got ${JSON.stringify(namespace)}`,
+    );
+  }
+  const last = segments[segments.length - 1]!;
+  if (CLASS_NAMES.includes(last)) {
+    throw new CodegenError(
+      `dotnet target: \`namespace\` must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
     );
   }
   if (!out.endsWith('.cs')) {
