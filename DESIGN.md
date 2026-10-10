@@ -245,13 +245,16 @@ constant form:
 | ts-server, ts-browser | lowerCamel | lowerCamel (`FlagKeys` property) | `checkoutV2NewFlow` |
 | go | UpperCamel, exported | `Key` + UpperCamel | `CheckoutV2NewFlow`, `KeyCheckoutV2NewFlow` |
 | java | lowerCamel | CONSTANT_CASE | `checkoutV2NewFlow`, `CHECKOUT_V2_NEW_FLOW` |
+| dotnet | UpperCamel | UpperCamel (`FlagKeys` constant) | `CheckoutV2NewFlow`, `FlagKeys.CheckoutV2NewFlow` |
 
 If the flag has an alias for the target, the alias is used as is (after
 validation) instead of the converted key. Otherwise the steps are: split on
 `-`, `_`, `.`, `/`, whitespace, and case changes; drop characters that are not
 letters or digits; apply the target's casing. Go additionally fixes common
 initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to `API`), so `api-url-id`
-becomes `APIURLID` and the Java constant `API_URL_ID`.
+becomes `APIURLID` and the Java constant `API_URL_ID`. .NET follows the
+Framework Design Guidelines instead (`Api`, `Url`, `Id`), so it applies no
+initialism table: `api-url-id` becomes `ApiUrlId`.
 
 The generator never invents a name: an identifier is either the converted key
 or an alias the user chose. These are errors, each naming the flag and
@@ -263,7 +266,12 @@ suggesting `codegen.name.<target>`:
   methods (`wait`, `notify`, `notifyAll`, `equals`, `hashCode`, `toString`,
   `getClass`, `clone`, `finalize`). Go's keywords can't collide with
   UpperCamel names, so Go checks only the names it generates itself (`New`,
-  `Client`, `Flags`).
+  `Client`, `Flags`). C# keywords are all lowercase too, so .NET checks its
+  own names (`Flags`, `FlagKeys`; a member can't share its class's name,
+  CS0542) and the `System.Object` members (`Equals`, `GetHashCode`,
+  `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`).
+  An alias, which can be in any case, is also checked against the C#
+  keywords. The generator never escapes a name with `@`.
 - **Collision.** The check covers every identifier a target emits: flag
   methods, their `Detail` and `Ctx` variants, and key constants. For example,
   flag `checkout`'s detail method and a flag named `checkout-detail` both want
@@ -327,6 +335,7 @@ output is the contract.
 | ts-server, ts-browser | `/** @deprecated ... */` on the method |
 | go | `// Deprecated: ...` paragraph in the doc comment |
 | java | `@Deprecated` plus `@deprecated` Javadoc tag |
+| dotnet | `[System.Obsolete(...)]`, with `DiagnosticId = "LDFLAG001"` and the flag's UI link as `UrlFormat` on .NET 5+ (ADR 0002) |
 
 The annotation goes on the flag's method, its `Detail` and `Ctx` variants,
 and its key constant. The text is the flag's `deprecationMessage`; without one,
@@ -361,19 +370,23 @@ Escaping per target:
 - **Java:** Javadoc is HTML, so escape `&`, `<`, `>`, and `*/` (as `*&#47;`).
   Emit `@param` and `@return`, and comment every member, private ones
   included, so the output passes `-Xdoclint:all`.
+- **.NET:** `///` XML doc comments, so escape `&`, `<` and `>`, and `"` in
+  attribute values. Emit `<param>` and `<returns>` and document every public
+  member, so `GenerateDocumentationFile` raises no CS1591. In an
+  `[Obsolete]` `UrlFormat` string, `{` and `}` are doubled.
 
 ## Generated code by target
 
 Flag kinds map to SDK methods. The examples below use three flags:
 `checkout-v2` (boolean), `pricing-tier` (string), `checkout-config` (json).
 
-| Kind | ts-server / ts-browser | go | java |
-| --- | --- | --- | --- |
-| boolean | `boolVariation` → `boolean` | `BoolVariation` → `bool` | `boolVariation` → `boolean` |
-| string | `stringVariation` → `string` | `StringVariation` → `string` | `stringVariation` → `String` |
-| number (double) | `numberVariation` → `number` | `Float64Variation` → `float64` | `doubleVariation` → `double` |
-| number (int) | `numberVariation` → `number` | `IntVariation` → `int` | `intVariation` → `int` |
-| json | `jsonVariation` → `unknown` | `JSONVariation` → `ldvalue.Value` | `jsonValueVariation` → `LDValue` |
+| Kind | ts-server / ts-browser | go | java | dotnet |
+| --- | --- | --- | --- | --- |
+| boolean | `boolVariation` → `boolean` | `BoolVariation` → `bool` | `boolVariation` → `boolean` | `BoolVariation` → `bool` |
+| string | `stringVariation` → `string` | `StringVariation` → `string` | `stringVariation` → `String` | `StringVariation` → `string` |
+| number (double) | `numberVariation` → `number` | `Float64Variation` → `float64` | `doubleVariation` → `double` | `DoubleVariation` → `double` |
+| number (int) | `numberVariation` → `number` | `IntVariation` → `int` | `intVariation` → `int` | `IntVariation` → `int` |
+| json | `jsonVariation` → `unknown` | `JSONVariation` → `ldvalue.Value` | `jsonValueVariation` → `LDValue` | `JsonVariation` → `LdValue` |
 
 ### ts-server (`@launchdarkly/node-server-sdk` v9)
 
@@ -561,6 +574,214 @@ public final class Flags {
 Output is always one class. It must compile without warnings under
 `-Xlint:all -Xdoclint:all -Werror`.
 
+### dotnet (`LaunchDarkly.ServerSdk` 8.x)
+
+`sdkMajors: [8]`. 7.x reached end of life on 2024-10-16. The wrapper takes
+`ILdClient` (namespace `LaunchDarkly.Sdk.Server.Interfaces`), which the
+sealed `LdClient` implements, so callers pass the real client and tests can
+pass a fake. The SDK has no async, `CancellationToken` or `Ctx` evaluation
+methods, so each flag gets two methods, `X` and `XDetail` (returning
+`EvaluationDetail<T>`), and the fallback is always required. Research:
+[`docs/research/dotnet-server-sdk.md`](docs/research/dotnet-server-sdk.md).
+
+The SDK targets `netstandard2.0`, `net462` and `net8.0`, and the first two
+default to C# 7.3. The output is C# 7.3, so one file compiles everywhere the
+SDK does: a block-scoped namespace, an ordinary constructor, and no
+`#nullable` or `?` annotations. The SDK isn't nullable-annotated either, so
+the API is nullability-oblivious to consumers.
+
+The header's third line, `// <auto-generated/>`, marks the file as generated
+(as does the `.g.cs` name). Analyzers, IDE style rules and `dotnet format`
+then skip it, so a consumer's `.editorconfig` never disagrees with what
+`check` compares. Compiler warnings still apply, which is why every public
+member has a doc comment and deprecation reaches consumers.
+
+Deprecation is a compile error for consumers who build with
+`TreatWarningsAsErrors`: on .NET 5+ it is `LDFLAG001` with a link to the
+flag, which `<NoWarn>LDFLAG001</NoWarn>` or `#pragma warning disable
+LDFLAG001` silences on its own; on older frameworks it is CS0618 (ADR 0002).
+The deprecated members of the same file can reference each other without a
+warning.
+
+Target options:
+
+- `namespace` (required): dotted C# identifiers, none of them a keyword. A
+  last segment of `Flags` or `FlagKeys` is rejected (exit 2), because code in
+  the parent namespace would then resolve `Flags` to the namespace (CS0118).
+- `out` is a directory; the file is always `Flags.g.cs`.
+
+The prototype in [`prototypes/dotnet`](prototypes/dotnet) is the sample
+output for four flags (the shared three plus a deprecated number flag,
+`max-cart-items`):
+
+```csharp
+// Code generated by launchdarkly-codegen. DO NOT EDIT.
+// project: my-project   generator: 0.3.0
+// <auto-generated/>
+
+using LaunchDarkly.Sdk;
+using LaunchDarkly.Sdk.Server.Interfaces;
+
+namespace MyApp.FeatureFlags
+{
+    /// <summary>
+    /// Typed accessors for the flags in LaunchDarkly project <c>my-project</c>.
+    /// </summary>
+    public sealed class Flags
+    {
+        private readonly ILdClient _client;
+
+        /// <summary>
+        /// Creates a wrapper that evaluates flags through <paramref name="client"/>.
+        /// </summary>
+        /// <param name="client">The LaunchDarkly client, usually an <c>LdClient</c>.</param>
+        public Flags(ILdClient client)
+        {
+            _client = client;
+        }
+
+        /// <summary>
+        /// Checkout V2
+        /// <para>Routes eligible users to the rewritten checkout flow.</para>
+        /// <para>key: <c>checkout-v2</c> · tags: checkout, q3 · maintainer: ada@example.com</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-v2"/></para>
+        /// </summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+        public bool CheckoutV2(Context context, bool fallback)
+        {
+            return _client.BoolVariation(FlagKeys.CheckoutV2, context, fallback);
+        }
+
+        /// <summary>Checkout V2, with the reason for the value. See <see cref="CheckoutV2"/>.</summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value and the reason it was chosen.</returns>
+        public EvaluationDetail<bool> CheckoutV2Detail(Context context, bool fallback)
+        {
+            return _client.BoolVariationDetail(FlagKeys.CheckoutV2, context, fallback);
+        }
+
+        /// <summary>
+        /// Pricing Tier
+        /// <para>key: <c>pricing-tier</c> · maintainer: team Payments</para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/pricing-tier"/></para>
+        /// </summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+        public string PricingTier(Context context, string fallback)
+        {
+            return _client.StringVariation(FlagKeys.PricingTier, context, fallback);
+        }
+
+        /// <summary>Pricing Tier, with the reason for the value. See <see cref="PricingTier"/>.</summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value and the reason it was chosen.</returns>
+        public EvaluationDetail<string> PricingTierDetail(Context context, string fallback)
+        {
+            return _client.StringVariationDetail(FlagKeys.PricingTier, context, fallback);
+        }
+
+        /// <summary>
+        /// Max Cart Items
+        /// <para>Caps the number of items in a cart &amp; at checkout.</para>
+        /// <para>key: <c>max-cart-items</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/max-cart-items"/></para>
+        /// </summary>
+        /// <remarks>Deprecated: Use cart-limits instead.</remarks>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
+        [System.Obsolete("Use cart-limits instead.")]
+#endif
+        public double MaxCartItems(Context context, double fallback)
+        {
+            return _client.DoubleVariation(FlagKeys.MaxCartItems, context, fallback);
+        }
+
+        /// <summary>Max Cart Items, with the reason for the value. See <see cref="MaxCartItems"/>.</summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value and the reason it was chosen.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
+        [System.Obsolete("Use cart-limits instead.")]
+#endif
+        public EvaluationDetail<double> MaxCartItemsDetail(Context context, double fallback)
+        {
+            return _client.DoubleVariationDetail(FlagKeys.MaxCartItems, context, fallback);
+        }
+
+        /// <summary>
+        /// Checkout Config
+        /// <para>key: <c>checkout-config</c></para>
+        /// <para><see href="https://app.launchdarkly.com/projects/my-project/flags/checkout-config"/></para>
+        /// </summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value for <paramref name="context"/>.</returns>
+        public LdValue CheckoutConfig(Context context, LdValue fallback)
+        {
+            return _client.JsonVariation(FlagKeys.CheckoutConfig, context, fallback);
+        }
+
+        /// <summary>Checkout Config, with the reason for the value. See <see cref="CheckoutConfig"/>.</summary>
+        /// <param name="context">The context to evaluate the flag for.</param>
+        /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
+        /// <returns>The flag's value and the reason it was chosen.</returns>
+        public EvaluationDetail<LdValue> CheckoutConfigDetail(Context context, LdValue fallback)
+        {
+            return _client.JsonVariationDetail(FlagKeys.CheckoutConfig, context, fallback);
+        }
+    }
+
+    /// <summary>
+    /// The raw key of every flag in <see cref="Flags"/>.
+    /// </summary>
+    public static class FlagKeys
+    {
+        /// <summary>Key of the flag behind <see cref="Flags.CheckoutV2"/>.</summary>
+        public const string CheckoutV2 = "checkout-v2";
+
+        /// <summary>Key of the flag behind <see cref="Flags.PricingTier"/>.</summary>
+        public const string PricingTier = "pricing-tier";
+
+        /// <summary>Key of the flag behind <see cref="Flags.MaxCartItems"/>.</summary>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
+        [System.Obsolete("Use cart-limits instead.")]
+#endif
+        public const string MaxCartItems = "max-cart-items";
+
+        /// <summary>Key of the flag behind <see cref="Flags.CheckoutConfig"/>.</summary>
+        public const string CheckoutConfig = "checkout-config";
+    }
+}
+```
+
+The full doc comment (name, description, trailer, link) sits on the main
+method, and a deprecated flag's adds a `<remarks>Deprecated: ...</remarks>`.
+The `Detail` method and the key constant get a one-line summary with a
+`<see cref>` to the main method, plus the same `[Obsolete]`.
+
+The compile fixture `fixtures/compile/dotnet/` builds every golden file with
+`TreatWarningsAsErrors`, `AnalysisLevel=latest-all`, `AnalysisMode=All`,
+`EnforceCodeStyleInBuild`, `GenerateDocumentationFile` and
+`WarningLevel=9999`, in two projects: `modern` (net8.0, latest C#,
+`Nullable=enable`) and `legacy` (netstandard2.0, C# 7.3, which covers the
+pre-.NET 5 deprecation branch). `modern` also builds a copy with the
+`<auto-generated/>` line removed, so every analyzer still runs on the output,
+and the test asserts `dotnet format --verify-no-changes --include-generated`
+changes nothing. CI installs .NET 8 with `actions/setup-dotnet`.
+
 ### No runtime packages
 
 Generated code depends only on the official SDK. With Node SDK v9 and
@@ -596,6 +817,10 @@ targets:
     out: services/billing/src/main/java/com/example/flags/
     package: com.example.flags
     sdkMajor: 7
+  - id: dotnet
+    out: src/Billing/FeatureFlags/
+    namespace: Billing.FeatureFlags
+    sdkMajor: 8
 
 check:
   # default shown
@@ -755,7 +980,7 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`.
+3. `emit-go`, `emit-java`, `emit-dotnet`.
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.
