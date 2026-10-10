@@ -14,16 +14,16 @@ import {
   type EmittedIdentifier,
   type Emitter,
   type Flag,
-  type FlagKind,
   type FlagModel,
   type IdentifierRules,
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
-import { summarizeDotnetChanges } from './flag-changes.js';
+import { parseDotnetFlags } from './flag-changes.js';
 import { IDENTIFIER } from './identifier.js';
+import { CLIENT_FIELD, FLAG_KEYS_CLASS, FLAG_KEYS_DECLARATION, KEY_CONSTANT_PREFIX, sdkMethod } from './output.js';
 
-export { parseDotnetFlags, summarizeDotnetChanges } from './flag-changes.js';
+export { parseDotnetFlags } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const DOTNET: TargetId = 'dotnet';
@@ -53,12 +53,12 @@ const NAMING: IdentifierRules = {
   pattern: new RegExp(`^${IDENTIFIER}$`, 'u'),
 };
 /** The classes the file declares. */
-const CLASS_NAMES = ['Flags', 'FlagKeys'];
+const CLASS_NAMES = ['Flags', FLAG_KEYS_CLASS];
 /**
  * Names the file declares, which flag members must not reuse: the classes
  * (a member can't share its class's name, CS0542) and the wrapper's field.
  */
-const OWN_NAMES = [...CLASS_NAMES, '_client'];
+const OWN_NAMES = [...CLASS_NAMES, CLIENT_FIELD];
 
 /** Each flag's name, after checking every identifier the file will emit. */
 function flagNames(model: FlagModel): Map<Flag, string> {
@@ -164,27 +164,6 @@ function paragraphs(text: string): string[] {
   return lines;
 }
 
-interface SdkMethod {
-  /** The `ILdClient` method, without `Detail`. */
-  method: string;
-  /** The C# type of the flag's value. */
-  type: string;
-}
-
-/** The SDK method prefix and C# type for each Flag kind; a number flag is a `double` unless `codegen.number: int`. */
-const KIND_METHODS: Record<FlagKind, SdkMethod> = {
-  boolean: { method: 'BoolVariation', type: 'bool' },
-  string: { method: 'StringVariation', type: 'string' },
-  number: { method: 'DoubleVariation', type: 'double' },
-  json: { method: 'JsonVariation', type: 'LdValue' },
-};
-/** A number flag with `codegen.number: int` (ADR 0001). */
-const INT_METHOD: SdkMethod = { method: 'IntVariation', type: 'int' };
-
-function sdkMethod(flag: Flag): SdkMethod {
-  return flag.kind === 'number' && flag.numberType === 'int' ? INT_METHOD : KIND_METHODS[flag.kind];
-}
-
 /**
  * The `<summary>` body of a flag's main method (DESIGN.md → Doc comments):
  * the name, then a `<para>` each for the description, the trailer and the UI link.
@@ -233,21 +212,21 @@ function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   w.line('/// <returns>The flag\'s value for <paramref name="context"/>.</returns>');
   if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
   w.line(`public ${type} ${name}(Context context, ${type} fallback)`);
-  w.block('{', '}', () => w.line(`return _client.${method}(FlagKeys.${name}, context, fallback);`));
+  w.block('{', '}', () => w.line(`return ${CLIENT_FIELD}.${method}(${FLAG_KEYS_CLASS}.${name}, context, fallback);`));
   w.line();
   w.line(`/// <summary>${title}, with the reason for the value. See <see cref="${name}"/>.</summary>`);
   for (const doc of PARAM_DOCS) w.line(doc);
   w.line('/// <returns>The flag\'s value and the reason it was chosen.</returns>');
   if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
   w.line(`public EvaluationDetail<${type}> ${name}Detail(Context context, ${type} fallback)`);
-  w.block('{', '}', () => w.line(`return _client.${method}Detail(FlagKeys.${name}, context, fallback);`));
+  w.block('{', '}', () => w.line(`return ${CLIENT_FIELD}.${method}Detail(${FLAG_KEYS_CLASS}.${name}, context, fallback);`));
 }
 
 export const dotnetEmitter: Emitter = {
   id: DOTNET,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [8],
-  summarizeChanges: summarizeDotnetChanges,
+  readFlags: parseDotnetFlags,
   emit(model, cfg, ctx) {
     const { namespace } = targetOptions(cfg);
     const names = flagNames(model);
@@ -265,14 +244,14 @@ export const dotnetEmitter: Emitter = {
       w.line('/// </summary>');
       w.line('public sealed class Flags');
       w.block('{', '}', () => {
-        w.line('private readonly ILdClient _client;');
+        w.line(`private readonly ILdClient ${CLIENT_FIELD};`);
         w.line();
         w.line('/// <summary>');
         w.line('/// Creates a wrapper that evaluates flags through <paramref name="client"/>.');
         w.line('/// </summary>');
         w.line('/// <param name="client">The LaunchDarkly client, usually an <c>LdClient</c>.</param>');
         w.line('public Flags(ILdClient client)');
-        w.block('{', '}', () => w.line('_client = client;'));
+        w.block('{', '}', () => w.line(`${CLIENT_FIELD} = client;`));
         for (const flag of model.flags) {
           w.line();
           emitFlagMethods(w, flag, names.get(flag)!);
@@ -282,7 +261,7 @@ export const dotnetEmitter: Emitter = {
       w.line('/// <summary>');
       w.line('/// The raw key of every flag in <see cref="Flags"/>.');
       w.line('/// </summary>');
-      w.line('public static class FlagKeys');
+      w.line(FLAG_KEYS_DECLARATION);
       w.block('{', '}', () => {
         model.flags.forEach((flag, i) => {
           if (i > 0) w.line();
@@ -290,7 +269,7 @@ export const dotnetEmitter: Emitter = {
           const deprecation = deprecationText(flag, markdownCode);
           w.line(`/// <summary>Key of the flag behind <see cref="Flags.${name}"/>.</summary>`);
           if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
-          w.line(`public const string ${name} = ${csString(flag.key)};`);
+          w.line(`${KEY_CONSTANT_PREFIX} ${name} = ${csString(flag.key)};`);
         });
       });
     });

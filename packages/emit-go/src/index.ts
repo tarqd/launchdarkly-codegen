@@ -19,10 +19,10 @@ import {
   type TargetId,
 } from '@launchtarqly/core';
 import { deprecation, methodDoc } from './doc.js';
-import { summarizeGoChanges } from './flag-changes.js';
+import { parseGoFlags } from './flag-changes.js';
 import { FLAGS_STRUCT, goKind, keyConstant, KEYS_COMMENT, KIND_METHODS, METHOD_FORMS } from './output.js';
 
-export { parseGoFlags, summarizeGoChanges } from './flag-changes.js';
+export { parseGoFlags } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const GO: TargetId = 'go';
@@ -194,7 +194,7 @@ export const goEmitter: Emitter = {
     if (flags.length > 0) emitKeys(w, flags);
     return [{ path: cfg.out, contents: w.toString() }];
   },
-  summarizeChanges: summarizeGoChanges,
+  readFlags: parseGoFlags,
 };
 
 export default goEmitter;

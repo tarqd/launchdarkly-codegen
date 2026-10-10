@@ -4,7 +4,7 @@
  */
 
 import { resolve } from 'node:path';
-import { unifiedDiff, type NormalizeOptions, type Snapshot } from '@launchtarqly/core';
+import { summarizeReadBack, unifiedDiff, type NormalizeOptions, type Snapshot } from '@launchtarqly/core';
 import type { Config } from './config.js';
 import { emitterFor } from './emitters.js';
 import { readIfExists } from './fs.js';
@@ -43,8 +43,10 @@ export async function checkFiles(
     stale = true;
     const oldText = onDisk?.toString('utf8');
     report += unifiedDiff(file.path, oldText, file.contents);
-    // The summary is read back from the old file; if it can't be, the diff stands alone.
-    const summary = oldText === undefined ? undefined : emitter.summarizeChanges?.(oldText, file.contents);
+    // The summary is read back from both sides; if either can't be, the diff stands alone.
+    const { readFlags } = emitter;
+    const summary =
+      oldText === undefined || readFlags === undefined ? undefined : summarizeReadBack(readFlags, oldText, file.contents);
     if (summary !== undefined) report += `${summary}\n`;
   }
   return { stale, report };

@@ -1,6 +1,6 @@
 /**
  * Reads java output back into flags, for `check`'s summary
- * (`Emitter.summarizeChanges`). The old side is whatever is on disk, so this
+ * (`Emitter.readFlags`). The old side is whatever is on disk, so this
  * parses text rather than trusting a Flag model.
  *
  * Comments are dropped and whitespace is squeezed out of the code first, so
@@ -8,7 +8,7 @@
  * one-line form.
  */
 
-import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import type { GeneratedFlag } from '@launchtarqly/core';
 import { generatedKind, JAVA_KINDS, type JavaKind, type JavaKindName } from './kinds.js';
 
 /** Each primary method's return type, and the kind it is. */
@@ -84,11 +84,4 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
     flags.push({ key: unquote(entry[2]!), ...reader });
   }
   return flags;
-}
-
-/** `check`'s flag summary for a stale java file; `undefined` if either side can't be parsed. */
-export function summarizeJavaChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseJavaFlags(oldText);
-  const newFlags = parseJavaFlags(newText);
-  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }

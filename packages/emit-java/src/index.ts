@@ -6,13 +6,13 @@
 
 import { Writer, type Emitter, type Flag } from '@launchtarqly/core';
 import { classDoc, isDeprecated, javadocLines, keyConstantDoc, methodDoc, type Javadoc } from './javadoc.js';
-import { summarizeJavaChanges } from './flag-changes.js';
+import { parseJavaFlags } from './flag-changes.js';
 import { JAVA_KINDS, javaKind } from './kinds.js';
 import { callLines, constantLines, signatureLines, type Call, type Signature } from './layout.js';
 import { flagNames, JAVA, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
 
-export { parseJavaFlags, summarizeJavaChanges } from './flag-changes.js';
+export { parseJavaFlags } from './flag-changes.js';
 export { JAVA } from './naming.js';
 
 /** The one file the target writes, inside the `out` directory. */
@@ -84,7 +84,7 @@ export const javaEmitter: Emitter = {
   id: JAVA,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [7],
-  summarizeChanges: summarizeJavaChanges,
+  readFlags: parseJavaFlags,
   emit(model, cfg, ctx) {
     const options = javaOptions(cfg);
     const names = flagNames(model);
