@@ -6,6 +6,7 @@
 
 import { Writer, type Emitter, type Flag, type FlagKind, type TargetId } from '@launchtarqly/core';
 import { classDoc, isDeprecated, javadocLines, keyConstantDoc, methodDoc, type Javadoc } from './javadoc.js';
+import { callLines, constantLines, signatureLines } from './layout.js';
 import { flagNames, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
 
@@ -50,6 +51,8 @@ function imports(flags: readonly Flag[]): string[] {
 const CLASS_INDENT = 0;
 const MEMBER_INDENT = 2;
 const KEYS_MEMBER_INDENT = 4;
+/** The column a method's statements start at. */
+const METHOD_BODY_INDENT = 4;
 
 /** Writes `doc` laid out for a member at column `indent`. */
 function writeDoc(w: Writer, doc: Javadoc, indent: number): void {
@@ -66,19 +69,35 @@ function writeMethodDoc(w: Writer, doc: Javadoc): void {
   if (isDeprecated(doc)) w.line('@Deprecated');
 }
 
+/** Writes `lines` at the current indentation. */
+function writeLines(w: Writer, lines: readonly string[]): void {
+  for (const line of lines) w.line(line);
+}
+
+/** Writes one evaluation method: `head name(context, fallback)` returning `client.call(key, context, fallback)`. */
+function emitMethod(w: Writer, doc: Javadoc, head: string, name: string, call: string, key: string, type: string): void {
+  w.line();
+  writeMethodDoc(w, doc);
+  writeLines(w, signatureLines({ head, name, params: ['LDContext context', `${type} fallback`] }, MEMBER_INDENT));
+  w.indent(() => {
+    writeLines(w, callLines({ head: `return client.${call}`, args: [key, 'context', 'fallback'] }, METHOD_BODY_INDENT));
+  });
+  w.line('}');
+}
+
 function emitFlagMethods(w: Writer, flag: Flag, names: JavaFlagNames): void {
   const { method, type, boxed } = kindMethod(flag);
   const key = `Keys.${names.constant}`;
-  w.line();
-  writeMethodDoc(w, methodDoc(flag, 'value'));
-  w.block(`public ${type} ${names.method}(LDContext context, ${type} fallback) {`, '}', () => {
-    w.line(`return client.${method}(${key}, context, fallback);`);
-  });
-  w.line();
-  writeMethodDoc(w, methodDoc(flag, 'detail'));
-  w.block(`public EvaluationDetail<${boxed}> ${names.method}Detail(LDContext context, ${type} fallback) {`, '}', () => {
-    w.line(`return client.${method}Detail(${key}, context, fallback);`);
-  });
+  emitMethod(w, methodDoc(flag, 'value'), `public ${type}`, names.method, method, key, type);
+  emitMethod(
+    w,
+    methodDoc(flag, 'detail'),
+    `public EvaluationDetail<${boxed}>`,
+    `${names.method}Detail`,
+    `${method}Detail`,
+    key,
+    type,
+  );
 }
 
 /** A double-quoted Java string literal. */
@@ -118,9 +137,13 @@ export const javaEmitter: Emitter = {
           w.line();
           const doc = keyConstantDoc(flag);
           writeDoc(w, doc, KEYS_MEMBER_INDENT);
-          // google-java-format keeps an annotation on a field on the same line.
-          const annotation = isDeprecated(doc) ? '@Deprecated ' : '';
-          w.line(`${annotation}public static final String ${names.get(flag)!.constant} = ${javaString(flag.key)};`);
+          const constant = {
+            ...(isDeprecated(doc) ? { annotation: '@Deprecated' } : {}),
+            head: 'public static final String',
+            name: names.get(flag)!.constant,
+            value: javaString(flag.key),
+          };
+          writeLines(w, constantLines(constant, KEYS_MEMBER_INDENT));
         }
       });
     });
