@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ts-server]
+        target: [ts-server, java]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,6 +36,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # JDK 21 runs javac (--release 8), javadoc and google-java-format; the runner ships mvn.
+      - if: matrix.target == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+          cache-dependency-path: fixtures/compile/java/pom.xml
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:compile -t '${{ matrix.target }}'
 

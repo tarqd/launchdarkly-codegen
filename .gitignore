@@ -4,3 +4,6 @@ bundle/
 *.tsbuildinfo
 # written by compile tests
 fixtures/compile/*/src/flags.generated.*
+fixtures/compile/java/target/
+fixtures/compile/java/src/main/java/com/example/flags/
+fixtures/compile/java/src/main/java/com/example/usage/
