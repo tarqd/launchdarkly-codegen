@@ -27,7 +27,7 @@ Invoke the `tdd` skill. Each item below is a behaviour with its own failing test
   A target whose formatter reflows comments (java, ADR 0004) may use its own doc helper instead of `Writer.docComment`, so the comments come out already in the formatter's layout.
 - **Header.** Construct `new Writer({ indent, commentPrefix })` with the language's indent unit and comment prefix, then call `w.header(...)`. `GENERATED_MARKER` is already the exact line Go tooling recognizes.
 - **Target options.** `parseTargets` passes extra keys through unchecked. The emitter validates its own keys and throws `CodegenError` naming the key, which exits 2.
-- **`summarizeChanges`.** Parse the emitter's own output back into `GeneratedFlag`s in `src/flag-changes.ts` and return core's `summarizeFlagChanges`. Return `undefined` when the text can't be read back. Test it against every golden file, as `emit-ts-server/test/flag-changes.test.ts` does.
+- **`readFlags`.** Parse the emitter's own output back into `GeneratedFlag`s in `src/flag-changes.ts`, and return `undefined` when the text can't be read back; `check` pairs the old and new sides itself. Put the strings and patterns both the writer and the parser rely on in `src/output.ts`, as `emit-go` does. Test it against every golden file, as `emit-ts-server/test/flag-changes.test.ts` does.
 
 Keep these invariants:
 

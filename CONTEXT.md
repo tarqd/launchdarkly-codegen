@@ -52,3 +52,7 @@ _Avoid_: primary identifier
 **Derived name**:
 Any other identifier a target emits for a flag, built from its flag name: a `Detail` or `Ctx` method, a key constant. Checked like the flag name and included in the collision check.
 _Avoid_: variant (for key constants)
+
+**Read-back**:
+Reading a target's generated text back into flags (key, identifier, kind), so `check` can summarize what changed in a stale file. The old side is whatever is on disk, so read-back parses text rather than trusting a flag model, and a file it can't read gets the diff alone.
+_Avoid_: reverse emit, decompile

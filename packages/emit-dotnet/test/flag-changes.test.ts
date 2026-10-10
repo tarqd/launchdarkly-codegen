@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseDotnetFlags, summarizeDotnetChanges } from '../src/index.js';
+import { parseDotnetFlags } from '../src/index.js';
 
 const GOLDEN = resolve(import.meta.dirname, '../../../fixtures/golden/dotnet');
 const golden = (name: string) => readFileSync(join(GOLDEN, name), 'utf8');
@@ -58,31 +58,36 @@ describe('parseDotnetFlags', () => {
   });
 });
 
-describe('summarizeDotnetChanges', () => {
-  it('reports added, removed, renamed and changed-kind flags', () => {
+describe('parseDotnetFlags on edited output', () => {
+  it('reads renamed, re-typed and replaced flags', () => {
     const next = KINDS.replaceAll('LdValue CheckoutConfig', 'string CheckoutConfig')
       .replace('JsonVariation(FlagKeys.CheckoutConfig', 'StringVariation(FlagKeys.CheckoutConfig')
       .replaceAll('MaxCartItems', 'CartLimit')
       .replace('"banner-ids"', '"promo-ids"');
-    expect(summarizeDotnetChanges(KINDS, next)).toBe(
-      'flags: 1 added (promo-ids), 1 removed (banner-ids), 1 renamed (max-cart-items: MaxCartItems → CartLimit), 1 changed kind (checkout-config: json → string)',
-    );
+    expect(parseDotnetFlags(next)).toEqual([
+      { key: 'promo-ids', identifier: 'BannerIds', kind: 'json' },
+      { key: 'checkout-config', identifier: 'CheckoutConfig', kind: 'string' },
+      { key: 'checkout-v2', identifier: 'CheckoutV2', kind: 'boolean' },
+      { key: 'max-cart-items', identifier: 'CartLimit', kind: 'number', numberType: 'int' },
+      { key: 'pricing-tier', identifier: 'PricingTier', kind: 'string' },
+      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number', numberType: 'double' },
+    ]);
   });
 
-  it('reports a number flag switching from int to double', () => {
+  it('reads a number flag switched from int to double', () => {
     const next = KINDS.replaceAll('int MaxCartItems', 'double MaxCartItems')
       .replace('<int> MaxCartItemsDetail', '<double> MaxCartItemsDetail')
       .replace('IntVariation(FlagKeys.MaxCartItems', 'DoubleVariation(FlagKeys.MaxCartItems')
       .replace('IntVariationDetail(FlagKeys.MaxCartItems', 'DoubleVariationDetail(FlagKeys.MaxCartItems');
-    expect(summarizeDotnetChanges(KINDS, next)).toBe('flags: 1 changed kind (max-cart-items: number (int) → number (double))');
+    expect(parseDotnetFlags(next)?.find((f) => f.key === 'max-cart-items')).toEqual({
+      key: 'max-cart-items',
+      identifier: 'MaxCartItems',
+      kind: 'number',
+      numberType: 'double',
+    });
   });
 
-  it('says so when no flag changed (for example a generator upgrade)', () => {
-    expect(summarizeDotnetChanges(KINDS.replace('generator: 0.1.0', 'generator: 0.0.9'), KINDS)).toBe('flags: no changes');
-  });
-
-  it('returns undefined when either side cannot be parsed', () => {
-    expect(summarizeDotnetChanges('garbage', KINDS)).toBeUndefined();
-    expect(summarizeDotnetChanges(KINDS, 'garbage')).toBeUndefined();
+  it('reads the same flags whatever generator version wrote the file', () => {
+    expect(parseDotnetFlags(KINDS.replace('generator: 0.1.0', 'generator: 0.0.9'))).toEqual(parseDotnetFlags(KINDS));
   });
 });

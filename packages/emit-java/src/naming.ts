@@ -14,6 +14,7 @@ import {
   type NamingRules,
   type TargetId,
 } from '@launchtarqly/core';
+import { CLIENT_FIELD, KEYS_CLASS } from './output.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const JAVA: TargetId = 'java';
@@ -53,7 +54,7 @@ const NAMING: NamingRules = {
   reserved: new Set([...JAVA_RESERVED_WORDS, ...JAVA_UNUSABLE_NAMES]),
   pattern: JAVA_IDENTIFIER,
   // The class, its nested class and its field.
-  ownNames: ['Flags', 'Keys', 'client'],
+  ownNames: ['Flags', KEYS_CLASS, CLIENT_FIELD],
   // The constant is checked like the method: an alias such as `_1x` or `$`
   // converts to a constant that isn't an identifier.
   derived: (method) => [`${method}Detail`, constantCase(method)],

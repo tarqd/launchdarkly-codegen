@@ -1,25 +1,37 @@
 /**
  * Reads dotnet output back into flags, for `check`'s summary
- * (`Emitter.summarizeChanges`). The old side is whatever is on disk, so this
+ * (`Emitter.readFlags`). The old side is whatever is on disk, so this
  * parses text rather than trusting a Flag model.
  */
 
-import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import type { GeneratedFlag } from '@launchtarqly/core';
 import { IDENTIFIER as ID } from './identifier.js';
-
-const SDK_KINDS: Record<string, Pick<GeneratedFlag, 'kind' | 'numberType'>> = {
-  Bool: { kind: 'boolean' },
-  String: { kind: 'string' },
-  Int: { kind: 'number', numberType: 'int' },
-  Double: { kind: 'number', numberType: 'double' },
-  Json: { kind: 'json' },
-};
+import {
+  CLIENT_FIELD,
+  FLAG_KEYS_CLASS,
+  FLAG_KEYS_DECLARATION,
+  KEY_CONSTANT_PREFIX,
+  kindOfSdkMethod,
+  SDK_METHODS,
+} from './output.js';
 
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
 
+/** `text` matched literally inside a RegExp, with any run of spaces matching any whitespace. */
+function pattern(text: string): string {
+  return text
+    .split(' ')
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join(String.raw`\s+`);
+}
+
 // `return _client.<Kind>Variation(FlagKeys.<Name>, ...`. `Variation\s*\(` skips the `...VariationDetail(` methods.
-const CALL = new RegExp(String.raw`_client\.(Bool|String|Int|Double|Json)Variation\s*\(\s*FlagKeys\.(${ID})\s*,`, 'gu');
-const CONSTANT = new RegExp(String.raw`^public\s+const\s+string\s+(${ID})\s*=\s*(${STRING})\s*;$`, 'u');
+const CALL = new RegExp(
+  String.raw`${pattern(CLIENT_FIELD)}\.(${SDK_METHODS.join('|')})\s*\(\s*${pattern(FLAG_KEYS_CLASS)}\.(${ID})\s*,`,
+  'gu',
+);
+const CONSTANT = new RegExp(String.raw`^${pattern(KEY_CONSTANT_PREFIX)}\s+(${ID})\s*=\s*(${STRING})\s*;$`, 'u');
+const KEYS = new RegExp(String.raw`\n[ \t]*${pattern(FLAG_KEYS_DECLARATION)}\s*\{\r?\n([\s\S]*?)\r?\n[ \t]*\}`);
 /** Lines `FlagKeys` may hold besides its constants: doc comments, `#if` directives and attributes. */
 const SKIPPED = /^(?:$|\/\/|#|\[)/;
 
@@ -36,11 +48,11 @@ function unquote(literal: string): string {
  * unparseable.
  */
 export function parseDotnetFlags(text: string): GeneratedFlag[] | undefined {
-  const block = /\n[ \t]*public\s+static\s+class\s+FlagKeys\s*\{\r?\n([\s\S]*?)\r?\n[ \t]*\}/.exec(text);
+  const block = KEYS.exec(text);
   if (!block) return undefined;
 
   const kinds = new Map<string, Pick<GeneratedFlag, 'kind' | 'numberType'>>();
-  for (const [, sdkKind, name] of text.matchAll(CALL)) kinds.set(name!, SDK_KINDS[sdkKind!]!);
+  for (const [, method, name] of text.matchAll(CALL)) kinds.set(name!, kindOfSdkMethod(method!)!);
 
   const flags: GeneratedFlag[] = [];
   for (const raw of block[1]!.split('\n')) {
@@ -54,11 +66,4 @@ export function parseDotnetFlags(text: string): GeneratedFlag[] | undefined {
     flags.push({ key: unquote(entry[2]!), identifier, ...kind });
   }
   return flags;
-}
-
-/** `check`'s flag summary for a stale dotnet file; `undefined` if either side can't be parsed. */
-export function summarizeDotnetChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseDotnetFlags(oldText);
-  const newFlags = parseDotnetFlags(newText);
-  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }

@@ -12,13 +12,13 @@ import {
   Writer,
   type Emitter,
   type Flag,
-  type FlagKind,
   type NamingRules,
   type TargetId,
 } from '@launchtarqly/core';
-import { summarizeTsServerChanges } from './flag-changes.js';
+import { parseTsServerFlags } from './flag-changes.js';
+import { CLIENT_FIELD, FLAG_KEYS_CLOSE, FLAG_KEYS_OPEN, KIND_METHODS } from './output.js';
 
-export { parseTsServerFlags, summarizeTsServerChanges } from './flag-changes.js';
+export { parseTsServerFlags } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const TS_SERVER: TargetId = 'ts-server';
@@ -32,7 +32,7 @@ const NAMING: NamingRules = {
   reserved: ECMASCRIPT_RESERVED_WORDS,
   pattern: /^[A-Za-z_$][A-Za-z0-9_$]*$/,
   // Members of the generated `Flags` class that flag methods must not shadow.
-  ownNames: ['constructor', 'client'],
+  ownNames: ['constructor', CLIENT_FIELD],
   derived: (name) => [`${name}Detail`],
 };
 
@@ -56,28 +56,20 @@ function inlineCode(text: string): string {
   return `\`${text}\``;
 }
 
-/** The SDK method prefix and TypeScript type for each Flag kind. */
-const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = {
-  boolean: { method: 'boolVariation', type: 'boolean' },
-  string: { method: 'stringVariation', type: 'string' },
-  number: { method: 'numberVariation', type: 'number' },
-  json: { method: 'jsonVariation', type: 'unknown' },
-};
-
 function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const key = tsString(flag.key);
   const { method, type } = KIND_METHODS[flag.kind];
   const doc = docLines(flag);
   w.docComment(doc);
   w.block(`${name}(context: LDContext, fallback: ${type}): Promise<${type}> {`, '}', () => {
-    w.line(`return this.client.${method}(${key}, context, fallback);`);
+    w.line(`return this.${CLIENT_FIELD}.${method}(${key}, context, fallback);`);
   });
   w.docComment(doc);
   w.block(
     `${name}Detail(context: LDContext, fallback: ${type}): Promise<LDEvaluationDetailTyped<${type}>> {`,
     '}',
     () => {
-      w.line(`return this.client.${method}Detail(${key}, context, fallback);`);
+      w.line(`return this.${CLIENT_FIELD}.${method}Detail(${key}, context, fallback);`);
     },
   );
 }
@@ -94,14 +86,14 @@ export const tsServerEmitter: Emitter = {
     w.line(`import type { LDClient, LDContext, LDEvaluationDetailTyped } from ${tsString(SDK_PACKAGE)};`);
     w.line();
     w.block('export class Flags {', '}', () => {
-      w.line('constructor(private readonly client: LDClient) {}');
+      w.line(`constructor(private readonly ${CLIENT_FIELD}: LDClient) {}`);
       for (const flag of model.flags) {
         w.line();
         emitFlagMethods(w, flag, names.get(flag)!);
       }
     });
     w.line();
-    w.block('export const FlagKeys = {', '} as const;', () => {
+    w.block(FLAG_KEYS_OPEN, FLAG_KEYS_CLOSE, () => {
       for (const flag of model.flags) {
         const deprecation = deprecationText(flag, inlineCode);
         if (deprecation !== undefined) w.inlineDocComment(`@deprecated ${deprecation}`);
@@ -110,7 +102,7 @@ export const tsServerEmitter: Emitter = {
     });
     return [{ path: cfg.out, contents: w.toString() }];
   },
-  summarizeChanges: summarizeTsServerChanges,
+  readFlags: parseTsServerFlags,
 };
 
 export default tsServerEmitter;

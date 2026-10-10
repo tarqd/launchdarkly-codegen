@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { normalize, parseSnapshot } from '@launchtarqly/core';
-import { goEmitter, parseGoFlags, summarizeGoChanges } from '../src/index.js';
+import { goEmitter, parseGoFlags } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
 const FIXTURES = resolve(import.meta.dirname, '../../../fixtures');
@@ -83,28 +83,33 @@ describe('parseGoFlags', () => {
   });
 });
 
-describe('summarizeGoChanges', () => {
-  it('reports added, removed, renamed and changed-kind flags', () => {
+describe('parseGoFlags on edited output', () => {
+  it('reads renamed, re-typed and replaced flags', () => {
     const next = OLD.replaceAll('fallback ldvalue.Value) (ldvalue.Value, error)', 'fallback string) (string, error)')
       .replaceAll('MaxItems', 'ItemLimit')
       .replaceAll('OldThing', 'NewThing')
       .replace('= "old-thing"', '= "new-thing"');
-    expect(summarizeGoChanges(OLD, next)).toBe(
-      'flags: 1 added (new-thing), 1 removed (old-thing), 1 renamed (max-items: MaxItems → ItemLimit), 1 changed kind (checkout-config: json → string)',
-    );
+    expect(parseGoFlags(next)).toEqual([
+      { key: 'checkout-config', identifier: 'CheckoutConfig', kind: 'string' },
+      { key: 'checkout-v2', identifier: 'CheckoutV2', kind: 'boolean' },
+      { key: 'max-items', identifier: 'ItemLimit', kind: 'number', numberType: 'int' },
+      { key: 'new-thing', identifier: 'NewThing', kind: 'boolean' },
+      { key: 'pricing-tier', identifier: 'PricingTier', kind: 'string' },
+      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number', numberType: 'double' },
+    ]);
   });
 
-  it('reports switching a number flag between int and float64 as a changed kind', () => {
+  it('reads a number flag switched from int to float64 as a double', () => {
     const next = OLD.replaceAll('fallback int) (int, error)', 'fallback float64) (float64, error)');
-    expect(summarizeGoChanges(OLD, next)).toBe('flags: 1 changed kind (max-items: number (int) → number (double))');
+    expect(parseGoFlags(next)?.find((f) => f.key === 'max-items')).toEqual({
+      key: 'max-items',
+      identifier: 'MaxItems',
+      kind: 'number',
+      numberType: 'double',
+    });
   });
 
-  it('says so when no flag changed (for example a generator upgrade)', () => {
-    expect(summarizeGoChanges(OLD.replace('0.3.0', '0.2.9'), OLD)).toBe('flags: no changes');
-  });
-
-  it('returns undefined when either side cannot be parsed', () => {
-    expect(summarizeGoChanges('garbage', OLD)).toBeUndefined();
-    expect(summarizeGoChanges(OLD, 'garbage')).toBeUndefined();
+  it('reads the same flags whatever generator version wrote the file', () => {
+    expect(parseGoFlags(OLD.replace('0.3.0', '0.2.9'))).toEqual(parseGoFlags(OLD));
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Reads java output back into flags, for `check`'s summary
- * (`Emitter.summarizeChanges`). The old side is whatever is on disk, so this
+ * (`Emitter.readFlags`). The old side is whatever is on disk, so this
  * parses text rather than trusting a Flag model.
  *
  * Comments are dropped and whitespace is squeezed out of the code first, so
@@ -8,8 +8,19 @@
  * one-line form.
  */
 
-import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import type { GeneratedFlag } from '@launchtarqly/core';
 import { generatedKind, JAVA_KINDS, type JavaKind, type JavaKindName } from './kinds.js';
+import {
+  CLIENT_FIELD,
+  CONTEXT_PARAM,
+  CONTEXT_TYPE,
+  DEPRECATED,
+  FALLBACK_PARAM,
+  KEY_CONSTANT_HEAD,
+  KEYS_CLASS,
+  KEYS_CONSTRUCTOR,
+  KEYS_DECLARATION,
+} from './output.js';
 
 /** Each primary method's return type, and the kind it is. */
 const BY_TYPE = new Map(
@@ -42,10 +53,17 @@ function squeeze(text: string): string {
   return out;
 }
 
-const KEYS = /public static final class Keys\{private Keys\(\)\{\}(.*)\}\}$/s;
-const CONSTANT = new RegExp(String.raw`(?:@Deprecated )?public static final String (${IDENT})=(${STRING});`, 'y');
+/** Code from `output.ts`, squeezed as the file is, matched literally inside a RegExp. */
+function code(text: string): string {
+  return squeeze(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const KEYS = new RegExp(String.raw`${code(KEYS_DECLARATION)}\{${code(KEYS_CONSTRUCTOR)}(.*)\}\}$`, 's');
+const CONSTANT = new RegExp(String.raw`(?:${code(DEPRECATED)} )?${code(KEY_CONSTANT_HEAD)} (${IDENT})=(${STRING});`, 'y');
+const [CONTEXT, FALLBACK] = [code(CONTEXT_PARAM), code(FALLBACK_PARAM)];
 const METHOD = new RegExp(
-  String.raw`public (\w+) (${IDENT})\(LDContext context,\1 fallback\)\{return client\.(\w+)\(Keys\.(${IDENT}),context,fallback\);\}`,
+  String.raw`public (\w+) (${IDENT})\(${code(CONTEXT_TYPE)} ${CONTEXT},\1 ${FALLBACK}\)\{` +
+    String.raw`return ${code(CLIENT_FIELD)}\.(\w+)\(${code(KEYS_CLASS)}\.(${IDENT}),${CONTEXT},${FALLBACK}\);\}`,
   'g',
 );
 
@@ -84,11 +102,4 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
     flags.push({ key: unquote(entry[2]!), ...reader });
   }
   return flags;
-}
-
-/** `check`'s flag summary for a stale java file; `undefined` if either side can't be parsed. */
-export function summarizeJavaChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseJavaFlags(oldText);
-  const newFlags = parseJavaFlags(newText);
-  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseTsServerFlags, summarizeTsServerChanges } from '../src/index.js';
+import { parseTsServerFlags } from '../src/index.js';
 
 const GOLDEN = resolve(import.meta.dirname, '../../../fixtures/golden/ts-server');
 
@@ -107,24 +107,23 @@ describe('parseTsServerFlags', () => {
   });
 });
 
-describe('summarizeTsServerChanges', () => {
-  it('reports added, removed, renamed and changed-kind flags', () => {
+describe('parseTsServerFlags on edited output', () => {
+  it('reads renamed, re-typed and replaced flags', () => {
     const next = OLD.replace('fallback: unknown): Promise<unknown> {\n    return this.client.jsonVariation', 'fallback: string): Promise<string> {\n    return this.client.stringVariation')
       .replaceAll('maxItems', 'itemLimit')
       .replace("  oldThing: 'old-thing',\n", "  newThing: 'new-thing',\n")
       .replace('oldThing(context', 'newThing(context')
       .replace("boolVariation('old-thing'", "boolVariation('new-thing'");
-    expect(summarizeTsServerChanges(OLD, next)).toBe(
-      'flags: 1 added (new-thing), 1 removed (old-thing), 1 renamed (max-items: maxItems → itemLimit), 1 changed kind (checkout-config: json → string)',
-    );
+    expect(parseTsServerFlags(next)).toEqual([
+      { key: 'checkout-v2', identifier: 'checkoutV2', kind: 'boolean' },
+      { key: 'pricing-tier', identifier: 'pricingTier', kind: 'string' },
+      { key: 'max-items', identifier: 'itemLimit', kind: 'number' },
+      { key: 'checkout-config', identifier: 'checkoutConfig', kind: 'string' },
+      { key: 'new-thing', identifier: 'newThing', kind: 'boolean' },
+    ]);
   });
 
-  it('says so when no flag changed (for example a generator upgrade)', () => {
-    expect(summarizeTsServerChanges(OLD.replace('0.1.0', '0.0.9'), OLD)).toBe('flags: no changes');
-  });
-
-  it('returns undefined when either side cannot be parsed', () => {
-    expect(summarizeTsServerChanges('garbage', OLD)).toBeUndefined();
-    expect(summarizeTsServerChanges(OLD, 'garbage')).toBeUndefined();
+  it('reads the same flags whatever generator version wrote the file', () => {
+    expect(parseTsServerFlags(OLD.replace('0.1.0', '0.0.9'))).toEqual(parseTsServerFlags(OLD));
   });
 });

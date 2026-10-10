@@ -1,10 +1,10 @@
 /**
  * Reads go output back into flags, for `check`'s summary
- * (`Emitter.summarizeChanges`). The old side is whatever is on disk, so this
+ * (`Emitter.readFlags`). The old side is whatever is on disk, so this
  * parses text rather than trusting a Flag model.
  */
 
-import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import type { GeneratedFlag } from '@launchtarqly/core';
 import { FLAGS_STRUCT, keyConstant, KEYS_COMMENT, kindOfGoType } from './output.js';
 
 const IDENT = String.raw`[\p{L}\p{Nd}_]+`;
@@ -68,11 +68,4 @@ export function parseGoFlags(text: string): GeneratedFlag[] | undefined {
     flags.push({ key, identifier, ...kind });
   }
   return flags;
-}
-
-/** `check`'s flag summary for a stale go file; `undefined` if either side can't be parsed. */
-export function summarizeGoChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseGoFlags(oldText);
-  const newFlags = parseGoFlags(newText);
-  return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }
