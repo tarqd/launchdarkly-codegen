@@ -82,10 +82,12 @@ async function fetchViewMembers(
   const url = apiUrl(request.baseUri, `/api/v2/projects/${project}/views/${encodeURIComponent(viewKey)}/linked/flags`);
   url.searchParams.set('limit', String(VIEW_MEMBERS_PAGE_LIMIT));
   let pages: ViewMembersPage[];
+  let seen = 0;
   try {
-    pages = await client.getPages<ViewMembersPage>(url, VIEWS_API_VERSION, (page, all) => {
-      const seen = all.reduce((n, p) => n + (p.items?.length ?? 0), 0);
-      return (page.items?.length ?? 0) > 0 && (typeof page.totalCount !== 'number' || seen < page.totalCount);
+    pages = await client.getPages<ViewMembersPage>(url, VIEWS_API_VERSION, (page) => {
+      const count = page.items?.length ?? 0;
+      seen += count;
+      return count > 0 && (typeof page.totalCount !== 'number' || seen < page.totalCount);
     });
   } catch (err) {
     throw viewError(err, viewKey, request.projectKey);
@@ -160,13 +162,14 @@ export class LdApiClient {
 
   /**
    * GETs `first` and every page after it, following `_links.next` until it
-   * is absent. Pages are returned raw, in fetch order. `hasNext` can add a
-   * stop condition for endpoints whose `_links` is optional.
+   * is absent. Pages are returned raw, in fetch order. `more` is called once
+   * per page, in order, and can stop paging early for endpoints whose
+   * `_links` is optional.
    */
   async getPages<P extends PagedBody>(
     first: URL,
     apiVersion: string,
-    hasNext: (page: P, pages: P[]) => boolean = () => true,
+    more: (page: P) => boolean = () => true,
   ): Promise<P[]> {
     const pages: P[] = [];
     const seen = new Set<string>();
@@ -177,7 +180,7 @@ export class LdApiClient {
       const body: P = await this.getJson<P>(url, apiVersion);
       pages.push(body);
       const next = body._links?.next?.href;
-      url = next !== undefined && hasNext(body, pages) ? new URL(next, this.baseUri) : undefined;
+      url = more(body) && next !== undefined ? new URL(next, this.baseUri) : undefined;
     }
     return pages;
   }
@@ -198,7 +201,7 @@ export class LdApiClient {
       if (res.status === 429) {
         if (retries >= RETRY_POLICY.maxRetries) {
           throw new CodegenError(
-            `GET ${url.pathname}: still rate limited after ${RETRY_POLICY.maxRetries} retries${await errorDetail(res)}`,
+            `GET ${url.pathname}: still rate limited after ${RETRY_POLICY.maxRetries} retries${formatDetail(await errorBody(res))}`,
           );
         }
         await this.deps.sleep(rateLimitWait(res.headers, retries, this.deps.now()) + this.deps.random() * RETRY_POLICY.jitterMs);
@@ -281,9 +284,4 @@ async function errorBody(res: Response): Promise<{ code?: string; message?: stri
   } catch {
     return {};
   }
-}
-
-/** `: <code>: <message>` from an API error body, if it has one. */
-async function errorDetail(res: Response): Promise<string> {
-  return formatDetail(await errorBody(res));
 }

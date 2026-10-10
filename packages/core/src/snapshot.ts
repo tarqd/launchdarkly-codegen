@@ -1,7 +1,7 @@
 /**
  * Snapshot format and replay (DESIGN.md → Fetcher). A snapshot is the raw
  * LaunchDarkly API responses for one project; nothing here interprets them.
- * The live fetcher (later) produces the same `Snapshot` shape.
+ * The live fetcher (fetcher.ts) produces the same `Snapshot` shape.
  */
 
 import { readFile } from 'node:fs/promises';

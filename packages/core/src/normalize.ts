@@ -117,15 +117,13 @@ function deprecationOf(item: ApiFlag): { deprecated: boolean; deprecationMessage
   };
 }
 
-/** The value category used for kind inference; objects, arrays and null are all `json`. */
-type ValueType = 'boolean' | 'string' | 'number' | 'json';
-
-function valueType(value: unknown): ValueType {
+/** The flag kind a single variation value implies; objects, arrays and null are all `json`. */
+function valueKind(value: unknown): FlagKind {
   switch (typeof value) {
     case 'boolean':
     case 'string':
     case 'number':
-      return typeof value as ValueType;
+      return typeof value as FlagKind;
     default:
       return 'json';
   }
@@ -142,7 +140,7 @@ function inferKind(item: ApiFlag, warn: (message: string) => void): FlagKind {
     }
     return 'boolean';
   }
-  const types = [...new Set(values.map(valueType))];
+  const types = [...new Set(values.map(valueKind))];
   if (types.length === 1 && (types[0] === 'string' || types[0] === 'number')) return types[0];
   if (types.length > 1) {
     warn(`flag ${item.key}: variations mix value types (${types.join(', ')}); treating it as json`);
