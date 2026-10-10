@@ -267,9 +267,9 @@ suggesting `codegen.name.<target>`:
   UpperCamel names, so Go checks only the names it generates itself (`New`,
   `Client`, `Flags`).
 - **Collision.** The check covers every identifier a target emits: flag
-  methods, their `Detail` variants (and Go's `Ctx` variants), and key constants. For example,
-  flag `checkout`'s detail method and a flag named `checkout-detail` both want
-  `CheckoutDetail`. Java would otherwise silently overload them when the
+  methods, their `Detail` variants (and Go's `Ctx` variants), and key
+  constants. For example, flag `checkout`'s detail method and a flag named
+  `checkout-detail` both want `CheckoutDetail`. Java would otherwise silently overload them when the
   parameter types differ. Both keys are named.
 
 ### Emitters
@@ -330,9 +330,9 @@ output is the contract.
 | go | `// Deprecated: ...` paragraph in the doc comment |
 | java | bare `@Deprecated` plus `@deprecated` Javadoc tag, always as a pair (`since` and `forRemoval` need Java 9) |
 
-The annotation goes on the flag's method, its `Detail` variant (and Go's `Ctx` variants),
-and its key constant. The text is the flag's `deprecationMessage`; without one,
-it's a generic message naming the flag. The message has no date, so
+The annotation goes on the flag's method, its `Detail` variant (and Go's
+`Ctx` variants), and its key constant. The text is the flag's
+`deprecationMessage`; without one, it's a generic message naming the flag. The message has no date, so
 deprecating, un-deprecating and re-deprecating doesn't churn output.
 
 ### Doc comments
