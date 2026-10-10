@@ -19,8 +19,8 @@ describe('go naming', () => {
     expect(out).toContain('func (f *Flags) APIURLID(context ldcontext.Context');
     expect(out).toContain('func (f *Flags) APIURLIDDetailCtx(ctx gocontext.Context');
     expect(out).toContain('KeyAPIURLID  = "api-url-id"');
-    // `ids` is not an initialism, only `id` is.
-    expect(out).toContain('func (f *Flags) BannerIds(context ldcontext.Context');
+    // A plural initialism keeps its `s` lower-case.
+    expect(out).toContain('func (f *Flags) BannerIDs(context ldcontext.Context');
   });
 
   it('uses the go alias as is, without initialisms', () => {

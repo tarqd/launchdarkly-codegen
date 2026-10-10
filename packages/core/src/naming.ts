@@ -43,7 +43,9 @@ export const GO_INITIALISMS: ReadonlySet<string> = new Set([
 export interface UpperCamelOptions {
   /**
    * Words to write all upper-case instead of capitalized, spelled upper-case:
-   * with `GO_INITIALISMS`, `api-url-id` → `APIURLID`. Only whole words match.
+   * with `GO_INITIALISMS`, `api-url-id` → `APIURLID`. Only whole words match,
+   * plus a listed word followed by a plural `s`, which stays lower-case:
+   * `banner-ids` → `BannerIDs` (ADR 0002).
    */
   initialisms?: ReadonlySet<string>;
 }
@@ -57,7 +59,10 @@ export function upperCamel(key: string, options: UpperCamelOptions = {}): string
   return splitWords(key)
     .map((word) => {
       const upper = word.toUpperCase();
-      return initialisms?.has(upper) ? upper : capitalize(word);
+      if (initialisms?.has(upper)) return upper;
+      // A listed word wins over a plural reading: `https` is HTTPS, not HTTPs.
+      if (word.endsWith('s') && initialisms?.has(upper.slice(0, -1))) return `${upper.slice(0, -1)}s`;
+      return capitalize(word);
     })
     .join('');
 }

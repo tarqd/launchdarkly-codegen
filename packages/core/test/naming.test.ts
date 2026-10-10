@@ -127,7 +127,22 @@ describe('upperCamel with the Go initialisms (ADR 0002)', () => {
     // A digit stays with the word before it: `utf8` is on the list, `http2` is not.
     expect(go('http2-api')).toBe('Http2API');
     expect(go('utf8-name')).toBe('UTF8Name');
-    expect(go('identity-urls')).toBe('IdentityUrls');
-    expect(go('ids')).toBe('Ids');
+    expect(go('identity-urlz')).toBe('IdentityUrlz');
+    expect(go('idss')).toBe('Idss');
+  });
+
+  // `https` is itself on the list, so HTTP has no plural form.
+  it.each(ADR_0002.filter((i) => i !== 'HTTP'))('writes the plural of %s with a lower-case s', (initialism) => {
+    const word = initialism.toLowerCase();
+    expect(go(`${word}s`)).toBe(`${initialism}s`);
+    expect(go(`banner-${word}s-flag`)).toBe(`Banner${initialism}sFlag`);
+  });
+
+  it('prefers a listed word to a plural reading, and keeps stacked initialisms', () => {
+    expect(go('https-only')).toBe('HTTPSOnly');
+    expect(go('identity-urls')).toBe('IdentityURLs');
+    expect(go('apis-url-ids')).toBe('APIsURLIDs');
+    expect(go('userIds')).toBe('UserIDs');
+    expect(go('ids')).toBe('IDs');
   });
 });

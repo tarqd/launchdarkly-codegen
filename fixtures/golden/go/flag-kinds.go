@@ -44,27 +44,27 @@ type Flags struct{ client Client }
 // New returns a Flags that evaluates through client.
 func New(client Client) *Flags { return &Flags{client: client} }
 
-// BannerIds evaluates the "Banner ids" flag.
+// BannerIDs evaluates the "Banner ids" flag.
 //
 // key: "banner-ids"
 // https://app.launchdarkly.com/projects/my-project/flags/banner-ids
-func (f *Flags) BannerIds(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
-	return f.client.JSONVariation(KeyBannerIds, context, fallback)
+func (f *Flags) BannerIDs(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
+	return f.client.JSONVariation(KeyBannerIDs, context, fallback)
 }
 
-// BannerIdsDetail is BannerIds with the evaluation reason.
-func (f *Flags) BannerIdsDetail(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
-	return f.client.JSONVariationDetail(KeyBannerIds, context, fallback)
+// BannerIDsDetail is BannerIDs with the evaluation reason.
+func (f *Flags) BannerIDsDetail(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
+	return f.client.JSONVariationDetail(KeyBannerIDs, context, fallback)
 }
 
-// BannerIdsCtx is BannerIds with a Go context for SDK hooks.
-func (f *Flags) BannerIdsCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
-	return f.client.JSONVariationCtx(ctx, KeyBannerIds, context, fallback)
+// BannerIDsCtx is BannerIDs with a Go context for SDK hooks.
+func (f *Flags) BannerIDsCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
+	return f.client.JSONVariationCtx(ctx, KeyBannerIDs, context, fallback)
 }
 
-// BannerIdsDetailCtx is BannerIdsDetail with a Go context for SDK hooks.
-func (f *Flags) BannerIdsDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
-	return f.client.JSONVariationDetailCtx(ctx, KeyBannerIds, context, fallback)
+// BannerIDsDetailCtx is BannerIDsDetail with a Go context for SDK hooks.
+func (f *Flags) BannerIDsDetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error) {
+	return f.client.JSONVariationDetailCtx(ctx, KeyBannerIDs, context, fallback)
 }
 
 // CheckoutConfig evaluates the "Checkout config" flag.
@@ -186,7 +186,7 @@ func (f *Flags) SampleRateDetailCtx(ctx gocontext.Context, context ldcontext.Con
 
 // Flag keys, for code that needs the raw key.
 const (
-	KeyBannerIds      = "banner-ids"
+	KeyBannerIDs      = "banner-ids"
 	KeyCheckoutConfig = "checkout-config"
 	KeyCheckoutV2     = "checkout-v2"
 	KeyMaxCartItems   = "max-cart-items"
