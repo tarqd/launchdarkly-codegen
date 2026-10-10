@@ -32,6 +32,9 @@ importers:
       '@launchtarqly/core':
         specifier: workspace:*
         version: link:../core
+      '@launchtarqly/emit-go':
+        specifier: workspace:*
+        version: link:../emit-go
       '@launchtarqly/emit-ts-server':
         specifier: workspace:*
         version: link:../emit-ts-server
@@ -43,6 +46,12 @@ importers:
         version: 2.8.1
 
   packages/core: {}
+
+  packages/emit-go:
+    dependencies:
+      '@launchtarqly/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/emit-ts-server:
     dependencies:
