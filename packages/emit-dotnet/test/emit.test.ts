@@ -3,7 +3,7 @@ import type { Flag, FlagModel } from '@launchtarqly/core';
 import { dotnetEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
-const cfg = { id: 'dotnet', out: 'src/FeatureFlags/Flags.g.cs', sdkMajor: 8, namespace: 'MyApp.FeatureFlags' } as const;
+const cfg = { id: 'dotnet', out: 'src/FeatureFlags/Flags.g.cs', sdkMajor: 8, options: { namespace: 'MyApp.FeatureFlags' } } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 describe('dotnet emitter', () => {

@@ -30,7 +30,7 @@ describe('java target', () => {
     const dir = await projectDir(configWith(withoutPackage));
     const result = await generate(dir);
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/java target: `package` is required/);
+    expect(result.stderr).toMatch(/targets\[0\]\.package is required \(for example com\.example\.flags\)/);
   });
 
   it.each([
@@ -47,7 +47,7 @@ describe('java target', () => {
     const dir = await projectDir(configWith({ ...javaTarget, package: pkg }));
     const result = await generate(dir);
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/java target: `package` /);
+    expect(result.stderr).toMatch(/targets\[0\]\.package must be /);
   });
 
   it('accepts identifiers with $ and _', async () => {

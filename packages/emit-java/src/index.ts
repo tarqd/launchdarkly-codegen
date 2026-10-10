@@ -10,7 +10,7 @@ import { parseJavaFlags } from './flag-changes.js';
 import { JAVA_KINDS, javaKind } from './kinds.js';
 import { callLines, constantLines, signatureLines, type Call, type Signature } from './layout.js';
 import { flagNames, JAVA, type JavaFlagNames } from './naming.js';
-import { javaOptions } from './options.js';
+import { OPTIONS } from './options.js';
 import {
   CLIENT_FIELD,
   CONTEXT_PARAM,
@@ -91,13 +91,15 @@ function javaString(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-export const javaEmitter: Emitter = {
+export const javaEmitter: Emitter<typeof OPTIONS> = {
   id: JAVA,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [7],
+  // `out` is the package's directory, so it has no extension to check.
+  options: OPTIONS,
   readFlags: parseJavaFlags,
   emit(model, cfg, ctx) {
-    const options = javaOptions(cfg);
+    const { options } = cfg;
     const names = flagNames(model);
     const w = new Writer();
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });

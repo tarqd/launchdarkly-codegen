@@ -4,7 +4,7 @@ import { CodegenError, normalize } from '@launchtarqly/core';
 import { dotnetEmitter } from '../src/index.js';
 import { apiFlag, customProperty, modelFlag, snapshotOf } from '../../core/test/builders.js';
 
-const cfg = { id: 'dotnet', out: 'Flags.g.cs', sdkMajor: 8, namespace: 'MyApp.FeatureFlags' } as const;
+const cfg = { id: 'dotnet', out: 'Flags.g.cs', sdkMajor: 8, options: { namespace: 'MyApp.FeatureFlags' } } as const;
 
 function emit(...flags: Flag[]): string {
   return dotnetEmitter.emit({ projectKey: 'my-project', flags }, cfg, { generatorVersion: '0.3.0' })[0]!.contents;

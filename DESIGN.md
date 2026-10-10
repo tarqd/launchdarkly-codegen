@@ -319,17 +319,42 @@ would be empty. Go's initialism table (ADR 0002) is part of the go target's
 Each emitter implements one interface:
 
 ```ts
-interface Emitter {
+interface Emitter<D extends OptionDeclarations = OptionDeclarations> {
   id: TargetId;
   sdkMajors: readonly number[];          // config validation checks `sdkMajor` against this
-  emit(model: FlagModel, cfg: TargetConfig, ctx: EmitContext): GeneratedFile[];
+  outExtensions?: readonly string[];     // what `out` may end in; absent when `out` is a directory
+  options?: D;                           // the target's own config keys
+  emit(model: FlagModel, cfg: TargetConfig<OptionValues<D>>, ctx: EmitContext): GeneratedFile[];
   readFlags?(text: string): GeneratedFlag[] | undefined;
+}
+
+interface TargetConfig<O> {
+  id: TargetId;
+  out: string;
+  sdkMajor: number;
+  options: O;                            // parsed at config load
+}
+
+interface TargetOption {                 // one entry of `options`, made with `targetOption({...})`
+  type: 'string' | 'number' | 'boolean';
+  required: boolean;
+  description: string;                   // documents the key (Configuration → Target options)
+  example: string;
+  parse?(value, fail: (message: string) => never): unknown;
 }
 
 interface EmitContext {
   generatorVersion: string;              // for the file header
 }
 ```
+
+A target's own keys (go's `package`, dotnet's `namespace`) are declared by
+its emitter and parsed when the config is loaded, not in `emit` (ADR 0005).
+Config loading checks each value's `type`, fails on a missing required one
+with its `example`, and then runs `parse` for the target's own rules; the
+type of `cfg.options` is inferred from the declarations. So `emit` gets
+typed options and never fails on config, and each option's description and
+example are data that can document it.
 
 `sdkMajors` is the one place a target's supported SDK majors are listed;
 config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
@@ -516,8 +541,9 @@ SDK facts are in [`docs/research/go-server-sdk-v7.md`](docs/research/go-server-s
 **Config.** `out` is the path of the one generated `.go` file (for example
 `internal/ldflags/flags_gen.go`); a value not ending in `.go` is exit 2.
 `package` is required: a lowercase Go identifier that is not a keyword, else
-exit 2 naming the key. There is no default from the directory name, since
-directories like `ld-flags` aren't valid package names.
+exit 2 naming the key (Configuration → Target options). There is no default
+from the directory name, since directories like `ld-flags` aren't valid
+package names.
 
 **Client.** `New` takes a generated `Client` interface listing the twenty
 typed evaluation methods: four forms (`X`, `XDetail`, `XCtx`, `XDetailCtx`)
@@ -755,8 +781,8 @@ entry and one fixture run. Facts and sources:
 holding `public final class Flags`, the only class name Java allows in that
 file. `package` is required: dot-separated identifiers, each matching
 `[A-Za-z_$][A-Za-z0-9_$]*` and not a reserved word; anything else is exit 2
-naming the key. The generator doesn't check `package` against `out`, because
-javac reports the mismatch.
+naming the key (Configuration → Target options). The generator doesn't check
+`package` against `out`, because javac reports the mismatch.
 
 **Shape.**
 
@@ -1112,7 +1138,7 @@ LDFLAG001` silences on its own; on older frameworks it is CS0618 (ADR 0003).
 The deprecated members of the same file can reference each other without a
 warning.
 
-Target options:
+Target options (Configuration → Target options):
 
 - `namespace` (required): dotted C# identifiers (Unicode letters allowed),
   none of them a keyword. A last segment of `Flags` or `FlagKeys` is rejected
@@ -1365,6 +1391,30 @@ check:
 
 A config that sets both `view` and `tags` is rejected (exit 2). That can be
 loosened later without breaking anyone.
+
+### Target options
+
+Every target has `id`, `out` and `sdkMajor`. Its other keys are the options
+its emitter declares (Emitters, ADR 0005); any other key is exit 2:
+
+| Target | `out` | Option | Description | Example |
+|---|---|---|---|---|
+| `ts-server` | a `.ts`, `.mts` or `.cts` file | none | | |
+| `dotnet` | a `.cs` file | `namespace` (required) | The generated classes' namespace: dotted C# identifiers, none a keyword, not ending in Flags or FlagKeys. | `MyApp.FeatureFlags` |
+| `go` | a `.go` file | `package` (required) | The generated file's Go package name: a lowercase Go identifier that is not a keyword. | `ldflags` |
+| `java` | a directory | `package` (required) | The generated file's `package`: dot-separated Java identifiers, none a reserved word. | `com.example.flags` |
+
+A test keeps this table in step with the emitters' declarations. Every
+configured target is validated when the config loads, including those
+`--target` leaves out, so a broken target fails every run. Errors name the
+config file and the target's position, like every other config error:
+
+```
+launchdarkly-codegen.config.yaml: targets[1].package must be a lowercase Go identifier that is not a keyword, got "LdFlags"
+launchdarkly-codegen.config.yaml: targets[1].package is required (for example ldflags)
+launchdarkly-codegen.config.yaml: targets[0].out must end in .ts, .mts or .cts, got "flags.js"
+launchdarkly-codegen.config.yaml: targets[1]: unknown key `pakage` for go (known keys: id, out, sdkMajor, package)
+```
 
 Precedence: CLI args, then environment variables, then the config file.
 Generator settings use the `LD_CODEGEN_` prefix (`LD_CODEGEN_PROJECT`,

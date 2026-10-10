@@ -3,7 +3,7 @@ import type { Flag, FlagModel } from '@launchtarqly/core';
 import { tsServerEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
-const cfg = { id: 'ts-server', out: 'src/flags.generated.ts', sdkMajor: 9 } as const;
+const cfg = { id: 'ts-server', out: 'src/flags.generated.ts', sdkMajor: 9, options: {} } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 describe('ts-server emitter', () => {

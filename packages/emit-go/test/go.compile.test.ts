@@ -63,7 +63,7 @@ const PIECES = [
   'A', 'Title Case Words', 'v1.2', 'e.g. this', '"q"', '<b>&amp;</b>', '%d', '{x}', 'end', ' ', ' ', ' ',
 ];
 const FUZZ_FLAGS = 3000;
-const FUZZ_CONFIG = { id: 'go', out: 'ldflags/flags_gen.go', sdkMajor: 7, package: 'ldflags' } as const;
+const FUZZ_CONFIG = { id: 'go', out: 'ldflags/flags_gen.go', sdkMajor: 7, options: { package: 'ldflags' } } as const;
 
 /** The prototype's deterministic LCG, so a failure reproduces. */
 function fuzzText(seed: number): () => string {

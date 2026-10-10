@@ -78,6 +78,7 @@ export const tsServerEmitter: Emitter = {
   id: TS_SERVER,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [9],
+  outExtensions: ['.ts', '.mts', '.cts'],
   emit(model, cfg, ctx) {
     const names = nameFlags(model, NAMING);
     const w = new Writer();

@@ -3,7 +3,7 @@ import { CodegenError, type Flag, type FlagModel } from '@launchtarqly/core';
 import { goEmitter } from '../src/index.js';
 import { modelFlag } from '../../core/test/builders.js';
 
-const cfg = { id: 'go', out: 'internal/ldflags/flags_gen.go', sdkMajor: 7, package: 'ldflags' } as const;
+const cfg = { id: 'go', out: 'internal/ldflags/flags_gen.go', sdkMajor: 7, options: { package: 'ldflags' } } as const;
 const ctx = { generatorVersion: '0.3.0' };
 
 function emit(...flags: Flag[]): string {

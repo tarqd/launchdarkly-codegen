@@ -26,13 +26,13 @@ Invoke the `tdd` skill. Each item below is a behaviour with its own failing test
 - **Doc comments and deprecation.** Use `Writer.docComment(lines, escape)` with this target's escape function, or `line` comments for line-comment languages. Put the deprecation annotation on the method, every variant and the key constant.
   A target whose formatter reflows comments (java, ADR 0004) may use its own doc helper instead of `Writer.docComment`, so the comments come out already in the formatter's layout.
 - **Header.** Construct `new Writer({ indent, commentPrefix })` with the language's indent unit and comment prefix, then call `w.header(...)`. `GENERATED_MARKER` is already the exact line Go tooling recognizes.
-- **Target options.** `parseTargets` passes extra keys through unchecked. The emitter validates its own keys and throws `CodegenError` naming the key, which exits 2.
+- **Target options.** Declare the target's own keys as `options: { key: targetOption({ type, required, description, example, parse }) }` on `Emitter<typeof OPTIONS>`, and the endings `out` may have as `outExtensions` (ADR 0005). Config loading parses them, so `emit` reads `cfg.options` and never throws for config. `parse` gets a value already of `type` and calls `fail('must be …')` for the target's own rules. Test the declarations through `parseTargetOptions`, as `emit-go/test/options.test.ts` does, and add the target's rows to DESIGN.md → Configuration → Target options, which `target-options-doc.test.ts` checks.
 - **`readFlags`.** Parse the emitter's own output back into `GeneratedFlag`s in `src/flag-changes.ts`, and return `undefined` when the text can't be read back; `check` pairs the old and new sides itself. Put the strings and patterns both the writer and the parser rely on in `src/output.ts`, as `emit-go` does. Test it against every golden file, as `emit-ts-server/test/flag-changes.test.ts` does.
 
 Keep these invariants:
 
 - `emit` is pure.
-- `emit` relies on config having already checked `sdkMajor` against `sdkMajors`.
+- `emit` relies on config having already checked `sdkMajor` against `sdkMajors`, `out` against `outExtensions`, and parsed `options`.
 - Output is canonical: byte-for-byte what the language's formatter would leave alone. No formatter runs, and `check` compares bytes.
 - Generated code imports only the official SDK. Any helper is emitted into the generated files, never published as a package.
 - The generator never invents a name: every naming failure tells the user to set `codegen.name.<id>`.

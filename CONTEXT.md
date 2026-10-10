@@ -56,3 +56,7 @@ _Avoid_: variant (for key constants)
 **Read-back**:
 Reading a target's generated text back into flags (key, identifier, kind), so `check` can summarize what changed in a stale file. The old side is whatever is on disk, so read-back parses text rather than trusting a flag model, and a file it can't read gets the diff alone.
 _Avoid_: reverse emit, decompile
+
+**Target option**:
+A config key one target has beyond `id`, `out` and `sdkMajor`, such as go's `package` or dotnet's `namespace`. Its emitter declares it, with a description and example, and config loading parses it.
+_Avoid_: emitter option, setting (settings are the top-level keys that env and CLI can also set)
