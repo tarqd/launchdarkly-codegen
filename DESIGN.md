@@ -6,8 +6,12 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: design, pre-implementation. Decisions below came out of a design
-interview; open items are collected at the end.
+Status: design, pre-implementation. `core` and the `ts-server` target have no
+open decisions left; the shared design (flag model, naming, emitter interface)
+has been checked against Go and Java with a compiling prototype. The full
+emitter specs for `go`, `java` and `ts-browser` are later work. Facts that
+could not be confirmed from a primary source are listed at the end, to be
+checked during implementation.
 
 ## Goals
 
@@ -25,12 +29,21 @@ interview; open items are collected at the end.
 - Narrowing string or number flags to the set of variations currently defined.
   Variations can be added at runtime, so string flags stay `string`.
 - Typing JSON flags from a schema. JSON flags return the SDK's native value
-  type. Schema support is a possible later addition.
+  type. If schema support is added later, the likely home is a custom property
+  holding a URL or inline schema, feeding a per-target type generator, with
+  the method's fallback and return type narrowed to the generated type.
 - Generating or baking in default values. The caller passes a fallback on
   every call, exactly as with the raw SDK. The generator never reads
   environment state.
 - Constructing the SDK client, managing contexts, or wrapping non-flag APIs
   (segments, metrics, experiments).
+- Running a formatter (prettier, gofmt, google-java-format). Emitters write
+  canonical text and `check` compares those bytes.
+- Publishing runtime helper packages. Generated code depends only on the
+  official SDK; anything extra is emitted as generated code.
+- Splitting a target's output by tag or view. One file (TS, Go) or one class
+  (Java) per target.
+- Third-party emitters.
 - Replacing the official SDKs or the OpenFeature CLI. See prior art.
 
 ## Prior art
@@ -50,32 +63,32 @@ generated code is a facade on top. We follow that.
 
 | Question | Decision |
 | --- | --- |
-| Source of truth | LaunchDarkly REST API, live at generation time |
+| Source of truth | LaunchDarkly REST API, live at generation time, or a recorded snapshot of its responses |
 | Scope of a run | one project; environments are not part of generation |
 | Targets for v1 | TypeScript (Node server SDK), TypeScript (browser client SDK), Go, Java. React later. |
-| Generated shape | one method per flag, plus a `...Detail` variant per flag |
-| Value types | the SDK's native type per flag kind; JSON flags return the SDK's JSON value type |
+| Generated shape | one method per flag, plus a `...Detail` variant per flag (Go also emits `...Ctx` forms) |
+| Value types | the SDK's native type per flag kind; numbers are `double` unless the flag opts into `int`; JSON flags return the SDK's JSON value type |
 | Defaults | caller passes a fallback on every call |
-| Flag selection | all flags in the project, or filtered by a LaunchDarkly view or by tags |
-| Naming | flag key converted to the language idiom; a per-language custom property on the flag overrides the name |
+| Flag selection | all flags in the project, or filtered by one LaunchDarkly view (by key) or by tags, never both |
+| Naming | flag key converted to the language idiom; an alias set through a custom property replaces it; the generator never invents a name |
 | Deprecation | flags marked deprecated get the language's deprecation annotation where one exists |
 | Browser output | only flags with client-side SDK availability enabled |
 | Docs | flag description becomes a doc comment, with a link to the flag in the LaunchDarkly UI, tags, and maintainer |
-| Generator implementation | JavaScript/TypeScript, runnable with `npx` |
-| Configuration | config file, overridable by CLI args and environment variables |
-| CI | `check` mode that fails when committed output is stale |
-| Runtime dependency | generated code depends on the official SDK plus a small published runtime helper per language |
+| Generator implementation | JavaScript/TypeScript, published as one npm package, `@launchtarqly/codegen`, runnable with `npx` |
+| Configuration | config file, overridable by CLI args and environment variables; connection settings use the LaunchDarkly CLI's (`ldcli`) names |
+| CI | `check` mode that fails when committed output differs from what would be generated, byte for byte |
+| Runtime dependency | the official SDK only; no published helper packages |
 | SDK versions | latest majors in v1; the SDK major is pinned per target in config so future majors can be added without breaking existing users |
 
 ## Architecture
 
 ```
                  ┌──────────────┐
-  LD REST API ──▶│   fetcher    │──▶ raw flags, views, tags
+  LD REST API ──▶│   fetcher    │──▶ raw API responses (a snapshot)
                  └──────┬───────┘
                         ▼
                  ┌──────────────┐
-                 │  normalizer  │──▶ FlagModel (language-neutral IR)
+                 │  normalizer  │──▶ FlagModel (language-neutral)
                  └──────┬───────┘
                         ▼
           ┌─────────────┼──────────────┬──────────────┐
@@ -83,7 +96,7 @@ generated code is a facade on top. We follow that.
     ts-server       ts-browser         go            java        (emitters)
           │             │              │              │
           ▼             ▼              ▼              ▼
-     files on disk, formatted, with a generated-file header and a model hash
+     files on disk, canonical text, with a generated-file header
 ```
 
 One generator, multiple targets. The fetcher and normalizer run once per
@@ -91,85 +104,161 @@ invocation; every configured target consumes the same `FlagModel`.
 
 ### Fetcher
 
-- Reads `GET /api/v2/flags/{projectKey}` with pagination, requesting the
-  fields the model needs (key, name, description, kind, variations,
-  client-side availability, tags, maintainer, archived, deprecated, custom
-  properties). Environment-specific fields are not requested.
-- When a view filter is configured, resolves the view to its flag set through
-  the views API and intersects.
-- When a tag filter is configured, passes it as the API filter and also
-  re-checks locally so behavior does not depend on server-side filter
-  semantics.
-- Auth from `LD_API_TOKEN` (or `LAUNCHDARKLY_ACCESS_TOKEN`, checked in that
-  order), or from `--token`. Never from the config file.
-- Respects rate-limit headers with bounded retry.
-- Can be bypassed with `--from-snapshot <file>` and populated with
-  `--write-snapshot <file>` so the normalizer and emitters can be tested
-  offline and so a team can pin a known model in CI if they want to.
+The fetcher's output is a **snapshot**: the raw API responses for one project.
+It never interprets them; that is the normalizer's job. A run either fetches
+live or replays a snapshot file, and the normalizer runs the same way on both.
+
+- Connection settings use `ldcli`'s names:
+
+  | Setting | CLI flag | Env var | Config key | Default |
+  | --- | --- | --- | --- | --- |
+  | Base URI (API and UI links; EU and federal instances) | `--base-uri` | `LD_BASE_URI` | `baseUri` | `https://app.launchdarkly.com` |
+  | Access token | `--access-token` | `LD_ACCESS_TOKEN` | never read from config | none |
+
+  There are no other token fallbacks. A read-only token is enough.
+- Flags come from `GET /api/v2/flags/{projectKey}` with
+  `LD-API-Version: 20240415`. Without that header, older tokens get
+  unpaginated responses that include environments.
+- Paging is `limit`/`offset` with `limit=100` (the documented maximum),
+  following `_links.next` until it is absent. Offset paging can skip or repeat
+  a flag if flags change mid-fetch, so the request sorts by `key` and the
+  fetcher dedupes by key.
+- `env` and `expand` are never sent, so no environment data comes back. The
+  API has no field selection. Archived flags are excluded by the API's
+  default; deprecated flags are included.
+- When a tag filter is configured, it is sent as `filter=tags:a+b`
+  (URL-encoded) and the normalizer re-checks it locally, so behavior does not
+  depend on server-side filter semantics.
+- When a view is configured, the fetcher lists the view's members with
+  `GET /api/v2/projects/{projectKey}/views/{viewKey}/linked/flags`, paged the
+  same way, and the normalizer intersects them with the flags list by key.
+  - The views API is beta: every views call sends `LD-API-Version: beta`, and
+    the fetcher reads only `items[].resourceKey`, `totalCount` and
+    `_links.next`, so changes elsewhere in the beta response can't break it.
+  - Views are addressed by **key** (lowercase, immutable), not by name.
+  - Views are an Enterprise feature. An unknown view, or an account without
+    views, is exit 2.
+  - The undocumented `filter=view:<key>` on the flags list is not used.
+- Rate limits: on a 429, wait for `Retry-After` (seconds) if present,
+  otherwise until `X-Ratelimit-Reset` / `X-Ratelimit-Auth-Token-Reset`
+  (epoch milliseconds), otherwise use exponential backoff. Always add jitter
+  and cap the retries; when the retries run out, exit 2.
+- `--write-snapshot <file>` saves the responses, and `--from-snapshot <file>`
+  replays them with no network. A snapshot records the project key, the
+  base URI, the view key and its resolved member keys (if a view was used),
+  and the flags-list pages. Snapshots are how the normalizer and emitters are
+  tested offline, and a team can pin one in CI if it wants to.
 
 ### Normalizer and the FlagModel
 
-The intermediate representation is intentionally small:
+The flag model is intentionally small:
 
 ```ts
 type FlagKind = 'boolean' | 'string' | 'number' | 'json';
 
 interface FlagModel {
   projectKey: string;
-  fetchedAt: string;           // excluded from the hash
-  flags: Flag[];
+  flags: Flag[];               // sorted by key
 }
 
 interface Flag {
   key: string;
   name: string;
-  description: string;
+  description: string;                 // missing → ""
   kind: FlagKind;
+  numberType?: 'int' | 'double';       // number flags only; default 'double'
   clientSideAvailability: { usingEnvironmentId: boolean; usingMobileKey: boolean };
   tags: string[];
-  maintainer?: { email: string; name?: string };
+  maintainer?: { kind: 'member'; email: string; name?: string }
+             | { kind: 'team'; key: string; name: string };
   deprecated: boolean;
+  deprecationMessage?: string;
   archived: boolean;
-  nameOverrides: Partial<Record<TargetId, string>>;   // from custom properties
+  aliases: Partial<Record<TargetId, string>>;   // from codegen.name custom properties
   uiUrl: string;
 }
 ```
 
 Normalizer rules:
 
-- Archived flags are dropped before emission.
-- `kind` is derived from the flag's variation type; a flag whose variations are
-  not all one JSON type is `json`.
-- Name overrides come from custom properties named
-  `codegen.name.<target>` (for example `codegen.name.go`), with
-  `codegen.name` as a fallback for all targets.
-- `deprecated` is true when the flag has LaunchDarkly's deprecated marker or
-  the custom property `codegen.deprecated` is set.
-- The model is sorted by key so output is deterministic. A SHA-256 of the
-  canonical model, excluding `fetchedAt`, is written into every generated file
-  header and is what `check` compares.
+- **Archived** flags are dropped before emission.
+- **Kind** is inferred from the variation values, the same way LaunchDarkly's
+  own UI does, because LaunchDarkly's `kind` only says `boolean` or
+  `multivariate`:
+  - A `boolean` flag must have only boolean values; anything else is a hard
+    error (exit 2) naming the flag.
+  - A `multivariate` flag with only strings is `string`, with only numbers is
+    `number`, and anything else is `json`.
+  - Mixed values give `json` plus a warning. LaunchDarkly allows real JSON
+    flags with mixed values.
+  - There is no override property for kind: LaunchDarkly stores no JSON
+    variation type, so value inference matches LaunchDarkly's own model.
+- **Number type.** Number flags are `double` by default. The custom property
+  `codegen.number` with the single value `int` makes the flag `int`. It is a
+  hard error if any variation is not an integer or doesn't fit in 32 bits
+  (Java's `int`). Unsigned and explicit 64-bit types are not offered: the SDKs
+  have no such methods, and the wrapper stays a pass-through.
+- **Client-side availability** comes from the flag's own
+  `clientSideAvailability`, which is per flag and applies to every
+  environment; the project's default only seeds new flags. If the field is
+  absent, `usingEnvironmentId` falls back to the deprecated
+  `includeInSnippet ?? false` and `usingMobileKey` to `true`.
+- **Maintainer.** `_maintainer` maps to
+  `{kind: 'member', email, name}`, where name is first + last. `_maintainerTeam`
+  maps to `{kind: 'team', key, name}`. If neither is present, the maintainer
+  is left out. List items carry both without `expand`.
+- **Custom properties** always hold string arrays.
+  - `codegen.name.<target>` (for example `codegen.name.go`) sets that target's
+    alias; `codegen.name` sets an alias for every target that has no
+    target-specific one.
+  - `codegen.name.*` and `codegen.number` take exactly one non-blank value.
+    More than one is a hard error naming the flag and property; an empty array
+    counts as unset.
+- **Deprecation.** `deprecated` is LaunchDarkly's deprecated marker OR any
+  `codegen.deprecated` property. `deprecationMessage` is the non-blank
+  `codegen.deprecated` values joined with a space. Both signals are kept: the
+  marker (which any flag can carry) also hides the flag from LaunchDarkly's
+  live list, which says something different from "don't add new calls", and
+  it has no message field.
+- **UI link.** `uiUrl` is `{baseUri}/projects/{projectKey}/flags/{key}`.
+- **Tags** filtering, when configured, is re-applied here. A view filter keeps
+  only flags whose key is among the view's members.
+- The model is sorted by key so output is deterministic.
 
 ### Naming
 
-Keys are converted per target:
+Keys are converted per target. Each target needs a method form and a
+constant form:
 
-| Target | Method | Example from `checkout-v2.new_flow` |
-| --- | --- | --- |
-| ts-server, ts-browser | lowerCamel | `checkoutV2NewFlow` |
-| go | UpperCamel, exported | `CheckoutV2NewFlow` |
-| java | lowerCamel | `checkoutV2NewFlow` |
+| Target | Method | Constant | Example from `checkout-v2.new_flow` |
+| --- | --- | --- | --- |
+| ts-server, ts-browser | lowerCamel | lowerCamel (`FlagKeys` property) | `checkoutV2NewFlow` |
+| go | UpperCamel, exported | `Key` + UpperCamel | `CheckoutV2NewFlow`, `KeyCheckoutV2NewFlow` |
+| java | lowerCamel | CONSTANT_CASE | `checkoutV2NewFlow`, `CHECKOUT_V2_NEW_FLOW` |
 
-Rules applied in order: split on `-`, `_`, `.`, `/`, whitespace, and
-case changes; drop characters that are not letters or digits; prefix with
-`flag` (or `Flag`) when the first character is a digit; apply the target's
-casing; then check against the target's reserved words and append `Flag` on
-collision. If two flags produce the same identifier the run fails with both
-keys named; the fix is a `codegen.name.<target>` override on one of them.
+If the flag has an alias for the target, the alias is used as is (after
+validation) instead of the converted key. Otherwise the steps are: split on
+`-`, `_`, `.`, `/`, whitespace, and case changes; drop characters that are not
+letters or digits; apply the target's casing. Go additionally fixes common
+initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to `API`), so `api-url-id`
+becomes `APIURLID` and the Java constant `API_URL_ID`.
 
-Go additionally fixes common initialisms (`Id` to `ID`, `Url` to `URL`, `Api`
-to `API`) to satisfy `golint`-style conventions. Java reserved words are
-checked against the JLS list; TypeScript against ECMAScript reserved words
-plus strict-mode reserved words.
+The generator never invents a name: an identifier is either the converted key
+or an alias the user chose. These are errors, each naming the flag and
+suggesting `codegen.name.<target>`:
+
+- **Leading digit.** The converted key starts with a digit.
+- **Reserved word.** TypeScript checks ECMAScript reserved words plus
+  strict-mode reserved words. Java checks the JLS list plus the `Object`
+  methods (`wait`, `notify`, `notifyAll`, `equals`, `hashCode`, `toString`,
+  `getClass`, `clone`, `finalize`). Go's keywords can't collide with
+  UpperCamel names, so Go checks only the names it generates itself (`New`,
+  `Client`, `Flags`).
+- **Collision.** The check covers every identifier a target emits: flag
+  methods, their `Detail` and `Ctx` variants, and key constants. For example,
+  flag `checkout`'s detail method and a flag named `checkout-detail` both want
+  `CheckoutDetail`. Java would otherwise silently overload them when the
+  parameter types differ. Both keys are named.
 
 ### Emitters
 
@@ -189,33 +278,35 @@ all live inside them. A programmatic emitter with small per-language string
 builders keeps those rules testable in isolation. A `Writer` helper handles
 indentation and comment escaping so emitters do not each reinvent it.
 
+Emitters write canonical, already-formatted text (what `prettier`, `gofmt` and
+`google-java-format` would leave alone for the shapes they emit). No formatter
+runs, and those bytes are what `check` compares.
+
 Every generated file starts with a header:
 
 ```
 // Code generated by launchdarkly-codegen. DO NOT EDIT.
-// project: my-project   model: sha256:3f2a…   generator: 0.3.0
+// project: my-project   generator: 0.3.0
 ```
 
 Go uses that exact first line so `go vet` and tooling recognize it as
-generated.
-
-Output is run through the language's formatter when available on the host
-(`prettier` bundled for TS, `gofmt` if on PATH, `google-java-format` if on
-PATH), and emitted unformatted otherwise. The emitter writes canonical,
-already-formatted text so the formatter is a safety net rather than a
-requirement, and `check` compares against formatted output when the formatter
-ran.
+generated. Because the generator version is in the header and `check`
+compares bytes, upgrading the generator with unchanged flags reports the
+output as stale until it is regenerated. That is intended: the committed
+output is the contract.
 
 ### Deprecation
 
 | Target | Annotation |
 | --- | --- |
 | ts-server, ts-browser | `/** @deprecated ... */` on the method |
-| go | `// Deprecated: ...` line in the doc comment |
+| go | `// Deprecated: ...` paragraph in the doc comment |
 | java | `@Deprecated` plus `@deprecated` Javadoc tag |
 
-The deprecation text comes from the custom property `codegen.deprecated` if
-it holds a string, otherwise a generic message naming the flag.
+The annotation goes on the flag's method, its `Detail` and `Ctx` variants,
+and its key constant. The text is the flag's `deprecationMessage`; without one,
+it's a generic message naming the flag. The message has no date, so
+deprecating, un-deprecating and re-deprecating doesn't churn output.
 
 ### Doc comments
 
@@ -233,20 +324,40 @@ a trailer with the key, tags, maintainer, and the UI link:
  */
 ```
 
-Description text is escaped for the target comment syntax (`*/` in
-TS/Java, nothing special in Go).
+A team maintainer shows as `maintainer: team Payments`. The link uses the
+configured base URI.
+
+Escaping per target:
+
+- **TS:** escape `*/`.
+- **Go:** nothing to escape. The comment starts with the identifier, as Go
+  convention requires (`// CheckoutV2 evaluates the "Checkout V2" flag.`),
+  followed by the flag name and description.
+- **Java:** Javadoc is HTML, so escape `&`, `<`, `>`, and `*/` (as `*&#47;`).
+  Emit `@param` and `@return`, and comment every member, private ones
+  included, so the output passes `-Xdoclint:all`.
 
 ## Generated code by target
 
-Flag kinds map to SDK methods. The example below uses three flags:
+Flag kinds map to SDK methods. The examples below use three flags:
 `checkout-v2` (boolean), `pricing-tier` (string), `checkout-config` (json).
+
+| Kind | ts-server / ts-browser | go | java |
+| --- | --- | --- | --- |
+| boolean | `boolVariation` → `boolean` | `BoolVariation` → `bool` | `boolVariation` → `boolean` |
+| string | `stringVariation` → `string` | `StringVariation` → `string` | `stringVariation` → `String` |
+| number (double) | `numberVariation` → `number` | `Float64Variation` → `float64` | `doubleVariation` → `double` |
+| number (int) | `numberVariation` → `number` | `IntVariation` → `int` | `intVariation` → `int` |
+| json | `jsonVariation` → `unknown` | `JSONVariation` → `ldvalue.Value` | `jsonValueVariation` → `LDValue` |
 
 ### ts-server (`@launchdarkly/node-server-sdk` v9)
 
+The SDK's typed `...VariationDetail` methods already return
+`LDEvaluationDetailTyped<T>`, so the wrapper returns them directly and needs
+no helper.
+
 ```ts
-import type { LDClient, LDContext, LDEvaluationDetail } from '@launchdarkly/node-server-sdk';
-import type { LDFlagValue } from '@launchdarkly/node-server-sdk';
-import { TypedDetail, detail } from '@launchdarkly/codegen-runtime-node';
+import type { LDClient, LDContext, LDEvaluationDetailTyped } from '@launchdarkly/node-server-sdk';
 
 export class Flags {
   constructor(private readonly client: LDClient) {}
@@ -255,17 +366,17 @@ export class Flags {
   checkoutV2(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('checkout-v2', context, fallback);
   }
-  checkoutV2Detail(context: LDContext, fallback: boolean): Promise<TypedDetail<boolean>> {
-    return detail(this.client.boolVariationDetail('checkout-v2', context, fallback));
+  checkoutV2Detail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
+    return this.client.boolVariationDetail('checkout-v2', context, fallback);
   }
 
   pricingTier(context: LDContext, fallback: string): Promise<string> { ... }
-  pricingTierDetail(...): Promise<TypedDetail<string>> { ... }
+  pricingTierDetail(...): Promise<LDEvaluationDetailTyped<string>> { ... }
 
-  checkoutConfig(context: LDContext, fallback: LDFlagValue): Promise<LDFlagValue> {
+  checkoutConfig(context: LDContext, fallback: unknown): Promise<unknown> {
     return this.client.jsonVariation('checkout-config', context, fallback);
   }
-  checkoutConfigDetail(...): Promise<TypedDetail<LDFlagValue>> { ... }
+  checkoutConfigDetail(...): Promise<LDEvaluationDetailTyped<unknown>> { ... }
 }
 
 export const FlagKeys = {
@@ -278,11 +389,14 @@ export const FlagKeys = {
 `FlagKeys` is emitted in every target as a cheap escape hatch for code that
 needs the raw key (logging, `allFlagsState`, migrations).
 
-### ts-browser (`@launchdarkly/js-client-sdk` v3)
+### ts-browser (`@launchdarkly/js-client-sdk` v4)
+
+The full emitter spec is later work; this records the shape the shared design
+was checked against.
 
 Same shape without the context parameter, because the client SDK evaluates
-against the context given at initialization. Only flags with
-`clientSideAvailability.usingEnvironmentId` set are emitted.
+against the context given at initialization. The methods are synchronous.
+Only flags with `clientSideAvailability.usingEnvironmentId` set are emitted.
 
 ```ts
 export class Flags {
@@ -290,46 +404,75 @@ export class Flags {
   checkoutV2(fallback: boolean): boolean {
     return this.client.boolVariation('checkout-v2', fallback);
   }
-  checkoutV2Detail(fallback: boolean): TypedDetail<boolean> { ... }
+  checkoutV2Detail(fallback: boolean): LDEvaluationDetailTyped<boolean> { ... }
 }
 ```
 
-The `sdkMajor` setting selects between the current `@launchdarkly/js-client-sdk`
-API and the legacy `launchdarkly-js-client-sdk` package, which only exposes an
-untyped `variation()`. For the legacy package the runtime helper performs the
-type check.
+`sdkMajor` picks the package: `4` is `@launchdarkly/js-client-sdk`, and `3` is
+the legacy `launchdarkly-js-client-sdk`, which has only an untyped
+`variation()`. Their majors don't overlap. For the legacy package the
+generated code does the type check itself.
 
 A React target (later) would emit `useCheckoutV2(fallback)` hooks on top of
-`@launchdarkly/react-client-sdk` and reuse the ts-browser filtering.
+`@launchdarkly/react-sdk` (v4, on js-client-sdk 4) or the legacy
+`launchdarkly-react-client-sdk` (v3), and reuse the ts-browser filtering.
 
 ### go (`github.com/launchdarkly/go-server-sdk/v7`)
+
+The full emitter spec is later work; this records the shape the shared design
+was checked against.
+
+`New` takes a generated `Client` interface listing exactly the SDK methods the
+wrapper calls, `...Ctx` forms included. `*ld.LDClient` satisfies it, so
+callers pass the real client unchanged and tests can pass a fake. The SDK's
+own `interfaces.LDClientEvaluations` can't be used because it lacks the `Ctx`
+methods. Each flag gets four methods, with the suffix order the SDK uses
+(`BoolVariationDetailCtx`).
 
 ```go
 // Code generated by launchdarkly-codegen. DO NOT EDIT.
 package ldflags
 
 import (
-    ld "github.com/launchdarkly/go-server-sdk/v7"
+    gocontext "context"
+
     "github.com/launchdarkly/go-sdk-common/v3/ldcontext"
     "github.com/launchdarkly/go-sdk-common/v3/ldreason"
     "github.com/launchdarkly/go-sdk-common/v3/ldvalue"
 )
 
-type Flags struct{ client *ld.LDClient }
-
-func New(client *ld.LDClient) *Flags { return &Flags{client: client} }
-
-// CheckoutV2 ...
-func (f *Flags) CheckoutV2(ctx ldcontext.Context, fallback bool) (bool, error) {
-    return f.client.BoolVariation("checkout-v2", ctx, fallback)
+// Client is the subset of *ld.LDClient the generated wrapper calls.
+type Client interface {
+    BoolVariation(key string, context ldcontext.Context, defaultVal bool) (bool, error)
+    BoolVariationDetail(key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
+    BoolVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, error)
+    BoolVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
+    // ... one group per kind the project uses
 }
 
-func (f *Flags) CheckoutV2Detail(ctx ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) {
-    return f.client.BoolVariationDetail("checkout-v2", ctx, fallback)
+// Flags is the typed wrapper.
+type Flags struct{ client Client }
+
+// New returns a Flags that evaluates through client.
+func New(client Client) *Flags { return &Flags{client: client} }
+
+// CheckoutV2 evaluates the "Checkout V2" flag. ...
+func (f *Flags) CheckoutV2(context ldcontext.Context, fallback bool) (bool, error) {
+    return f.client.BoolVariation(KeyCheckoutV2, context, fallback)
 }
 
-func (f *Flags) CheckoutConfig(ctx ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
-    return f.client.JSONVariation("checkout-config", ctx, fallback)
+// CheckoutV2Detail ...
+func (f *Flags) CheckoutV2Detail(context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) { ... }
+
+// CheckoutV2Ctx ...
+func (f *Flags) CheckoutV2Ctx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, error) { ... }
+
+// CheckoutV2DetailCtx ...
+func (f *Flags) CheckoutV2DetailCtx(ctx gocontext.Context, context ldcontext.Context, fallback bool) (bool, ldreason.EvaluationDetail, error) { ... }
+
+// CheckoutConfig ...
+func (f *Flags) CheckoutConfig(context ldcontext.Context, fallback ldvalue.Value) (ldvalue.Value, error) {
+    return f.client.JSONVariation(KeyCheckoutConfig, context, fallback)
 }
 
 const (
@@ -339,12 +482,16 @@ const (
 )
 ```
 
-Go's SDK already returns detail as a separate value, so the Go emitter needs
-no runtime helper for detail. The struct holds an interface rather than
-`*ld.LDClient` if the config sets `clientInterface: true`, to make mocking
-easier.
+The output must pass `gofmt`, `go vet` and staticcheck. go-server-sdk v7.19.0
+raises the `go` directive to 1.25.0 under `go mod tidy`, so the Go compile
+fixture needs Go 1.25 or later. The working prototype is on the
+[`prototype/go-java-crosscheck`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/go-java-crosscheck/prototypes/go-java-crosscheck)
+branch.
 
 ### java (`com.launchdarkly:launchdarkly-java-server-sdk` 7.x)
+
+The full emitter spec is later work; this records the shape the shared design
+was checked against.
 
 ```java
 // Code generated by launchdarkly-codegen. DO NOT EDIT.
@@ -355,50 +502,48 @@ import com.launchdarkly.sdk.LDContext;
 import com.launchdarkly.sdk.LDValue;
 import com.launchdarkly.sdk.server.interfaces.LDClientInterface;
 
+/** ... */
 public final class Flags {
+  /** ... */
   private final LDClientInterface client;
+
+  /** ... @param client ... */
   public Flags(LDClientInterface client) { this.client = client; }
 
   /** ... */
   public boolean checkoutV2(LDContext context, boolean fallback) {
-    return client.boolVariation("checkout-v2", context, fallback);
+    return client.boolVariation(Keys.CHECKOUT_V2, context, fallback);
   }
+  /** ... */
   public EvaluationDetail<Boolean> checkoutV2Detail(LDContext context, boolean fallback) {
-    return client.boolVariationDetail("checkout-v2", context, fallback);
+    return client.boolVariationDetail(Keys.CHECKOUT_V2, context, fallback);
   }
 
+  /** ... */
   public LDValue checkoutConfig(LDContext context, LDValue fallback) {
-    return client.jsonValueVariation("checkout-config", context, fallback);
+    return client.jsonValueVariation(Keys.CHECKOUT_CONFIG, context, fallback);
   }
 
+  /** ... */
   public static final class Keys {
+    /** ... */
     public static final String CHECKOUT_V2 = "checkout-v2";
     ...
   }
 }
 ```
 
-Java output is one class by default. A `splitBy: tag` option emits one class
-per tag (`CheckoutFlags`, `BillingFlags`) for projects with hundreds of flags,
-where a single class becomes unpleasant to navigate. Go output is one package;
-Go files split by first tag with the same option.
+Output is always one class. It must compile without warnings under
+`-Xlint:all -Xdoclint:all -Werror`.
 
-### Runtime helper packages
+### No runtime packages
 
-Published per language and kept deliberately tiny:
-
-| Package | Contents |
-| --- | --- |
-| `@launchdarkly/codegen-runtime-node` | `TypedDetail<T>`, `detail()` to narrow `LDEvaluationDetail` |
-| `@launchdarkly/codegen-runtime-browser` | same, plus a type-checked `variation()` shim for the legacy client SDK |
-| Go | none needed in v1 |
-| Java | none needed in v1 |
-
-Rationale: TypeScript's SDK detail types are untyped on `value`, and
-repeating the narrowing in every generated method is noise. Where the SDK is
-already typed (Go, Java) the generated code depends only on the SDK. Each
-runtime package pins the SDK major it was built against, and the generator
-checks that the configured `sdkMajor` matches.
+Generated code depends only on the official SDK. With Node SDK v9 and
+js-client-sdk v4 the SDK's own types are already precise, so no helper is
+needed. If a target ever needs shared helper code (for example the legacy
+browser SDK's type check), it is emitted as generated code, either in the
+wrapper file or as a second generated file next to it, never as a published
+package that would need its own versioning against `sdkMajor`.
 
 ## Configuration
 
@@ -406,8 +551,9 @@ checks that the configured `sdkMajor` matches.
 
 ```yaml
 project: my-project
-# exactly one of view or tags, or neither for the whole project
-view: payments
+# baseUri: https://app.eu.launchdarkly.com   # default https://app.launchdarkly.com
+# at most one of view or tags; neither means the whole project
+view: payments            # a view key, not its display name
 # tags: [checkout, billing]
 
 targets:
@@ -416,131 +562,134 @@ targets:
     sdkMajor: 9
   - id: ts-browser
     out: apps/web/src/flags.generated.ts
-    sdkMajor: 3
+    sdkMajor: 4
   - id: go
     out: internal/ldflags/
     package: ldflags
     sdkMajor: 7
-    clientInterface: true
   - id: java
     out: services/billing/src/main/java/com/example/flags/
     package: com.example.flags
     sdkMajor: 7
-    splitBy: tag
 
 check:
-  # defaults shown
+  # default shown
   failOnMissingOutput: true
-  ignoreFormatting: false
 ```
 
-Precedence: CLI args, then environment variables (`LD_CODEGEN_PROJECT`,
-`LD_CODEGEN_VIEW`, and so on), then the config file. The API token is never
-read from the config file.
+A config that sets both `view` and `tags` is rejected (exit 2). That can be
+loosened later without breaking anyone.
+
+Precedence: CLI args, then environment variables, then the config file.
+Generator settings use the `LD_CODEGEN_` prefix (`LD_CODEGEN_PROJECT`,
+`LD_CODEGEN_VIEW`, and so on); the connection settings use `ldcli`'s names
+(`LD_BASE_URI`, `LD_ACCESS_TOKEN`). The access token is never read from the
+config file.
 
 ## CLI
 
+The npm package is `@launchtarqly/codegen` and its bin is
+`launchtarqly-codegen`.
+
 ```
-npx launchdarkly-codegen generate [--config path] [--target id]... [--project key] [--view name] [--tag t]...
-npx launchdarkly-codegen check    [same flags]      exit 1 if any target is stale
-npx launchdarkly-codegen snapshot --write-snapshot flags.json
-npx launchdarkly-codegen init                        write a starter config
+npx @launchtarqly/codegen generate [--config path] [--target id]... [--project key] [--view key] [--tag t]...
+                                   [--base-uri uri] [--access-token token] [--from-snapshot file]
+npx @launchtarqly/codegen check    [same flags]      exit 1 if any target is stale
+npx @launchtarqly/codegen snapshot --write-snapshot flags.json [connection and selection flags]
+npx @launchtarqly/codegen init                       write a starter config
 ```
 
 `check` regenerates into memory and compares with what is on disk, byte for
-byte after formatting. On mismatch it prints a unified diff per file and a
-one-line summary of which flags were added, removed, renamed, or changed
-kind. Exit codes: 0 up to date, 1 stale, 2 configuration or API error. A
-network failure is exit 2, never 1, so a flaky API cannot masquerade as drift.
+byte. On mismatch it prints a unified diff per file and a one-line summary of
+which flags were added, removed, renamed, or changed kind. Exit codes: 0 up to
+date, 1 stale, 2 configuration, model or API error. A network failure is exit
+2, never 1, so a flaky API cannot masquerade as drift.
 
 ## Repository layout
 
 ```
 packages/
-  core/            fetcher, normalizer, FlagModel, naming, Writer, check logic
-  cli/             argument parsing, config loading, orchestration; the npx entry point
+  core/            fetcher, snapshot I/O, normalizer, FlagModel, naming, Writer, check logic
+  cli/             argument parsing, config loading, orchestration; published as @launchtarqly/codegen
   emit-ts-server/
   emit-ts-browser/
   emit-go/
   emit-java/
-  runtime-node/    published helper
-  runtime-browser/ published helper
 fixtures/
-  model/           snapshot FlagModels used as inputs
-  golden/<target>/ expected output per model
+  snapshots/       recorded API responses used as inputs
+  golden/<target>/ expected output per snapshot
   compile/<target>/ a minimal project per language that compiles the golden output
 ```
 
-Emitters are separate packages so a new target is a new package that
-implements `Emitter`, plus a golden fixture and a compile fixture. The CLI
-discovers built-in emitters statically; third-party emitters are out of scope
-for v1 but the interface is the extension point if that changes.
+Only `@launchtarqly/codegen` is published. It bundles `core` and the built-in
+emitters; the other packages are private workspace packages. Emitters are
+separate packages so a new target is a new package that implements `Emitter`,
+plus a golden fixture and a compile fixture. The CLI discovers built-in
+emitters statically.
 
 ## Testing
 
-- Unit tests on naming (key to identifier, reserved words, collisions,
-  initialisms), on normalization (archived dropped, kind inference, override
-  properties), and on `check` diffing.
-- Golden tests: each fixture model is run through every emitter and compared
-  with committed output. Reviewing a change to an emitter means reviewing the
-  golden diff.
+- Unit tests on naming (key to identifier, constant case, initialisms,
+  aliases, reserved words, leading digits, collisions across every emitted
+  identifier), on normalization (archived dropped, kind inference and its
+  errors, `codegen.number`, single-value properties, deprecation, maintainer
+  union, client-side availability fallback, tag and view filtering), and on
+  `check` diffing.
+- Fetcher tests against recorded responses: paging, dedupe, API-version
+  headers, view resolution, rate-limit retry, and exit 2 on unknown views.
+- Golden tests: each snapshot in `fixtures/snapshots` is run through every
+  emitter and compared with committed output. Reviewing a change to an emitter
+  means reviewing the golden diff.
 - Compile tests in CI: for each target, the golden output is dropped into a
-  minimal project with the pinned SDK major and compiled (`tsc --noEmit`,
-  `go vet ./...`, `javac` via Gradle). These run on the CI matrix only, not
-  on every local test run, since they need toolchains installed.
-- Fetcher tests against recorded API responses, plus one opt-in live test
-  that runs when `LD_API_TOKEN` is set.
+  minimal project with the pinned SDK major and compiled (`tsc --noEmit`;
+  `go vet ./...` and staticcheck with Go 1.25+; `javac -Xlint:all
+  -Xdoclint:all -Werror` via Gradle). These run on the CI matrix only, not on
+  every local test run, since they need toolchains installed.
+- One opt-in live test that runs when `LD_ACCESS_TOKEN` is set.
 
 ## Failure modes and how they are handled
 
 | Situation | Behavior |
 | --- | --- |
-| Two flags normalize to the same identifier | run fails, both keys named, suggests `codegen.name.<target>` |
-| Identifier is a reserved word | `Flag` suffix appended, noted in `--verbose` |
+| Two emitted identifiers collide (methods, variants or constants) | exit 2, both keys named, suggests `codegen.name.<target>` |
+| Identifier is a reserved word | exit 2, flag named, suggests `codegen.name.<target>` |
+| Converted key starts with a digit | exit 2, flag named, suggests `codegen.name.<target>` |
+| Boolean flag with a non-boolean value | exit 2, flag named |
+| Mixed-type values on a multivariate flag | treated as `json`, warning printed |
+| `codegen.number: int` on a flag with a non-integer or out-of-32-bit value | exit 2, flag and value named |
+| `codegen.name.*` or `codegen.number` with more than one value | exit 2, flag and property named |
+| `view` and `tags` both set | exit 2 |
+| Unknown view key, or an account without views | exit 2 |
 | Flag key changes in LaunchDarkly | method name changes, consumer code fails to compile at the call site; this is the intended behavior |
 | Flag kind changes | method signature changes, same as above |
 | Flag archived | method disappears; `check` lists it as removed |
 | Flag deleted while still referenced in code | compile error at the call site after regeneration |
-| Mixed-type variations on a non-JSON flag | treated as `json`, warning printed |
-| API unreachable in `check` | exit 2 with the error, never reported as drift |
-| Formatter missing on host | output written unformatted, warning printed; `check` compares unformatted |
+| Generator upgraded with unchanged flags | `check` reports stale (exit 1) until regenerated |
+| API unreachable, or retries exhausted | exit 2 with the error, never reported as drift |
 
-## Open questions
+## To verify during implementation
 
-1. **Runtime helper scope.** The decision was to allow a small published
-   runtime helper per language. The design above uses it only where the SDK's
-   own types force boilerplate (TypeScript). If publishing and versioning
-   those packages turns out to cost more than the boilerplate saves, the
-   fallback is to emit the helper as a second generated file next to the
-   wrapper. Worth revisiting after the TS emitter exists.
-2. **Views API shape.** The fetcher design assumes a view resolves to a flag
-   set through the API. Confirm the endpoint and pagination behavior before
-   building the view filter, and decide what happens when a view and tags are
-   both set (proposal: reject the config).
-3. **Deprecation signal.** LaunchDarkly's own deprecated marker versus the
-   `codegen.deprecated` custom property. The design honors both; confirm the
-   first one exists in the API response for flags and is not environment
-   scoped.
-4. **Per-environment client-side availability.** Client-side availability is
-   project level in the current API, which is what makes the browser filter
-   possible without an environment. Verify this holds for projects created
-   before the project-level setting existed.
-5. **JSON schema support.** Deferred. If added, the likely home is a custom
-   property holding a URL or inline schema, feeding a per-target type
-   generator, with the method's fallback and return type narrowed to the
-   generated type.
-6. **Formatting policy.** Bundling `prettier` is cheap; bundling `gofmt` and
-   `google-java-format` is not. The design falls back to canonical emitter
-   output. Decide whether `check` should fail when a formatter is configured
-   but missing.
+These came out of research without a primary-source confirmation. None of
+them changes a decision; each has a defined behavior already.
+
+- That the server enforces `limit` ≤ 100 on the flags list (the fetcher pages
+  by `_links.next` either way).
+- That an unknown view key returns 404 on the linked-flags endpoint, what a
+  non-Enterprise account gets back, and how a deleted view behaves (all exit
+  2).
+- The page-size limits of the views linked-flags endpoint.
+- That `clientSideAvailability` is always present on list items (the
+  `includeInSnippet` fallback covers it if not).
+- A recorded live response to seed `fixtures/snapshots`: the research worked
+  from the OpenAPI spec and the API source, not a live call.
 
 ## Roadmap
 
-1. `core` with fetcher, normalizer, naming, snapshot support, and `check`.
-2. `emit-ts-server` and `runtime-node`, golden and compile fixtures, `npx`
-   entry point. First usable release.
+1. `core` with fetcher, snapshot support, normalizer, naming, and `check`.
+2. `emit-ts-server`, golden and compile fixtures, the published
+   `@launchtarqly/codegen` package with its `npx` entry point. First usable
+   release.
 3. `emit-go`, `emit-java`.
-4. `emit-ts-browser` and `runtime-browser`, including legacy client SDK
-   support via `sdkMajor`.
+4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.
