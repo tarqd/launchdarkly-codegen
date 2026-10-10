@@ -263,9 +263,11 @@ suggesting `codegen.name.<target>`:
 
 - **Leading digit.** The converted key starts with a digit.
 - **Reserved word.** TypeScript checks ECMAScript reserved words plus
-  strict-mode reserved words. Java checks the JLS list plus the `Object`
-  methods (`wait`, `notify`, `notifyAll`, `equals`, `hashCode`, `toString`,
-  `getClass`, `clone`, `finalize`). Go's keywords can't collide with
+  strict-mode reserved words. Java checks the 51 JLS reserved keywords
+  (`_` included), the literals `true`, `false` and `null`, `yield` (legal to
+  declare but never callable unqualified), and the `Object` methods (`wait`,
+  `notify`, `notifyAll`, `equals`, `hashCode`, `toString`, `getClass`,
+  `clone`, `finalize`). Go's keywords can't collide with
   UpperCamel names, so Go checks only the names it generates itself (`New`,
   `Client`, `Flags`), and requires every identifier, aliases included, to
   match `^\p{Lu}[\p{L}\p{Nd}_]*$`: an exported name must start with an
@@ -277,10 +279,10 @@ suggesting `codegen.name.<target>`:
   in any case, is also checked against the C# keywords. The generator never
   escapes a name with `@`.
 - **Collision.** The check covers every identifier a target emits: flag
-  methods, their `Detail` and `Ctx` variants, and key constants. For example,
-  flag `checkout`'s detail method and a flag named `checkout-detail` both want
-  `CheckoutDetail`. Java would otherwise silently overload them when the
-  parameter types differ. Both keys are named.
+  methods, their `Detail` variants (and Go's `Ctx` variants), and key
+  constants. For example, flag `checkout`'s detail method and a flag named
+  `checkout-detail` both want `CheckoutDetail`. Java would otherwise silently
+  overload them when the parameter types differ. Both keys are named.
 
 ### Emitters
 
@@ -339,13 +341,13 @@ output is the contract.
 | --- | --- |
 | ts-server, ts-browser | `/** @deprecated ... */` on the method |
 | go | `// Deprecated: ...` paragraph in the doc comment |
-| java | `@Deprecated` plus `@deprecated` Javadoc tag |
+| java | bare `@Deprecated` plus `@deprecated` Javadoc tag, always as a pair (`since` and `forRemoval` need Java 9) |
 | dotnet | `[System.Obsolete(...)]`, with `DiagnosticId = "LDFLAG001"` and the flag's UI link as `UrlFormat` on .NET 5+ (ADR 0003) |
 
-The annotation goes on the flag's method, its `Detail` and `Ctx` variants,
-and its key constant. The text is the flag's `deprecationMessage`; without one,
-it's a generic message naming the flag. The message has no date, so
-deprecating, un-deprecating and re-deprecating doesn't churn output.
+The annotation goes on the flag's method, its `Detail` variant (and Go's
+`Ctx` variants), and its key constant. The text is the flag's
+`deprecationMessage`; without one, it's a generic message naming the flag.
+The message has no date, so deprecating, un-deprecating and re-deprecating doesn't churn output.
 
 ### Doc comments
 
@@ -374,9 +376,14 @@ Escaping per target:
   instead (Generated code by target → go). The comment starts with the
   identifier, as Go convention requires (`// CheckoutV2 evaluates the
   "Checkout V2" flag.`), followed by the description.
-- **Java:** Javadoc is HTML, so escape `&`, `<`, `>`, and `*/` (as `*&#47;`).
-  Emit `@param` and `@return`, and comment every member, private ones
-  included, so the output passes `-Xdoclint:all`.
+- **Java:** Javadoc is HTML and Javadoc tags start with `@`, so escape `&` →
+  `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `*/` → `*&#47;`, `\` → `&#92;` (javac
+  reads `\u` as a unicode escape even inside comments), and `@` → `&#64;`
+  where it starts a word or follows `{` (so `@since` and `{@code` stay text,
+  while `ada@example.com` stays readable). The key goes in `{@code …}`
+  unescaped, since keys only use letters, digits, `.`, `_` and `-`. Emit
+  `@param` and `@return`, and comment every member, private ones included, so
+  the output passes `-Xdoclint:all`.
 - **.NET:** `///` XML doc comments, so escape `&`, `<` and `>`, and `"` in
   attribute values. Emit `<param>` and `<returns>` and document every public
   member, so `GenerateDocumentationFile` raises no CS1591. In an
@@ -676,11 +683,75 @@ const (
 
 ### java (`com.launchdarkly:launchdarkly-java-server-sdk` 7.x)
 
-The full emitter spec is later work; this records the shape the shared design
-was checked against.
+`sdkMajors: [7]`. The generated class accepts
+`com.launchdarkly.sdk.server.interfaces.LDClientInterface`, which `LDClient`
+implements. The SDK has no narrower evaluation-only interface. The Java SDK has
+no context-propagation methods, so each flag gets two methods: `x` and
+`xDetail`. Number flags call `doubleVariation`, or `intVariation` with
+`codegen.number: int` (ADR 0001). The SDK bundles its common types
+(`LDContext`, `LDValue`, `EvaluationDetail`), so the import list never needs a
+second artifact. 6.x has the same ten methods and the output compiles against
+6.3.0 too, but 6 isn't supported until someone asks; adding it is one list
+entry and one fixture run. Facts and sources:
+[`docs/research/java-server-sdk.md`](docs/research/java-server-sdk.md).
+
+**Config.** `out` is a directory, and the emitter writes `<out>/Flags.java`
+holding `public final class Flags`, the only class name Java allows in that
+file. `package` is required: dot-separated identifiers, each matching
+`[A-Za-z_$][A-Za-z0-9_$]*` and not a reserved word; anything else is exit 2
+naming the key. The generator doesn't check `package` against `out`, because
+javac reports the mismatch.
+
+**Shape.**
+
+- The class Javadoc names the project, and the private `client` field and the
+  constructor both carry their own comment (doclint checks private members and
+  wants a main description, not only `@param`).
+- Each flag's `x` and `xDetail` carry the same doc comment (see Doc
+  comments) except for `@return`. The name is the first line. Each
+  blank-line-separated paragraph of the description becomes a `<p>`
+  paragraph, and single newlines inside one join with a space. The trailer is
+  `<p>key: {@code k} · tags: … · maintainer: …<br>` followed by the plain UI
+  URL. `@param context`, `@param fallback`, `@return` and, when deprecated,
+  `@deprecated` follow.
+- Nested `public static final class Keys` holds one documented
+  `public static final String` per flag, named in CONSTANT_CASE from the method
+  name (alias included), plus a commented `private Keys() {}`. The methods
+  read their key from `Keys`, so an alias renames both together.
+- The imports are exactly those used, in ASCII order: `EvaluationDetail` and
+  `LDContext` only when a flag exists, `LDValue` only for a json flag.
+  google-java-format deletes unused imports.
+
+**Canonical form is google-java-format 1.37.0**
+([ADR 0004](docs/adr/0004-java-output-is-google-java-format-canonical.md)).
+The emitter does the formatter's layout itself; no formatter runs. These are
+all the rules the emitted shapes need:
+
+- Widths are counted in UTF-16 code units (JavaScript's `length`), with a
+  limit of 100 columns, and indentation is two spaces.
+- Javadoc text is greedily filled: words separated by single spaces, with a
+  line break wherever the next word would pass column 100 counting the indent
+  and ` * `. A word longer than the room sits alone on a line and overflows
+  (a long URL). `<br>` ends the line. Each `<p>` paragraph and the block tags
+  are preceded by a bare ` *`. A block tag's continuation lines are indented 4
+  more spaces. `{@code k}` is two words and may be split after `{@code`.
+- A comment that fits on one line is written `/** text */`.
+- A signature or `return client.xVariation(…);` that passes 100 breaks after
+  `(`, with the arguments on one line 4 deeper; if that line passes 100 too,
+  one argument per line. A constant that passes 100 breaks after `=`, the
+  literal 4 deeper.
+- Every member is preceded by a blank line, the first one in a class body
+  excepted.
+- An annotation on a method goes on its own line; `@Deprecated` on a constant
+  stays on the same line.
+
+The complete sample: the prototype from add-emitter step 2, on
+[`prototype/java-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/java-emitter/prototypes/java-emitter).
+The first flag's description shows the escaping.
 
 ```java
 // Code generated by launchdarkly-codegen. DO NOT EDIT.
+// project: storefront   generator: 0.1.0
 package com.example.flags;
 
 import com.launchdarkly.sdk.EvaluationDetail;
@@ -688,39 +759,252 @@ import com.launchdarkly.sdk.LDContext;
 import com.launchdarkly.sdk.LDValue;
 import com.launchdarkly.sdk.server.interfaces.LDClientInterface;
 
-/** ... */
+/** Typed accessors for the flags in LaunchDarkly project {@code storefront}. */
 public final class Flags {
-  /** ... */
+  /** The wrapped SDK client. */
   private final LDClientInterface client;
 
-  /** ... @param client ... */
-  public Flags(LDClientInterface client) { this.client = client; }
+  /**
+   * Wraps an SDK client.
+   *
+   * @param client the LaunchDarkly client to evaluate flags with
+   */
+  public Flags(LDClientInterface client) {
+    this.client = client;
+  }
 
-  /** ... */
+  /**
+   * Checkout V2
+   *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>Matches paths like /cart/**&#47;*.json *&#47; when a &lt; b &amp;&amp; c &gt; d. &#64;since
+   * is not a tag here, nor is {&#64;code x}.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: team Payments<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   */
   public boolean checkoutV2(LDContext context, boolean fallback) {
     return client.boolVariation(Keys.CHECKOUT_V2, context, fallback);
   }
-  /** ... */
+
+  /**
+   * Checkout V2
+   *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>Matches paths like /cart/**&#47;*.json *&#47; when a &lt; b &amp;&amp; c &gt; d. &#64;since
+   * is not a tag here, nor is {&#64;code x}.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: team Payments<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   */
   public EvaluationDetail<Boolean> checkoutV2Detail(LDContext context, boolean fallback) {
     return client.boolVariationDetail(Keys.CHECKOUT_V2, context, fallback);
   }
 
-  /** ... */
+  /**
+   * Pricing tier
+   *
+   * <p>key: {@code pricing-tier} · maintainer: ada@example.com<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/pricing-tier
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   */
+  public String pricingTier(LDContext context, String fallback) {
+    return client.stringVariation(Keys.PRICING_TIER, context, fallback);
+  }
+
+  /**
+   * Pricing tier
+   *
+   * <p>key: {@code pricing-tier} · maintainer: ada@example.com<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/pricing-tier
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   */
+  public EvaluationDetail<String> pricingTierDetail(LDContext context, String fallback) {
+    return client.stringVariationDetail(Keys.PRICING_TIER, context, fallback);
+  }
+
+  /**
+   * Discount rate
+   *
+   * <p>key: {@code discount-rate}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/discount-rate
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   */
+  public double discountRate(LDContext context, double fallback) {
+    return client.doubleVariation(Keys.DISCOUNT_RATE, context, fallback);
+  }
+
+  /**
+   * Discount rate
+   *
+   * <p>key: {@code discount-rate}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/discount-rate
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   */
+  public EvaluationDetail<Double> discountRateDetail(LDContext context, double fallback) {
+    return client.doubleVariationDetail(Keys.DISCOUNT_RATE, context, fallback);
+  }
+
+  /**
+   * Max items
+   *
+   * <p>key: {@code max-items}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/max-items
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   */
+  public int maxItems(LDContext context, int fallback) {
+    return client.intVariation(Keys.MAX_ITEMS, context, fallback);
+  }
+
+  /**
+   * Max items
+   *
+   * <p>key: {@code max-items}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/max-items
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   */
+  public EvaluationDetail<Integer> maxItemsDetail(LDContext context, int fallback) {
+    return client.intVariationDetail(Keys.MAX_ITEMS, context, fallback);
+  }
+
+  /**
+   * Checkout config
+   *
+   * <p>key: {@code checkout-config}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-config
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   */
   public LDValue checkoutConfig(LDContext context, LDValue fallback) {
     return client.jsonValueVariation(Keys.CHECKOUT_CONFIG, context, fallback);
   }
 
-  /** ... */
+  /**
+   * Checkout config
+   *
+   * <p>key: {@code checkout-config}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-config
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   */
+  public EvaluationDetail<LDValue> checkoutConfigDetail(LDContext context, LDValue fallback) {
+    return client.jsonValueVariationDetail(Keys.CHECKOUT_CONFIG, context, fallback);
+  }
+
+  /**
+   * Legacy cart
+   *
+   * <p>The pre-2024 cart.
+   *
+   * <p>key: {@code legacy-cart} · tags: checkout<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}
+   * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026 &amp; later.
+   */
+  @Deprecated
+  public boolean legacyCart(LDContext context, boolean fallback) {
+    return client.boolVariation(Keys.LEGACY_CART, context, fallback);
+  }
+
+  /**
+   * Legacy cart
+   *
+   * <p>The pre-2024 cart.
+   *
+   * <p>key: {@code legacy-cart} · tags: checkout<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}, with the reason it was chosen
+   * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026 &amp; later.
+   */
+  @Deprecated
+  public EvaluationDetail<Boolean> legacyCartDetail(LDContext context, boolean fallback) {
+    return client.boolVariationDetail(Keys.LEGACY_CART, context, fallback);
+  }
+
+  /** The raw key of every flag, for code that needs the key itself. */
   public static final class Keys {
-    /** ... */
+    /** Not instantiable. */
+    private Keys() {}
+
+    /** {@code checkout-v2} */
     public static final String CHECKOUT_V2 = "checkout-v2";
-    ...
+
+    /** {@code pricing-tier} */
+    public static final String PRICING_TIER = "pricing-tier";
+
+    /** {@code discount-rate} */
+    public static final String DISCOUNT_RATE = "discount-rate";
+
+    /** {@code max-items} */
+    public static final String MAX_ITEMS = "max-items";
+
+    /** {@code checkout-config} */
+    public static final String CHECKOUT_CONFIG = "checkout-config";
+
+    /**
+     * {@code legacy-cart}
+     *
+     * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026 &amp; later.
+     */
+    @Deprecated public static final String LEGACY_CART = "legacy-cart";
   }
 }
 ```
 
-Output is always one class. It must compile without warnings under
-`-Xlint:all -Xdoclint:all -Werror`.
+**Compile fixture.** `fixtures/compile/java/` is a Maven project (one
+`pom.xml`, no `package.json`) pinning `launchdarkly-java-server-sdk` 7.17.2.
+The compile test copies the golden file into it and runs three checks,
+all of which must pass with no output:
+
+- `mvn compile` with `--release 8 -Xlint:all,-options -Xdoclint:all -Werror`.
+  Java 8 is the SDK's floor (class-file major 52); `-options` only silences
+  JDK 21's notice that release 8 is obsolete.
+- `javadoc -Xdoclint:all -Werror`. javac's doclint does not report unknown
+  tags such as a stray `@foo`, and the `javadoc` tool does.
+- `java -jar google-java-format-1.37.0-all-deps.jar --dry-run
+  --set-exit-if-changed`, which needs JDK 21 to run.
+
+CI uses `actions/setup-java` with JDK 21, whose runners ship `mvn`. The fixture
+also needs a consumer class calling every generated method, which passing the
+compile proves type-correct.
 
 ### dotnet (`LaunchDarkly.ServerSdk` 8.x)
 
@@ -1063,7 +1347,8 @@ emitters statically.
 - Compile tests in CI: for each target, the golden output is dropped into a
   minimal project with the pinned SDK major and compiled (`tsc --noEmit`;
   `go vet ./...` and staticcheck with Go 1.25+; `javac -Xlint:all
-  -Xdoclint:all -Werror` via Gradle). These run on the CI matrix only, not on
+  -Xdoclint:all -Werror` via Maven, plus `javadoc -Xdoclint:all` and
+  google-java-format; see java). These run on the CI matrix only, not on
   every local test run, since they need toolchains installed.
 - One opt-in live test that runs when `LD_ACCESS_TOKEN` is set.
 
