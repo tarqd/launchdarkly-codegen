@@ -3,10 +3,45 @@
  * (DESIGN.md → Generated code by target → ts-server).
  */
 
-import { CodegenError, lowerCamel, Writer, type Emitter, type Flag, type FlagKind } from '@launchtarqly/core';
+import {
+  checkIdentifiers,
+  CodegenError,
+  ECMASCRIPT_RESERVED_WORDS,
+  flagIdentifier,
+  lowerCamel,
+  Writer,
+  type EmittedIdentifier,
+  type Emitter,
+  type Flag,
+  type FlagKind,
+  type FlagModel,
+  type IdentifierRules,
+} from '@launchtarqly/core';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';
 const SUPPORTED_SDK_MAJORS = [9];
+
+const NAMING: IdentifierRules = {
+  target: 'ts-server',
+  reserved: ECMASCRIPT_RESERVED_WORDS,
+  pattern: /^[A-Za-z_$][A-Za-z0-9_$]*$/,
+};
+/** Members of the generated `Flags` class that flag methods must not shadow. */
+const CLASS_MEMBERS = ['constructor', 'client'];
+
+/** Each flag's name, after checking every identifier the file will emit. */
+function flagNames(model: FlagModel): Map<Flag, string> {
+  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, 'ts-server', lowerCamel)]));
+  const emitted: EmittedIdentifier[] = CLASS_MEMBERS.map((identifier) => ({ identifier }));
+  for (const [flag, name] of names) {
+    emitted.push(
+      { flagKey: flag.key, identifier: name, primary: true }, // method and FlagKeys entry
+      { flagKey: flag.key, identifier: `${name}Detail` },
+    );
+  }
+  checkIdentifiers(NAMING, emitted);
+  return names;
+}
 
 /** A single-quoted TypeScript string literal. */
 function tsString(value: string): string {
@@ -21,8 +56,7 @@ const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = {
   json: { method: 'jsonVariation', type: 'unknown' },
 };
 
-function emitFlagMethods(w: Writer, flag: Flag): void {
-  const name = lowerCamel(flag.key);
+function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const key = tsString(flag.key);
   const { method, type } = KIND_METHODS[flag.kind];
   w.block(`${name}(context: LDContext, fallback: ${type}): Promise<${type}> {`, '}', () => {
@@ -45,6 +79,7 @@ export const tsServerEmitter: Emitter = {
         `target ts-server: unsupported sdkMajor ${cfg.sdkMajor} (supported: ${SUPPORTED_SDK_MAJORS.join(', ')})`,
       );
     }
+    const names = flagNames(model);
     const w = new Writer();
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
     w.line();
@@ -54,13 +89,13 @@ export const tsServerEmitter: Emitter = {
       w.line('constructor(private readonly client: LDClient) {}');
       for (const flag of model.flags) {
         w.line();
-        emitFlagMethods(w, flag);
+        emitFlagMethods(w, flag, names.get(flag)!);
       }
     });
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
-        w.line(`${lowerCamel(flag.key)}: ${tsString(flag.key)},`);
+        w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }
     });
     return [{ path: cfg.out, contents: w.toString() }];
