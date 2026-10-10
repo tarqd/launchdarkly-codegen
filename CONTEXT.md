@@ -1,0 +1,46 @@
+# launchdarkly-codegen
+
+Turns a LaunchDarkly project's flag definitions into type-safe wrappers around
+the official LaunchDarkly SDKs, one per language the consumer uses.
+
+## Language
+
+**Generator**:
+The whole tool: one invocation that reads a project's flags and writes output for every configured target.
+_Avoid_: codegen (as a noun for the tool), compiler
+
+**Target**:
+A language and SDK pairing the user asks for in config, such as `ts-server` or `go`. The user-facing unit of output.
+_Avoid_: language, platform, emitter (in user-facing text)
+
+**Emitter**:
+The internal component that produces one target's files. Internal vocabulary only; users configure targets, never emitters.
+_Avoid_: generator, template, backend
+
+**Snapshot**:
+The raw LaunchDarkly API responses for one project, saved to a file so a run can replay them without network access. The normalizer still runs on a snapshot.
+_Avoid_: model dump, fixture (for the raw responses)
+
+**Flag model**:
+The language-neutral form of a project's flags that every target is generated from, derived from a snapshot or live fetch.
+_Avoid_: IR, schema, manifest
+
+**Flag kind**:
+The value type of a flag: boolean, string, number or JSON. Inferred from the flag's variation values, the same way LaunchDarkly itself infers it.
+_Avoid_: variation type, flag type (LaunchDarkly's own `kind` only distinguishes boolean from multivariate)
+
+**Maintainer**:
+The member or team accountable for a flag in LaunchDarkly. A member is identified by email; a team by its key and name.
+_Avoid_: owner
+
+**Deprecated flag**:
+A flag whose generated accessor carries the target's deprecation annotation. Set by LaunchDarkly's own deprecated marker or by the `codegen.deprecated` custom property, which can also supply the message.
+_Avoid_: archived (archived flags are not generated at all)
+
+**Base URI**:
+The root URL of the LaunchDarkly instance a project lives on, used both for API calls and for links to flags in the UI. Named after the LaunchDarkly CLI's setting.
+_Avoid_: base URL, host, server
+
+**Alias**:
+An identifier the user chooses for a flag in one target (or all targets), set through the `codegen.name` custom properties. Required whenever the converted key is reserved, starts with a digit, or collides with another generated name; the generator never invents a name itself.
+_Avoid_: name override, rename
