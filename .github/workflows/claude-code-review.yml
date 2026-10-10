@@ -1,0 +1,40 @@
+name: Claude Code Review
+
+# Reviews each PR when it is opened or updated and leaves inline comments.
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. Read CLAUDE.md, CONTEXT.md and DESIGN.md
+            first, and check the change against them. Focus on:
+            - Correctness of the generated code and the emitters that produce it
+            - Type safety of the emitted wrappers against the LaunchDarkly SDKs
+            - Golden-file and test coverage for the change
+            - Consistency with the domain terms in CONTEXT.md and decisions in docs/adr/
+
+            Use `gh pr comment` for top-level feedback and
+            `mcp__github_inline_comment__create_inline_comment` for specific lines.
+            Only post findings you are confident in.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
