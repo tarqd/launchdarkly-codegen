@@ -13,6 +13,12 @@ export interface Config {
   project: string;
   baseUri?: string;
   targets: TargetConfig[];
+  check?: CheckConfig;
+}
+
+export interface CheckConfig {
+  /** A missing output file is stale (default `true`); `false` skips it. */
+  failOnMissingOutput?: boolean;
 }
 
 export interface LoadedConfig {
@@ -72,5 +78,15 @@ function parseConfig(text: string, path: string): Config {
 
   const config: Config = { project: raw.project as string, targets };
   if (typeof raw.baseUri === 'string') config.baseUri = raw.baseUri;
+  if (raw.check !== undefined) config.check = parseCheckConfig(raw.check, fail);
   return config;
+}
+
+function parseCheckConfig(raw: unknown, fail: (msg: string) => never): CheckConfig {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail('`check` must be an object');
+  const { failOnMissingOutput } = raw as Record<string, unknown>;
+  if (failOnMissingOutput !== undefined && typeof failOnMissingOutput !== 'boolean') {
+    fail('`check.failOnMissingOutput` must be a boolean');
+  }
+  return failOnMissingOutput === undefined ? {} : { failOnMissingOutput: failOnMissingOutput as boolean };
 }

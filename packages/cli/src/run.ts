@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { CodegenError, readSnapshot } from '@launchtarqly/core';
 import { loadConfig } from './config.js';
 import { generateFiles, writeFiles } from './generate.js';
+import { checkFiles } from './check.js';
 
 export interface RunIO {
   cwd: string;
@@ -14,6 +15,7 @@ export interface RunIO {
 }
 
 const USAGE = `usage: launchtarqly-codegen generate [--config path] [--from-snapshot file]
+       launchtarqly-codegen check    [same flags]      exit 1 if any target is stale
 `;
 
 /** Runs the CLI and returns its exit code: 0 ok, 1 stale, 2 error. */
@@ -23,6 +25,8 @@ export async function run(argv: string[], io: RunIO): Promise<number> {
     switch (command) {
       case 'generate':
         return await generateCommand(rest, io);
+      case 'check':
+        return await checkCommand(rest, io);
       case undefined:
       case '--help':
       case '-h':
@@ -55,7 +59,8 @@ function parse(args: string[]) {
   }
 }
 
-async function generateCommand(args: string[], io: RunIO): Promise<number> {
+/** Config and snapshot for `generate` and `check`, which take the same flags. */
+async function loadInputs(args: string[], io: RunIO) {
   const opts = parse(args);
   const { config, dir } = await loadConfig(io.cwd, opts.config);
   const snapshotPath = opts['from-snapshot'];
@@ -63,7 +68,22 @@ async function generateCommand(args: string[], io: RunIO): Promise<number> {
     throw new CodegenError('live fetching is not implemented yet; pass --from-snapshot <file>');
   }
   const snapshot = await readSnapshot(resolve(io.cwd, snapshotPath));
+  return { config, dir, snapshot };
+}
+
+async function generateCommand(args: string[], io: RunIO): Promise<number> {
+  const { config, dir, snapshot } = await loadInputs(args, io);
   const written = await writeFiles(generateFiles(config, snapshot), dir);
   for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
   return 0;
+}
+
+async function checkCommand(args: string[], io: RunIO): Promise<number> {
+  // Config, fetch and model errors (exit 2) all happen inside loadInputs and
+  // checkFiles' generation step, before any file is compared, so an API
+  // failure can never be reported as drift.
+  const { config, dir, snapshot } = await loadInputs(args, io);
+  const result = await checkFiles(config, snapshot, dir);
+  io.stdout(result.report);
+  return result.stale ? 1 : 0;
 }

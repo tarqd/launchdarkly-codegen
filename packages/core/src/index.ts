@@ -5,3 +5,5 @@ export * from './normalize.js';
 export * from './naming.js';
 export * from './writer.js';
 export * from './emitter.js';
+export * from './check/diff.js';
+export * from './check/flag-changes.js';
