@@ -253,8 +253,8 @@ validation) instead of the converted key. Otherwise the steps are: split on
 `-`, `_`, `.`, `/`, whitespace, and case changes; drop characters that are not
 letters or digits; apply the target's casing. Go additionally upper-cases
 staticcheck's 42 default initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to
-`API`, `Http` to `HTTP`, …; ADR 0002), so `api-url-id` becomes `APIURLID` and
-the Java constant `API_URL_ID`. .NET follows the Framework Design Guidelines
+`API`, `Http` to `HTTP`, …) and their plurals (`Ids` to `IDs`; ADR 0002), so
+`api-url-id` becomes `APIURLID` and the Java constant `API_URL_ID`. .NET follows the Framework Design Guidelines
 instead (`Api`, `Url`, `Id`), so it applies no initialism table: `api-url-id`
 becomes `ApiUrlId`.
 
@@ -566,9 +566,8 @@ inputs on the prototype branch and re-fuzzed by the compile test:
 
 **Naming.** Identifiers are UpperCamel with staticcheck's default
 initialisms upper-cased (ADR 0002), so `checkout-v2` is `CheckoutV2` and
-`api-url` is `APIURL`. The table has no plural forms, so `banner-ids` becomes
-`BannerIds`, not `BannerIDs`; plural initialisms are tracked in
-[#47](https://github.com/tarqd/launchdarkly-codegen/issues/47). Every
+`api-url` is `APIURL`. A plural initialism keeps its `s` lower-case, so
+`banner-ids` becomes `BannerIDs`, while `https` stays `HTTPS`. Every
 identifier the file declares (each flag's four methods and its constant, plus
 `Client`, `Flags` and `New`) goes through the collision check, and every one,
 aliases included, must be an exported Go identifier.
