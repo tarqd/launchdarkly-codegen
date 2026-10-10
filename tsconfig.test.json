@@ -7,5 +7,5 @@
     "sourceMap": false,
     "noEmit": true
   },
-  "include": ["packages/*/src", "packages/*/test", "vitest.config.ts", "vitest.compile.config.ts"]
+  "include": ["packages/*/src", "packages/*/test", "vitest.config.ts", "vitest.compile.config.ts", "vitest.smoke.config.ts"]
 }

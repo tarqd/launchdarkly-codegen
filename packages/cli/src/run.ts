@@ -71,7 +71,8 @@ async function generateCommand(args: string[], io: RunIO): Promise<number> {
   const snapshotPath = opts['from-snapshot'];
   const snapshot =
     snapshotPath === undefined ? await fetchLive(opts, config, io) : await readSnapshot(resolve(io.cwd, snapshotPath));
-  const written = await writeFiles(generateFiles(config, snapshot), dir);
+  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
+  const written = await writeFiles(generateFiles(config, snapshot, { warn }), dir);
   for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
   return 0;
 }

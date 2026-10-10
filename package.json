@@ -11,6 +11,7 @@
     "typecheck": "tsc -b && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:compile": "vitest run -c vitest.compile.config.ts",
+    "test:smoke": "vitest run -c vitest.smoke.config.ts",
     "update-golden": "UPDATE_GOLDEN=1 vitest run packages/cli/test/golden.test.ts"
   },
   "devDependencies": {

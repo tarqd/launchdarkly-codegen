@@ -62,6 +62,39 @@ export const FlagKeys = {
     ]);
   });
 
+  it('emits typed methods for string, number and json flags', () => {
+    const model: FlagModel = {
+      projectKey: 'my-project',
+      flags: [
+        { ...boolFlag('checkout-config'), kind: 'json' },
+        { ...boolFlag('max-items'), kind: 'number', numberType: 'int' },
+        { ...boolFlag('pricing-tier'), kind: 'string' },
+      ],
+    };
+    const [file] = tsServerEmitter.emit(model, cfg, ctx);
+    expect(file?.contents).toContain(`  checkoutConfig(context: LDContext, fallback: unknown): Promise<unknown> {
+    return this.client.jsonVariation('checkout-config', context, fallback);
+  }
+  checkoutConfigDetail(context: LDContext, fallback: unknown): Promise<LDEvaluationDetailTyped<unknown>> {
+    return this.client.jsonVariationDetail('checkout-config', context, fallback);
+  }
+
+  maxItems(context: LDContext, fallback: number): Promise<number> {
+    return this.client.numberVariation('max-items', context, fallback);
+  }
+  maxItemsDetail(context: LDContext, fallback: number): Promise<LDEvaluationDetailTyped<number>> {
+    return this.client.numberVariationDetail('max-items', context, fallback);
+  }
+
+  pricingTier(context: LDContext, fallback: string): Promise<string> {
+    return this.client.stringVariation('pricing-tier', context, fallback);
+  }
+  pricingTierDetail(context: LDContext, fallback: string): Promise<LDEvaluationDetailTyped<string>> {
+    return this.client.stringVariationDetail('pricing-tier', context, fallback);
+  }
+`);
+  });
+
   it('rejects an SDK major it does not support', () => {
     const model: FlagModel = { projectKey: 'my-project', flags: [] };
     expect(() => tsServerEmitter.emit(model, { ...cfg, sdkMajor: 8 }, ctx)).toThrow(

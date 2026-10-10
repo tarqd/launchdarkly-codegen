@@ -1,0 +1,74 @@
+{
+  "snapshotVersion": 1,
+  "projectKey": "my-project",
+  "baseUri": "https://app.launchdarkly.com",
+  "flagPages": [
+    {
+      "items": [
+        {
+          "key": "2fa-enabled",
+          "name": "Two-factor auth",
+          "description": "Key starts with a digit, so ts-server needs an alias.",
+          "kind": "boolean",
+          "variations": [{ "value": true }, { "value": false }],
+          "tags": [],
+          "customProperties": {
+            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["twoFactorEnabled"] }
+          },
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "default",
+          "name": "Default theme",
+          "kind": "boolean",
+          "variations": [{ "value": true }, { "value": false }],
+          "tags": [],
+          "customProperties": {
+            "codegen.name": { "name": "codegen.name", "value": ["defaultTheme"] }
+          },
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "search-v3",
+          "name": "Search v3",
+          "kind": "boolean",
+          "variations": [{ "value": true }, { "value": false }],
+          "tags": [],
+          "customProperties": {
+            "codegen.name": { "name": "codegen.name", "value": ["SearchV3"] },
+            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["newSearch"] },
+            "codegen.name.go": { "name": "codegen.name.go", "value": [] }
+          },
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "checkout",
+          "name": "Checkout",
+          "kind": "boolean",
+          "variations": [{ "value": true }, { "value": false }],
+          "tags": [],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "checkout-detail",
+          "name": "Checkout detail page",
+          "description": "Would collide with checkoutDetail() of flag checkout without its alias.",
+          "kind": "boolean",
+          "variations": [{ "value": true }, { "value": false }],
+          "tags": [],
+          "customProperties": {
+            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["checkoutDetailPage"] }
+          },
+          "archived": false,
+          "deprecated": false
+        }
+      ],
+      "totalCount": 5
+    }
+  ]
+}

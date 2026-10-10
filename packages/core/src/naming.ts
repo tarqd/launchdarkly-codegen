@@ -1,8 +1,9 @@
 /**
  * Flag key → identifier conversion (DESIGN.md → Naming).
  *
- * Only the basic split-and-case conversion lives here so far. Aliases,
- * reserved words, leading digits and collision checks are layered on top.
+ * Only the split-and-case conversion lives here. Aliases come from
+ * aliases.ts; reserved words, leading digits and collisions are checked in
+ * identifiers.ts.
  */
 
 const SEPARATORS = /[-_./\s]+/;
