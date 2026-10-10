@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GO_INITIALISMS, lowerCamel, upperCamel } from '../src/index.js';
+import { constantCase, GO_INITIALISMS, lowerCamel, upperCamel } from '../src/index.js';
 
 describe('lowerCamel', () => {
   it('converts the DESIGN.md example key', () => {
@@ -36,6 +36,33 @@ describe('lowerCamel', () => {
 
   it('drops characters that are not letters or digits without splitting', () => {
     expect(lowerCamel('enable:new+flow@v2')).toBe('enablenewflowv2');
+  });
+});
+
+describe('constantCase', () => {
+  it('converts the DESIGN.md example from its lowerCamel name', () => {
+    expect(constantCase('checkoutV2NewFlow')).toBe('CHECKOUT_V2_NEW_FLOW');
+  });
+
+  it('converts a raw key the same way', () => {
+    expect(constantCase('checkout-v2.new_flow')).toBe('CHECKOUT_V2_NEW_FLOW');
+  });
+
+  it('splits an UpperCamel alias and acronym runs', () => {
+    expect(constantCase('SearchV3')).toBe('SEARCH_V3');
+    expect(constantCase('HTTPServerTimeout')).toBe('HTTP_SERVER_TIMEOUT');
+  });
+
+  it('keeps digits with the word before them', () => {
+    expect(constantCase('maxCartItems2x')).toBe('MAX_CART_ITEMS2X');
+    expect(constantCase('checkoutV2')).toBe('CHECKOUT_V2');
+  });
+
+  it('converts alias-derived names', () => {
+    expect(constantCase('myAlias')).toBe('MY_ALIAS');
+    expect(constantCase('apiUrlId')).toBe('API_URL_ID');
+    expect(constantCase('apiURLId')).toBe('API_URL_ID');
+    expect(constantCase('twoFactorEnabled')).toBe('TWO_FACTOR_ENABLED');
   });
 });
 

@@ -6,12 +6,12 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: `core` and three targets, `ts-server`, `dotnet` and `go`, are built.
-The `java` target is fully specified below but not built yet; `ts-browser`
-has an outline, and its full spec is later work. Before any target past
-`ts-server` was specified, the shared design (flag model, naming, emitter
-interface) was checked against Go and Java with compiling prototypes. Facts
-from research that still lack a primary-source check are listed under To
+Status: `core` and four targets, `ts-server`, `dotnet`, `go` and `java`,
+are built. `ts-browser` has an outline, and its full spec is later work.
+Before any target past `ts-server` was specified, the shared design (flag
+model, naming, emitter interface) was checked against Go and Java with
+compiling prototypes. Facts from research that still lack a primary-source
+check are listed under To
 verify during implementation.
 
 ## Goals
@@ -764,10 +764,15 @@ all the rules the emitted shapes need:
   `(`, with the arguments on one line 4 deeper; if that line passes 100 too,
   one argument per line. A constant that passes 100 breaks after `=`, the
   literal 4 deeper.
+- When even `type name(` or `type NAME =` passes 100, it also breaks after the
+  return or field type, the name 4 deeper and the rest laid out from there
+  (parameters or literal 8 deeper). A `Keys.NAME,` argument that still passes
+  100 on its own line breaks before the `.`, which goes 4 deeper still.
 - Every member is preceded by a blank line, the first one in a class body
   excepted.
 - An annotation on a method goes on its own line; `@Deprecated` on a constant
-  stays on the same line.
+  stays on the same line, unless that line would pass 100: then it goes on
+  its own line and the rest of the constant is laid out as above.
 
 The complete sample: the prototype from add-emitter step 2, on
 [`prototype/java-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/java-emitter/prototypes/java-emitter).
@@ -1012,6 +1017,22 @@ public final class Flags {
   }
 }
 ```
+
+**`check` summary.** `summarizeChanges` (`packages/emit-java/src/flag-changes.ts`)
+reads a `Flags.java` back into flags. Comments are dropped and whitespace is
+squeezed out of the code (kept only between two words), so every line break
+above reads the same as the one-line form. Each `Keys` constant gives the
+key (its string literal). The primary method whose `client.xVariation` call
+reads that constant (`Keys.X`) gives the identifier, its name as for
+ts-server (the CONSTANT_CASE name is lossy: aliases `apiUrlId` and
+`apiURLId` both give `API_URL_ID`, so a rename between them must still show
+as `renamed`), and the kind, its return type: `boolean`, `String`, `double`,
+`int` or `LDValue`, each only with its own SDK method. `int` and `double`
+are read back as a number flag with that number type, as for dotnet, so
+switching `codegen.number` shows as `changed kind (k: number (double) →
+number (int))`. A file with no `Keys` class, anything but string constants in it, or a
+constant no primary method reads gives no summary, and `check` prints the
+diff alone.
 
 **Compile fixture.** `fixtures/compile/java/` is a Maven project (one
 `pom.xml`, no `package.json`) pinning `launchdarkly-java-server-sdk` 7.17.2.
@@ -1465,8 +1486,9 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`, `emit-dotnet` (`emit-go` and `emit-dotnet` are
-   shipped).
+3. `emit-go`, `emit-java`, `emit-dotnet`. All three have shipped: golden
+   output for every snapshot, a compile fixture in CI (dotnet build, go build
+   with staticcheck, Maven), and `check` summaries.
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.

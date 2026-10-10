@@ -30,6 +30,7 @@ describe('docTrailer', () => {
     const upper = (t: string) => t.toUpperCase();
     expect(docTrailer(flag, (k) => `<c>${k}</c>`, upper)).toBe('key: <c>a&b</c> · tags: X<Y · maintainer: TEAM R&D');
   });
+
 });
 
 describe('maintainerLabel', () => {
@@ -60,6 +61,18 @@ describe('deprecationText', () => {
 
   it('is undefined for a flag that is not deprecated', () => {
     expect(deprecationText(modelFlag('cart', { deprecationMessage: 'stale' }), backticks)).toBeUndefined();
+  });
+
+  it("formats the flag's message with `text`", () => {
+    const flag = modelFlag('old-flag', { deprecated: true, deprecationMessage: 'Use <new>.' });
+    expect(deprecationText(flag, backticks, (t) => t.replace(/</g, '&lt;'))).toBe('Use &lt;new>.');
+  });
+
+  it('marks up the key in the generic message with code, without formatting it with `text`', () => {
+    const flag = modelFlag('old-flag', { deprecated: true });
+    expect(deprecationText(flag, (key) => `{@code ${key}}`, () => 'escaped')).toBe(
+      'The {@code old-flag} flag is deprecated.',
+    );
   });
 });
 

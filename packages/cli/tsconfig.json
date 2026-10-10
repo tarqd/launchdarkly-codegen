@@ -9,6 +9,7 @@
     { "path": "../core" },
     { "path": "../emit-ts-server" },
     { "path": "../emit-dotnet" },
-    { "path": "../emit-go" }
+    { "path": "../emit-go" },
+    { "path": "../emit-java" }
   ]
 }

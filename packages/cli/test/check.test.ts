@@ -150,6 +150,35 @@ describe('check --from-snapshot', () => {
     });
   });
 
+  describe('the flag summary for java', () => {
+    const JAVA_OUT = 'src/main/java/com/example/flags/Flags.java';
+    const javaConfig = {
+      project: 'my-project',
+      targets: [{ id: 'java', out: 'src/main/java/com/example/flags', package: 'com.example.flags', sdkMajor: 7 }],
+    };
+
+    it('follows the diff of a stale Flags.java', async () => {
+      const dir = await generatedProject(javaConfig);
+      const path = join(dir, JAVA_OUT);
+      // As if the committed file predates an alias for checkout-v2.
+      const old = (await readFile(path, 'utf8')).replaceAll('checkoutV2', 'checkoutVersion2');
+      await writeFile(path, old.replaceAll('CHECKOUT_V2', 'CHECKOUT_VERSION_2'));
+      const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 renamed \(checkout-v2: checkoutVersion2 → checkoutV2\)\n$/);
+    });
+
+    it('is left out for a hand-mangled Flags.java, but the diff is still printed', async () => {
+      const dir = await generatedProject(javaConfig);
+      const path = join(dir, JAVA_OUT);
+      await writeFile(path, (await readFile(path, 'utf8')).replace('private Keys() {}', 'private Keys() { throw null; }'));
+      const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toContain('+    private Keys() {}\n');
+      expect(result.stdout).not.toContain('flags:');
+    });
+  });
+
   describe('a missing output file', () => {
     it('is stale by default, diffed against /dev/null, and is not created', async () => {
       const dir = await projectDir(minimalConfig);

@@ -2,8 +2,9 @@
  * Doc-comment text every target shares (DESIGN.md → Doc comments,
  * Deprecation). Each emitter wraps it in its own comment syntax; `code` writes
  * a flag key the way the target shows inline code (backticks in TSDoc and in
- * .NET `[Obsolete]` messages, `<c>` in XML docs, quotes in Go), and `text`
- * escapes the plain parts for the target (XML escaping in .NET).
+ * .NET `[Obsolete]` messages, `<c>` in XML docs, quotes in Go, `{@code}` in
+ * Javadoc), and `text` escapes the plain parts for the target (XML escaping
+ * in .NET, Javadoc escaping in Java).
  */
 
 import type { Flag, Maintainer } from './model.js';
@@ -25,10 +26,14 @@ export function maintainerLabel(maintainer: Maintainer): string {
   return maintainer.kind === 'team' ? `team ${maintainer.name}` : maintainer.email;
 }
 
-/** A deprecated flag's message, else {@link defaultDeprecationMessage}; `undefined` if it isn't deprecated. */
-export function deprecationText(flag: Flag, code: Format): string | undefined {
+/**
+ * A deprecated flag's message formatted with `text`, else
+ * {@link defaultDeprecationMessage}; `undefined` if it isn't deprecated.
+ */
+export function deprecationText(flag: Flag, code: Format, text: Format = verbatim): string | undefined {
   if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? defaultDeprecationMessage(flag, code);
+  const message = flag.deprecationMessage;
+  return message !== undefined ? text(message) : defaultDeprecationMessage(flag, code);
 }
 
 /** The deprecation text for a deprecated flag with no message. No date, so output doesn't churn. */

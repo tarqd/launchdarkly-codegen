@@ -15,7 +15,8 @@
           "customProperties": {
             "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["twoFactorEnabled"] },
             "codegen.name.go": { "name": "codegen.name.go", "value": ["TwoFactorEnabled"] },
-            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["TwoFactorEnabled"] }
+            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["TwoFactorEnabled"] },
+            "codegen.name.java": { "name": "codegen.name.java", "value": ["twoFactorEnabled"] }
           },
           "archived": false,
           "deprecated": false
@@ -68,7 +69,8 @@
           "customProperties": {
             "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["checkoutDetailPage"] },
             "codegen.name.go": { "name": "codegen.name.go", "value": ["CheckoutDetailPage"] },
-            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["CheckoutDetailPage"] }
+            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["CheckoutDetailPage"] },
+            "codegen.name.java": { "name": "codegen.name.java", "value": ["checkoutDetailPage"] }
           },
           "archived": false,
           "deprecated": false
