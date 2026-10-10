@@ -3,8 +3,10 @@
  * a live fetch and on a replayed snapshot.
  */
 
+import { aliasesFor } from './aliases.js';
 import { CodegenError } from './errors.js';
 import type { Flag, FlagKind, FlagModel } from './model.js';
+import { singlePropertyValue } from './properties.js';
 import type { ApiFlag, Snapshot } from './snapshot.js';
 
 export interface NormalizeOptions {
@@ -37,7 +39,7 @@ function normalizeFlag(item: ApiFlag, snapshot: Snapshot, warn: (message: string
     tags: item.tags,
     deprecated: item.deprecated,
     archived: item.archived,
-    aliases: {},
+    aliases: aliasesFor(item),
     uiUrl: `${snapshot.baseUri}/projects/${snapshot.projectKey}/flags/${item.key}`,
   };
 }
@@ -81,15 +83,10 @@ const INT32_MAX = 2 ** 31 - 1;
 /** `double` unless `codegen.number` is `int`, which every variation must then fit. */
 function numberType(item: ApiFlag): 'int' | 'double' {
   const prop = 'codegen.number';
-  const values = item.customProperties?.[prop]?.value ?? [];
-  if (values.length === 0) return 'double';
-  if (values.length > 1) {
-    throw new CodegenError(
-      `flag ${item.key}: custom property ${prop} must have exactly one value, got ${values.length}`,
-    );
-  }
-  if (values[0] !== 'int') {
-    throw new CodegenError(`flag ${item.key}: custom property ${prop} must be "int", got ${JSON.stringify(values[0])}`);
+  const setting = singlePropertyValue(item, prop);
+  if (setting === undefined) return 'double';
+  if (setting !== 'int') {
+    throw new CodegenError(`flag ${item.key}: custom property ${prop} must be "int", got ${JSON.stringify(setting)}`);
   }
   for (const { value } of item.variations) {
     const n = value as number;
