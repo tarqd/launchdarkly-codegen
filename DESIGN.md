@@ -6,11 +6,11 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: design, pre-implementation. `core` and the `ts-server` target have no
-open decisions left; the shared design (flag model, naming, emitter interface)
-has been checked against Go and Java with a compiling prototype. The `java`
-target is built (`emit-java`). The full emitter specs for `go` and
-`ts-browser` are later work. Facts that
+Status: implemented for `core` and the `ts-server` and `java` targets
+(`packages/core`, `emit-ts-server`, `emit-java`). `core` and `ts-server` have
+no open decisions left; the shared design (flag model, naming, emitter
+interface) has been checked against Go and Java with a compiling prototype. The full emitter specs for
+`go` and `ts-browser` are later work. Facts that
 could not be confirmed from a primary source are listed at the end, to be
 checked during implementation.
 

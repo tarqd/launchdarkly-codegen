@@ -24,6 +24,7 @@ Invoke the `tdd` skill. Each item below is a behaviour with its own failing test
 - **Shared converters.** Converters that more than one target will need (UpperCamel, CONSTANT_CASE, Go initialisms) belong in `packages/core/src/naming.ts` next to `lowerCamel`. Invoke `codebase-design` to keep that module deep, and test the converters there.
 - **Kinds.** Map all four kinds to the SDK's typed method. For number flags, `numberType` chooses between `int` and `double`.
 - **Doc comments and deprecation.** Use `Writer.docComment(lines, escape)` with this target's escape function, or `line` comments for line-comment languages. Put the deprecation annotation on the method, every variant and the key constant.
+  A target whose formatter reflows comments (java, ADR 0004) may use its own doc helper instead of `Writer.docComment`, so the comments come out already in the formatter's layout.
 - **Header.** Construct `new Writer({ indent, commentPrefix })` with the language's indent unit and comment prefix, then call `w.header(...)`. `GENERATED_MARKER` is already the exact line Go tooling recognizes.
 - **Target options.** `parseTargets` passes extra keys through unchecked. The emitter validates its own keys and throws `CodegenError` naming the key, which exits 2.
 - **`summarizeChanges`.** Parse the emitter's own output back into `GeneratedFlag`s in `src/flag-changes.ts` and return core's `summarizeFlagChanges`. Return `undefined` when the text can't be read back. Test it against every golden file, as `emit-ts-server/test/flag-changes.test.ts` does.
