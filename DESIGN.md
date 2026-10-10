@@ -121,8 +121,10 @@ live or replays a snapshot file, and the normalizer runs the same way on both.
   unpaginated responses that include environments.
 - Paging is `limit`/`offset` with `limit=100` (the documented maximum),
   following `_links.next` until it is absent. Offset paging can skip or repeat
-  a flag if flags change mid-fetch, so the request sorts by `key` and the
-  fetcher dedupes by key.
+  a flag if flags change mid-fetch, so the request sorts by `key` and
+  duplicates are dropped by key (first occurrence wins). The dedupe happens in
+  the normalizer, not the fetcher, so a snapshot keeps the raw pages exactly
+  as the API returned them.
 - `env` and `expand` are never sent, so no environment data comes back. The
   API has no field selection. Archived flags are excluded by the API's
   default; deprecated flags are included.
@@ -135,7 +137,8 @@ live or replays a snapshot file, and the normalizer runs the same way on both.
   - The views API is beta: every views call sends `LD-API-Version: beta`, and
     the fetcher reads only `items[].resourceKey`, `totalCount` and
     `_links.next`, so changes elsewhere in the beta response can't break it.
-  - Views are addressed by **key** (lowercase, immutable), not by name.
+  - Views are addressed by **key** (immutable and case-sensitive, not
+    necessarily lowercase: `Team-A` is a valid key), not by name.
   - Views are an Enterprise feature. An unknown view, or an account without
     views, is exit 2.
   - The undocumented `filter=view:<key>` on the flags list is not used.
@@ -144,10 +147,17 @@ live or replays a snapshot file, and the normalizer runs the same way on both.
   (epoch milliseconds), otherwise use exponential backoff. Always add jitter
   and cap the retries; when the retries run out, exit 2.
 - `--write-snapshot <file>` saves the responses, and `--from-snapshot <file>`
-  replays them with no network. A snapshot records the project key, the
-  base URI, the view key and its resolved member keys (if a view was used),
-  and the flags-list pages. Snapshots are how the normalizer and emitters are
-  tested offline, and a team can pin one in CI if it wants to.
+  replays them with no network. A snapshot is JSON with:
+  - `snapshotVersion` (currently `1`; any other value is rejected),
+  - `projectKey` and `baseUri`,
+  - `tags`, the tag filter the flags list was fetched with (only if one was
+    set),
+  - `view`, the view key and its resolved member keys (only if a view was
+    set),
+  - `flagPages`, the raw flags-list pages in fetch order.
+
+  Snapshots are how the normalizer and emitters are tested offline, and a
+  team can pin one in CI if it wants to.
 
 ### Normalizer and the FlagModel
 
@@ -267,9 +277,24 @@ Each emitter implements one interface:
 ```ts
 interface Emitter {
   id: TargetId;
-  emit(model: FlagModel, cfg: TargetConfig): GeneratedFile[];
+  sdkMajors: readonly number[];          // config validation checks `sdkMajor` against this
+  emit(model: FlagModel, cfg: TargetConfig, ctx: EmitContext): GeneratedFile[];
+  summarizeChanges?(oldText: string, newText: string): string | undefined;
+}
+
+interface EmitContext {
+  generatorVersion: string;              // for the file header
 }
 ```
+
+`sdkMajors` is the one place a target's supported SDK majors are listed;
+config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
+one. `summarizeChanges` is optional and only used by `check`: it reads the
+file on disk and the new output back into flags (key, identifier, kind) and
+returns the one-line summary from core's `summarizeFlagChanges`, or
+`undefined` when the old file can't be read back, in which case `check`
+prints the diff alone. Only the emitter knows its own output format, so the
+parsing lives in the emitter package, not in `core` or the CLI.
 
 Emitters are code, not text templates. The OpenFeature CLI uses Go text
 templates per language, and the experience there is that templates stop being
@@ -599,6 +624,28 @@ npx @launchtarqly/codegen snapshot --write-snapshot flags.json [connection and s
 npx @launchtarqly/codegen init                       write a starter config
 ```
 
+Each command accepts only its own flags; anything else (for example
+`--write-snapshot` on `generate`) is an unknown option, exit 2.
+
+`generate` and `check` need a config file with `targets`. `snapshot` needs
+neither: it reads a config file if there is one (for `project`, `baseUri`,
+`view`, `tags`), but `--project` or `LD_CODEGEN_PROJECT` and a token are
+enough, and `targets` and `check` are not read.
+
+With `--from-snapshot`, the snapshot fixes what was fetched, so the config is
+checked against it:
+
+- a configured project other than the snapshot's `projectKey` is exit 2,
+  naming both;
+- an explicitly set base URI (CLI, env or file, not the default) other than
+  the snapshot's `baseUri` is a warning naming both, and the snapshot's
+  `baseUri` is still used for UI links, so a replay stays byte-identical to
+  the run that recorded it;
+- a view recorded in the snapshot with configured tags, or tags recorded in
+  the snapshot with a configured view, is exit 2, the same rule as `view` and
+  `tags` both set in the config. A configured view must match the recorded
+  one; configured tags are applied on top of recorded tags.
+
 `check` regenerates into memory and compares with what is on disk, byte for
 byte. On mismatch it prints a unified diff per file and a one-line summary of
 which flags were added, removed, renamed, or changed kind. Exit codes: 0 up to
@@ -658,7 +705,9 @@ emitters statically.
 | Mixed-type values on a multivariate flag | treated as `json`, warning printed |
 | `codegen.number: int` on a flag with a non-integer or out-of-32-bit value | exit 2, flag and value named |
 | `codegen.name.*` or `codegen.number` with more than one value | exit 2, flag and property named |
-| `view` and `tags` both set | exit 2 |
+| `view` and `tags` both set (in the config, or one recorded in a replayed snapshot) | exit 2 |
+| Replayed snapshot from a different project than configured | exit 2, both named |
+| Replayed snapshot from a different base URI than explicitly configured | warning, both named; the snapshot's is used |
 | Unknown view key, or an account without views | exit 2 |
 | Flag key changes in LaunchDarkly | method name changes, consumer code fails to compile at the call site; this is the intended behavior |
 | Flag kind changes | method signature changes, same as above |
@@ -672,16 +721,33 @@ emitters statically.
 These came out of research without a primary-source confirmation. None of
 them changes a decision; each has a defined behavior already.
 
-- That the server enforces `limit` ≤ 100 on the flags list (the fetcher pages
-  by `_links.next` either way).
-- That an unknown view key returns 404 on the linked-flags endpoint, what a
-  non-Enterprise account gets back, and how a deleted view behaves (all exit
-  2).
-- The page-size limits of the views linked-flags endpoint.
-- That `clientSideAvailability` is always present on list items (the
-  `includeInSnippet` fallback covers it if not).
-- A recorded live response to seed `fixtures/snapshots`: the research worked
-  from the OpenAPI spec and the API source, not a live call.
+Verified against the live API (read-only GETs, 2026-10-10):
+
+- The server enforces `limit` ≤ 100 on the flags list: a larger `limit` is
+  400 `invalid_request` ("`limit` must be less than or equal to 100").
+  `_links.next.href` is root-relative and keeps `limit`, `sort` and `offset`.
+- An unknown view key is 404 `{"code":"not_found","message":"View not
+  found"}` on the linked-flags endpoint, also in a project with no views; an
+  unknown project is 404 `Project not found`; a views call without
+  `LD-API-Version: beta` is 403. View keys are case-sensitive.
+- The linked-flags endpoint pages with a default `limit` of 20, a maximum of
+  100 (larger is 400) and a minimum of 1. `_links.next` is present only when
+  more pages follow; an offset past the end returns empty `items` and no
+  `next`. Items carry only `_links`, `linkedAt`, `resourceKey` and
+  `resourceType`.
+- `clientSideAvailability` was present on every list item checked (19/19),
+  and no `environments` field comes back. The `includeInSnippet` fallback
+  stays as a guard.
+- Live responses match the shape `fixtures/snapshots` assume. The opt-in
+  live test records a real snapshot and checks that replaying it gives the
+  same output as a live `generate`.
+
+Still open (could not be checked without a different account or mutating
+data):
+
+- What an account without views (non-Enterprise) gets back. Any 403 from the
+  views API is reported as views being unavailable (exit 2).
+- How a deleted view behaves (expected to be the same 404, exit 2).
 
 ## Roadmap
 
