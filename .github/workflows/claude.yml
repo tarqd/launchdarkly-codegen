@@ -39,7 +39,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: anthropics/claude-code-action@v1
         with:
+          # Set either secret; an unset one is passed as an empty string.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             actions: read
           claude_args: |
