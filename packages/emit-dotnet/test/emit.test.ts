@@ -292,3 +292,52 @@ ${OBSOLETE}        public const string MaxCartItems = "max-cart-items";
     expect(contents).not.toContain('#if');
   });
 });
+
+describe('dotnet single-line contexts', () => {
+  it('folds a multi-line name onto one doc-comment line in both summaries', () => {
+    const contents = emitOne(modelFlag('cart', { name: 'Cart\n  limits\r\nv2' }));
+    expect(contents).toContain('        /// <summary>\n        /// Cart limits v2\n        /// <para>key:');
+    expect(contents).toContain('        /// <summary>Cart limits v2, with the reason for the value.');
+  });
+
+  it('folds a multi-line deprecation message in the remark and escapes it in [System.Obsolete]', () => {
+    const contents = emitOne(modelFlag('cart', { deprecated: true, deprecationMessage: 'Use cart-v2.\nSee\tthe wiki.' }));
+    expect(contents).toContain('        /// <remarks>Deprecated: Use cart-v2. See\tthe wiki.</remarks>\n');
+    expect(contents).toContain('        [System.Obsolete("Use cart-v2.\\nSee\\tthe wiki.")]\n');
+  });
+
+  it('escapes control and C# line-break characters in string literals', () => {
+    const contents = emitOne(
+      modelFlag('cart', { deprecated: true, deprecationMessage: 'a\rb\u0000c\u0085d\u2028e\u2029f\u007fg' }),
+    );
+    expect(contents).toContain('[System.Obsolete("a\\rb\\u0000c\\u0085d\\u2028e\\u2029f\\u007Fg")]\n');
+  });
+
+  it('replaces characters XML forbids in doc comments with U+FFFD', () => {
+    const contents = emitOne(
+      modelFlag('cart', { name: 'Bell\u0007here', description: 'Null\u0000here', deprecated: true, deprecationMessage: 'Esc\u001bhere' }),
+    );
+    expect(contents).toContain('        /// Bell\uFFFDhere\n        /// <para>Null\uFFFDhere</para>\n');
+    expect(contents).toContain('/// <remarks>Deprecated: Esc\uFFFDhere</remarks>\n');
+    expect(contents).toContain('[System.Obsolete("Esc\\u001Bhere")]\n');
+  });
+
+  it('never writes a C# line break inside a doc comment or string literal', () => {
+    const contents = emitOne(
+      modelFlag('cart', {
+        name: 'Cart\u2028limits',
+        description: 'One\u2029two\n\nThree\u0085four',
+        deprecated: true,
+        deprecationMessage: 'Line\u0085break\rhere',
+      }),
+    );
+    expect(contents).not.toMatch(/[\r\u0085\u2028\u2029]/);
+    for (const line of contents.split('\n')) {
+      expect(line.trim(), 'every line is code, a doc comment, a directive or blank').toMatch(
+        /^(?:$|\/\/|#|\[System\.Obsolete\(|public |private |namespace |using |return |_client|\{|\})/,
+      );
+    }
+    expect(contents).toContain('        /// Cart limits\n');
+    expect(contents).toContain('        /// <para>One\n        /// two</para>\n        /// <para>Three\n        /// four</para>\n');
+  });
+});

@@ -71,6 +71,8 @@ describe('generate --from-snapshot', () => {
     ['namespace is missing', { out: 'Flags.g.cs' }, '`namespace`'],
     ['namespace is not dotted identifiers', { out: 'Flags.g.cs', namespace: 'My App' }, '`namespace`'],
     ['out is not a .cs file', { out: 'Flags.txt', namespace: 'MyApp' }, '`out`'],
+    ['namespace has a C# keyword segment', { out: 'Flags.g.cs', namespace: 'MyApp.class' }, '"class" is a C# keyword'],
+    ['namespace ends in a generated class name', { out: 'Flags.g.cs', namespace: 'MyApp.Flags' }, 'must not end in Flags'],
   ])('exits 2 naming the key when the dotnet %s', async (_name, options, key) => {
     const dir = await projectDir({ project: 'my-project', targets: [{ id: 'dotnet', sdkMajor: 8, ...options }] });
     const result = await runCli(['generate', '--from-snapshot', snapshot], dir);

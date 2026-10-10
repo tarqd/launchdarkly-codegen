@@ -6,18 +6,22 @@
 import {
   checkIdentifiers,
   CodegenError,
+  deprecationText,
   flagIdentifier,
+  maintainerLabel,
   upperCamel,
   Writer,
   type EmittedIdentifier,
   type Emitter,
   type Flag,
+  type FlagKind,
   type FlagModel,
   type IdentifierRules,
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
 import { summarizeDotnetChanges } from './flag-changes.js';
+import { IDENTIFIER } from './identifier.js';
 
 export { parseDotnetFlags, summarizeDotnetChanges } from './flag-changes.js';
 
@@ -32,7 +36,7 @@ const OBJECT_MEMBERS = ['Equals', 'GetHashCode', 'ToString', 'GetType', 'Memberw
  * all lowercase, so only an alias can hit one. Contextual keywords (`var`,
  * `async`, …) are legal member names and aren't listed.
  */
-const CSHARP_KEYWORDS = [
+const CSHARP_KEYWORDS: ReadonlySet<string> = new Set([
   'abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class',
   'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event',
   'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if',
@@ -41,14 +45,7 @@ const CSHARP_KEYWORDS = [
   'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct',
   'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe',
   'ushort', 'using', 'virtual', 'void', 'volatile', 'while',
-];
-
-/**
- * A C# identifier (C# spec → Lexical structure → Identifiers), without the
- * `@` prefix or Unicode escapes: a letter or `_`, then letters, digits,
- * connecting, combining and formatting characters.
- */
-const IDENTIFIER = '[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}\\p{Mn}\\p{Mc}\\p{Cf}]*';
+]);
 
 const NAMING: IdentifierRules = {
   target: DOTNET,
@@ -89,7 +86,7 @@ function targetOptions(cfg: TargetConfig): { namespace: string } {
     );
   }
   const segments = namespace.split('.');
-  const keyword = segments.find((segment) => CSHARP_KEYWORDS.includes(segment));
+  const keyword = segments.find((segment) => CSHARP_KEYWORDS.has(segment));
   if (keyword !== undefined) {
     throw new CodegenError(
       `dotnet target: \`namespace\` segment "${keyword}" is a C# keyword; got ${JSON.stringify(namespace)}`,
@@ -109,14 +106,42 @@ function targetOptions(cfg: TargetConfig): { namespace: string } {
   return { namespace };
 }
 
-/** A regular C# string literal. */
+/**
+ * A C# new-line (C# spec → Lexical structure → Line terminators): it ends a
+ * `///` comment and can't appear in a regular string literal.
+ */
+const NEWLINE = String.raw`(?:\r\n|\r(?!\n)|[\n\u0085\u2028\u2029])`;
+
+const STRING_ESCAPES: Record<string, string> = { '\\': '\\\\', '"': '\\"', '\n': '\\n', '\r': '\\r', '\t': '\\t' };
+
+/**
+ * A regular C# string literal. Control characters and the other new-lines,
+ * which would end the literal or hide in it, become `\uXXXX` escapes.
+ */
 function csString(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  const escaped = value.replace(
+    /[\\"\p{Cc}\u2028\u2029]/gu,
+    (c) => STRING_ESCAPES[c] ?? `\\u${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
+  );
+  return `"${escaped}"`;
 }
 
-/** Escapes text for an XML doc comment. */
+/** `text` on one line, for a doc comment that has one: each run of new-lines and the spaces around it become one space. */
+function oneLine(text: string): string {
+  return text.trim().replace(new RegExp(String.raw`(?:[ \t]*${NEWLINE})+[ \t]*`, 'gu'), ' ');
+}
+
+/**
+ * Escapes text for an XML doc comment. Characters XML 1.0 forbids even as
+ * references (most C0 controls, lone surrogates, U+FFFE/U+FFFF) become U+FFFD,
+ * or the compiler rejects the comment (CS1570).
+ */
 function xmlText(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return text
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\p{Cs}\uFFFE\uFFFF]/gu, '\uFFFD')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /** Escapes text for a double-quoted XML attribute value in a doc comment. */
@@ -130,8 +155,8 @@ function xmlAttribute(text: string): string {
  */
 function paragraphs(text: string): string[] {
   const lines: string[] = [];
-  for (const paragraph of text.trim().split(/(?:\r?\n[ \t]*){2,}/)) {
-    const body = paragraph.split(/\r?\n/).map((l) => xmlText(l.trimEnd()));
+  for (const paragraph of text.trim().split(new RegExp(`(?:${NEWLINE}[ \\t]*){2,}`, 'u'))) {
+    const body = paragraph.split(new RegExp(NEWLINE, 'u')).map((l) => xmlText(l.trimEnd()));
     body[0] = `<para>${body[0]}`;
     body[body.length - 1] += '</para>';
     lines.push(...body);
@@ -139,25 +164,25 @@ function paragraphs(text: string): string[] {
   return lines;
 }
 
-/** The SDK method prefix and C# type for a flag's kind; `codegen.number: int` picks `int` (ADR 0001). */
-function kindMethod(flag: Flag): { method: string; type: string } {
-  switch (flag.kind) {
-    case 'boolean':
-      return { method: 'BoolVariation', type: 'bool' };
-    case 'string':
-      return { method: 'StringVariation', type: 'string' };
-    case 'number':
-      return flag.numberType === 'int'
-        ? { method: 'IntVariation', type: 'int' }
-        : { method: 'DoubleVariation', type: 'double' };
-    case 'json':
-      return { method: 'JsonVariation', type: 'LdValue' };
-  }
+interface SdkMethod {
+  /** The `ILdClient` method, without `Detail`. */
+  method: string;
+  /** The C# type of the flag's value. */
+  type: string;
 }
 
-/** A brace-delimited block: `{`, the indented `body`, `}`, each on its own line. */
-function braces(w: Writer, body: () => void): void {
-  w.block('{', '}', body);
+/** The SDK method prefix and C# type for each Flag kind; a number flag is a `double` unless `codegen.number: int`. */
+const KIND_METHODS: Record<FlagKind, SdkMethod> = {
+  boolean: { method: 'BoolVariation', type: 'bool' },
+  string: { method: 'StringVariation', type: 'string' },
+  number: { method: 'DoubleVariation', type: 'double' },
+  json: { method: 'JsonVariation', type: 'LdValue' },
+};
+/** A number flag with `codegen.number: int` (ADR 0001). */
+const INT_METHOD: SdkMethod = { method: 'IntVariation', type: 'int' };
+
+function sdkMethod(flag: Flag): SdkMethod {
+  return flag.kind === 'number' && flag.numberType === 'int' ? INT_METHOD : KIND_METHODS[flag.kind];
 }
 
 /**
@@ -165,33 +190,22 @@ function braces(w: Writer, body: () => void): void {
  * the name, then a `<para>` each for the description, the trailer and the UI link.
  */
 function summaryLines(flag: Flag): string[] {
-  const lines = [xmlText(flag.name)];
+  const lines = [xmlText(oneLine(flag.name))];
   if (flag.description.trim() !== '') lines.push(...paragraphs(flag.description));
   const trailer = [`key: <c>${xmlText(flag.key)}</c>`];
   if (flag.tags.length > 0) trailer.push(`tags: ${xmlText(flag.tags.join(', '))}`);
-  if (flag.maintainer) {
-    const maintainer = flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email;
-    trailer.push(`maintainer: ${xmlText(maintainer)}`);
-  }
+  if (flag.maintainer) trailer.push(`maintainer: ${xmlText(maintainerLabel(flag.maintainer))}`);
   lines.push(`<para>${trailer.join(' · ')}</para>`, `<para><see href="${xmlAttribute(flag.uiUrl)}"/></para>`);
   return lines;
 }
 
-/** The deprecation message: the flag's own, else a generic one. No date, so output doesn't churn. */
-function deprecationText(flag: Flag): string | undefined {
-  if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
-}
-
 /**
- * `[System.Obsolete]` for a deprecated flag's member: on .NET 5+ with the
+ * `[System.Obsolete]` with a deprecated flag's `message`: on .NET 5+ with the
  * `LDFLAG001` diagnostic id and the flag's UI link, plain before (ADR 0003).
  * `UrlFormat` is a format string, so its braces are doubled.
  */
-function emitObsolete(w: Writer, flag: Flag): void {
-  const message = deprecationText(flag);
-  if (message === undefined) return;
-  const url = flag.uiUrl.replace(/\{/g, '{{').replace(/\}/g, '}}');
+function emitObsolete(w: Writer, message: string, uiUrl: string): void {
+  const url = uiUrl.replace(/\{/g, '{{').replace(/\}/g, '}}');
   w.directive('#if NET5_0_OR_GREATER');
   w.line(`[System.Obsolete(${csString(message)}, DiagnosticId = "LDFLAG001", UrlFormat = ${csString(url)})]`);
   w.directive('#else');
@@ -199,30 +213,31 @@ function emitObsolete(w: Writer, flag: Flag): void {
   w.directive('#endif');
 }
 
+const PARAM_DOCS = [
+  '/// <param name="context">The context to evaluate the flag for.</param>',
+  '/// <param name="fallback">The value to use if the flag can\'t be evaluated.</param>',
+];
+
 function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
-  const { method, type } = kindMethod(flag);
-  const title = xmlText(flag.name);
-  const params = [
-    '/// <param name="context">The context to evaluate the flag for.</param>',
-    '/// <param name="fallback">The value to use if the flag can\'t be evaluated.</param>',
-  ];
+  const { method, type } = sdkMethod(flag);
+  const title = xmlText(oneLine(flag.name));
+  const deprecation = deprecationText(flag);
   w.line('/// <summary>');
   for (const text of summaryLines(flag)) w.line(`/// ${text}`);
   w.line('/// </summary>');
-  const deprecation = deprecationText(flag);
-  if (deprecation !== undefined) w.line(`/// <remarks>Deprecated: ${xmlText(deprecation)}</remarks>`);
-  for (const p of params) w.line(p);
+  if (deprecation !== undefined) w.line(`/// <remarks>Deprecated: ${xmlText(oneLine(deprecation))}</remarks>`);
+  for (const doc of PARAM_DOCS) w.line(doc);
   w.line('/// <returns>The flag\'s value for <paramref name="context"/>.</returns>');
-  emitObsolete(w, flag);
+  if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
   w.line(`public ${type} ${name}(Context context, ${type} fallback)`);
-  braces(w, () => w.line(`return _client.${method}(FlagKeys.${name}, context, fallback);`));
+  w.block('{', '}', () => w.line(`return _client.${method}(FlagKeys.${name}, context, fallback);`));
   w.line();
   w.line(`/// <summary>${title}, with the reason for the value. See <see cref="${name}"/>.</summary>`);
-  for (const p of params) w.line(p);
+  for (const doc of PARAM_DOCS) w.line(doc);
   w.line('/// <returns>The flag\'s value and the reason it was chosen.</returns>');
-  emitObsolete(w, flag);
+  if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
   w.line(`public EvaluationDetail<${type}> ${name}Detail(Context context, ${type} fallback)`);
-  braces(w, () => w.line(`return _client.${method}Detail(FlagKeys.${name}, context, fallback);`));
+  w.block('{', '}', () => w.line(`return _client.${method}Detail(FlagKeys.${name}, context, fallback);`));
 }
 
 export const dotnetEmitter: Emitter = {
@@ -233,7 +248,7 @@ export const dotnetEmitter: Emitter = {
   emit(model, cfg, ctx) {
     const { namespace } = targetOptions(cfg);
     const names = flagNames(model);
-    const w = new Writer({ indent: '    ' });
+    const w = new Writer({ indent: '    ', commentPrefix: '//' });
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
     w.line('// <auto-generated/>');
     w.line();
@@ -241,12 +256,12 @@ export const dotnetEmitter: Emitter = {
     w.line('using LaunchDarkly.Sdk.Server.Interfaces;');
     w.line();
     w.line(`namespace ${namespace}`);
-    braces(w, () => {
+    w.block('{', '}', () => {
       w.line('/// <summary>');
       w.line(`/// Typed accessors for the flags in LaunchDarkly project <c>${xmlText(model.projectKey)}</c>.`);
       w.line('/// </summary>');
       w.line('public sealed class Flags');
-      braces(w, () => {
+      w.block('{', '}', () => {
         w.line('private readonly ILdClient _client;');
         w.line();
         w.line('/// <summary>');
@@ -254,7 +269,7 @@ export const dotnetEmitter: Emitter = {
         w.line('/// </summary>');
         w.line('/// <param name="client">The LaunchDarkly client, usually an <c>LdClient</c>.</param>');
         w.line('public Flags(ILdClient client)');
-        braces(w, () => w.line('_client = client;'));
+        w.block('{', '}', () => w.line('_client = client;'));
         for (const flag of model.flags) {
           w.line();
           emitFlagMethods(w, flag, names.get(flag)!);
@@ -265,12 +280,13 @@ export const dotnetEmitter: Emitter = {
       w.line('/// The raw key of every flag in <see cref="Flags"/>.');
       w.line('/// </summary>');
       w.line('public static class FlagKeys');
-      braces(w, () => {
+      w.block('{', '}', () => {
         model.flags.forEach((flag, i) => {
           if (i > 0) w.line();
           const name = names.get(flag)!;
+          const deprecation = deprecationText(flag);
           w.line(`/// <summary>Key of the flag behind <see cref="Flags.${name}"/>.</summary>`);
-          emitObsolete(w, flag);
+          if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
           w.line(`public const string ${name} = ${csString(flag.key)};`);
         });
       });

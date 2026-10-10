@@ -5,6 +5,7 @@
  */
 
 import { summarizeFlagChanges, type FlagKind, type GeneratedFlag } from '@launchtarqly/core';
+import { IDENTIFIER as ID } from './identifier.js';
 
 const SDK_KINDS: Record<string, FlagKind> = {
   Bool: 'boolean',
@@ -14,8 +15,6 @@ const SDK_KINDS: Record<string, FlagKind> = {
   Json: 'json',
 };
 
-/** A C# identifier as the emitter writes one (letters, digits, `_`, Unicode included). */
-const ID = String.raw`[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Nd}\p{Pc}\p{Mn}\p{Mc}\p{Cf}]*`;
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
 
 // `return _client.<Kind>Variation(FlagKeys.<Name>, ...`. `Variation\s*\(` skips the `...VariationDetail(` methods.
