@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ts-server, go]
+        target: [ts-server, dotnet, go]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,6 +36,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        if: matrix.target == 'dotnet'
+        with:
+          dotnet-version: 8.0.x
       # Go 1.25 is go-server-sdk v7's floor; staticcheck 2025.1.1 is pinned with it (DESIGN.md → go → Toolchain).
       - uses: actions/setup-go@v5
         if: matrix.target == 'go'

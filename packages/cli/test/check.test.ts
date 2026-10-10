@@ -76,6 +76,27 @@ describe('check --from-snapshot', () => {
       expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: checkoutVersion2 → checkoutV2\)\n$/);
     });
 
+    it('follows the diff of a stale dotnet file', async () => {
+      const out = 'src/Flags.g.cs';
+      const dir = await generatedProject({
+        project: 'my-project',
+        targets: [{ id: 'dotnet', out, sdkMajor: 8, namespace: 'MyApp.FeatureFlags' }],
+      });
+      const path = join(dir, out);
+      // As if the committed file predates a rename of checkout-v2's identifier and the removal of a flag.
+      const committed = (await readFile(path, 'utf8'))
+        .replaceAll('CheckoutV2', 'CheckoutVersion2')
+        .replace(
+          '\n        }\n    }\n\n',
+          '\n        }\n\n        public bool Zombie(Context context, bool fallback)\n        {\n            return _client.BoolVariation(FlagKeys.Zombie, context, fallback);\n        }\n    }\n\n',
+        )
+        .replace(/;\n    }\n}\n$/, ';\n\n        public const string Zombie = "zombie";\n    }\n}\n');
+      await writeFile(path, committed);
+      const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: CheckoutVersion2 → CheckoutV2\)\n$/);
+    });
+
     describe('for a go file', () => {
       const GO_OUT = 'internal/ldflags/flags_gen.go';
       const goConfig = { project: 'my-project', targets: [{ id: 'go', out: GO_OUT, sdkMajor: 7, package: 'ldflags' }] };

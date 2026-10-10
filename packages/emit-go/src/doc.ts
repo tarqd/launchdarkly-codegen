@@ -3,7 +3,7 @@
  * Doc comments, Sanitizing doc text).
  */
 
-import { defaultDeprecationMessage, docTrailer, type Flag } from '@launchtarqly/core';
+import { defaultDeprecationMessage, deprecationText, docTrailer, type Flag } from '@launchtarqly/core';
 
 /**
  * The primary method's doc comment, one entry per comment line without the
@@ -57,8 +57,10 @@ function quoted(text: string): string {
  * one naming the flag. No date, so output doesn't churn.
  */
 export function deprecation(flag: Flag): string | undefined {
-  if (!flag.deprecated) return undefined;
-  const message = oneLine(flag.deprecationMessage ?? '');
+  const text = deprecationText(flag, quoted);
+  if (text === undefined) return undefined;
+  // A message made only of characters oneLine strips falls back to the default.
+  const message = oneLine(text);
   return `Deprecated: ${message === '' ? defaultDeprecationMessage(flag, quoted) : message}`;
 }
 

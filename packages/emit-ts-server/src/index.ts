@@ -5,7 +5,7 @@
 
 import {
   checkIdentifiers,
-  defaultDeprecationMessage,
+  deprecationText,
   docTrailer,
   ECMASCRIPT_RESERVED_WORDS,
   flagIdentifier,
@@ -60,7 +60,7 @@ function docLines(flag: Flag): string[] {
   const lines = [flag.name, ''];
   if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
   lines.push(docTrailer(flag, inlineCode), flag.uiUrl);
-  const deprecation = deprecationText(flag);
+  const deprecation = deprecationText(flag, inlineCode);
   if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
   return lines;
 }
@@ -68,12 +68,6 @@ function docLines(flag: Flag): string[] {
 /** TSDoc inline code. */
 function inlineCode(text: string): string {
   return `\`${text}\``;
-}
-
-/** The `@deprecated` text: the flag's message, else a generic one. */
-function deprecationText(flag: Flag): string | undefined {
-  if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? defaultDeprecationMessage(flag, inlineCode);
 }
 
 /** The SDK method prefix and TypeScript type for each Flag kind. */
@@ -123,7 +117,7 @@ export const tsServerEmitter: Emitter = {
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
-        const deprecation = deprecationText(flag);
+        const deprecation = deprecationText(flag, inlineCode);
         if (deprecation !== undefined) w.inlineDocComment(`@deprecated ${deprecation}`);
         w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }

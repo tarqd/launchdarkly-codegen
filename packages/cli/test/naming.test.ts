@@ -42,6 +42,36 @@ describe('generate fails on names the user must choose', () => {
   });
 });
 
+describe('generate fails on dotnet names the user must choose', () => {
+  const dotnetConfig = {
+    project: 'my-project',
+    targets: [{ id: 'dotnet', out: 'Flags.g.cs', sdkMajor: 8, namespace: 'MyApp.FeatureFlags' }],
+  };
+
+  async function generateDotnet(...items: ApiFlag[]) {
+    const dir = await projectDir(dotnetConfig);
+    return runCli(['generate', '--from-snapshot', await writeSnapshot(dir, items)], dir);
+  }
+
+  it.each([
+    ['a key with a leading digit', apiFlag('2fa-enabled'), '2fa-enabled'],
+    ['a name that hides a System.Object member', apiFlag('to-string'), 'ToString'],
+    ['a C# keyword alias', apiFlag('my-flag', { customProperties: customProperty('codegen.name.dotnet', ['class']) }), 'class'],
+  ])('exits 2 on %s, suggesting the dotnet alias', async (_name, item, named) => {
+    const result = await generateDotnet(item);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain(named);
+    expect(result.stderr).toContain('codegen.name.dotnet');
+  });
+
+  it('succeeds once a dotnet alias resolves the problem', async () => {
+    const result = await generateDotnet(
+      apiFlag('2fa-enabled', { customProperties: customProperty('codegen.name.dotnet', ['TwoFactor']) }),
+    );
+    expect(result).toMatchObject({ exitCode: 0, stderr: '' });
+  });
+});
+
 describe('go names', () => {
   const goConfig = {
     project: 'my-project',

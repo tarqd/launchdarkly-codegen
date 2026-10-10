@@ -32,6 +32,9 @@ importers:
       '@launchtarqly/core':
         specifier: workspace:*
         version: link:../core
+      '@launchtarqly/emit-dotnet':
+        specifier: workspace:*
+        version: link:../emit-dotnet
       '@launchtarqly/emit-go':
         specifier: workspace:*
         version: link:../emit-go
@@ -46,6 +49,12 @@ importers:
         version: 2.8.1
 
   packages/core: {}
+
+  packages/emit-dotnet:
+    dependencies:
+      '@launchtarqly/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/emit-go:
     dependencies:

@@ -4,7 +4,7 @@
  * back into `GeneratedFlag`s (`Emitter.summarizeChanges`); this compares them.
  */
 
-import type { FlagKind } from '../model.js';
+import type { Flag, FlagKind } from '../model.js';
 
 /** A flag as read back from generated text. */
 export interface GeneratedFlag {
@@ -13,20 +13,15 @@ export interface GeneratedFlag {
   identifier: string;
   kind: FlagKind;
   /**
-   * Number flags only, when the target's output tells `int` from `double`
-   * (go does, ts-server doesn't). Compared only when both sides have it.
+   * For a number flag, whether the target emitted it as an int or a double;
+   * left out by targets whose output doesn't tell them apart (ts-server).
    */
-  numberType?: 'int' | 'double';
+  numberType?: Flag['numberType'];
 }
 
-/** `json`, or `number (int)` when the number type is known. */
+/** `number (int)` for a number flag whose number type the target read back, else the kind. */
 function kindLabel(flag: GeneratedFlag): string {
-  return flag.numberType === undefined ? flag.kind : `${flag.kind} (${flag.numberType})`;
-}
-
-function kindChanged(o: GeneratedFlag, n: GeneratedFlag): boolean {
-  if (o.kind !== n.kind) return true;
-  return o.numberType !== undefined && n.numberType !== undefined && o.numberType !== n.numberType;
+  return flag.kind === 'number' && flag.numberType ? `number (${flag.numberType})` : flag.kind;
 }
 
 function part(count: number, label: string, items: string[]): string | undefined {
@@ -54,7 +49,8 @@ export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlag
     else if (!n) removed.push(key);
     else {
       if (o.identifier !== n.identifier) renamed.push(`${key}: ${o.identifier} → ${n.identifier}`);
-      if (kindChanged(o, n)) changedKind.push(`${key}: ${kindLabel(o)} → ${kindLabel(n)}`);
+      const [oldKind, newKind] = [kindLabel(o), kindLabel(n)];
+      if (oldKind !== newKind) changedKind.push(`${key}: ${oldKind} → ${newKind}`);
     }
   }
 

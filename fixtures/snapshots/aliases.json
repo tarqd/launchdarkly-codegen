@@ -14,7 +14,8 @@
           "tags": [],
           "customProperties": {
             "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["twoFactorEnabled"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["TwoFactorEnabled"] }
+            "codegen.name.go": { "name": "codegen.name.go", "value": ["TwoFactorEnabled"] },
+            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["TwoFactorEnabled"] }
           },
           "archived": false,
           "deprecated": false
@@ -27,7 +28,8 @@
           "tags": [],
           "customProperties": {
             "codegen.name": { "name": "codegen.name", "value": ["defaultTheme"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["DefaultTheme"] }
+            "codegen.name.go": { "name": "codegen.name.go", "value": ["DefaultTheme"] },
+            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["DefaultTheme"] }
           },
           "archived": false,
           "deprecated": false
@@ -65,7 +67,8 @@
           "tags": [],
           "customProperties": {
             "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["checkoutDetailPage"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["CheckoutDetailPage"] }
+            "codegen.name.go": { "name": "codegen.name.go", "value": ["CheckoutDetailPage"] },
+            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["CheckoutDetailPage"] }
           },
           "archived": false,
           "deprecated": false

@@ -49,12 +49,17 @@ describe('upperCamel', () => {
     expect(upperCamel('beta.dark_mode')).toBe('BetaDarkMode');
   });
 
-  it('keeps a leading digit, for the identifier check to reject', () => {
-    expect(upperCamel('2fa-enabled')).toBe('2faEnabled');
+  it('treats acronyms as ordinary words, with no initialism table', () => {
+    expect(upperCamel('api-url-id')).toBe('ApiUrlId');
+    expect(upperCamel('HTTPServerTimeout')).toBe('HttpServerTimeout');
   });
 
-  it('applies no initialisms unless given some', () => {
-    expect(upperCamel('api-url-id')).toBe('ApiUrlId');
+  it('keeps a key that is already UpperCamel', () => {
+    expect(upperCamel('AllowGuestCheckout')).toBe('AllowGuestCheckout');
+  });
+
+  it('keeps a leading digit, for the identifier check to reject', () => {
+    expect(upperCamel('2fa-enabled')).toBe('2faEnabled');
   });
 });
 

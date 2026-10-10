@@ -48,7 +48,10 @@ export interface UpperCamelOptions {
   initialisms?: ReadonlySet<string>;
 }
 
-/** `checkout-v2.new_flow` → `CheckoutV2NewFlow` */
+/**
+ * `checkout-v2.new_flow` → `CheckoutV2NewFlow`. Acronyms are ordinary words
+ * (`api-url` → `ApiUrl`) unless listed in `initialisms`.
+ */
 export function upperCamel(key: string, options: UpperCamelOptions = {}): string {
   const { initialisms } = options;
   return splitWords(key)

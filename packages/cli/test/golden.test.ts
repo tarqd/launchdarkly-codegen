@@ -10,6 +10,7 @@ import { GOLDEN_DIR, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
 
 const TARGETS = [
   { id: 'ts-server', ext: '.ts', extra: { sdkMajor: 9 } },
+  { id: 'dotnet', ext: '.g.cs', extra: { sdkMajor: 8, namespace: 'MyApp.FeatureFlags' } },
   { id: 'go', ext: '.go', extra: { sdkMajor: 7, package: 'ldflags' } },
 ];
 
