@@ -5,7 +5,7 @@
  * 1.37.0 would (ADR 0004).
  */
 
-import type { Flag } from '@launchtarqly/core';
+import { deprecationText, maintainerText, type Flag } from '@launchtarqly/core';
 import { CONTINUATION, MAX_WIDTH } from './layout.js';
 
 /**
@@ -141,16 +141,12 @@ function descriptionParagraphs(description: string): string[] {
 function trailer(flag: Flag): string {
   const parts = [`key: {@code ${flag.key}}`];
   if (flag.tags.length > 0) parts.push(`tags: ${escapeJavadoc(flag.tags.join(', '))}`);
-  if (flag.maintainer) {
-    const who = flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email;
-    parts.push(`maintainer: ${escapeJavadoc(who)}`);
-  }
+  if (flag.maintainer) parts.push(`maintainer: ${escapeJavadoc(maintainerText(flag.maintainer))}`);
   return `${parts.join(' · ')}<br>\n${flag.uiUrl}`;
 }
 
-/** The `@deprecated` tag: the flag's message, else a generic one. No date, so output doesn't churn. */
+/** The `@deprecated` tag, when the flag is deprecated. */
 function deprecatedTag(flag: Flag): string[] {
-  if (!flag.deprecated) return [];
-  const message = flag.deprecationMessage;
-  return [`@deprecated ${message !== undefined ? escapeJavadoc(message) : `The {@code ${flag.key}} flag is deprecated.`}`];
+  const text = deprecationText(flag, (key) => `{@code ${key}}`, escapeJavadoc);
+  return text === undefined ? [] : [`@deprecated ${text}`];
 }

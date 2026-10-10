@@ -5,9 +5,11 @@
 
 import {
   checkIdentifiers,
+  deprecationText,
   ECMASCRIPT_RESERVED_WORDS,
   flagIdentifier,
   lowerCamel,
+  maintainerText,
   Writer,
   type EmittedIdentifier,
   type Emitter,
@@ -60,20 +62,17 @@ function docLines(flag: Flag): string[] {
   const trailer = [`key: \`${flag.key}\``];
   if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
   if (flag.maintainer) {
-    trailer.push(
-      `maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`,
-    );
+    trailer.push(`maintainer: ${maintainerText(flag.maintainer)}`);
   }
   lines.push(trailer.join(' · '), flag.uiUrl);
-  const deprecation = deprecationText(flag);
+  const deprecation = tsDeprecationText(flag);
   if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
   return lines;
 }
 
-/** The `@deprecated` text: the flag's message, else a generic one. No date, so output doesn't churn. */
-function deprecationText(flag: Flag): string | undefined {
-  if (!flag.deprecated) return undefined;
-  return flag.deprecationMessage ?? `The \`${flag.key}\` flag is deprecated.`;
+/** The `@deprecated` text, the key in backticks. */
+function tsDeprecationText(flag: Flag): string | undefined {
+  return deprecationText(flag, (key) => `\`${key}\``);
 }
 
 /** The SDK method prefix and TypeScript type for each Flag kind. */
@@ -123,7 +122,7 @@ export const tsServerEmitter: Emitter = {
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
-        const deprecation = deprecationText(flag);
+        const deprecation = tsDeprecationText(flag);
         if (deprecation !== undefined) w.inlineDocComment(`@deprecated ${deprecation}`);
         w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }
