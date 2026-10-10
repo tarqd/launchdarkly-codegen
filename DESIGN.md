@@ -254,9 +254,9 @@ validation) instead of the converted key. Otherwise the steps are: split on
 letters or digits; apply the target's casing. Go additionally upper-cases
 staticcheck's 42 default initialisms (`Id` to `ID`, `Url` to `URL`, `Api` to
 `API`, `Http` to `HTTP`, …) and their plurals (`Ids` to `IDs`; ADR 0002), so
-`api-url-id` becomes `APIURLID` and the Java constant `API_URL_ID`. .NET follows the Framework Design Guidelines
-instead (`Api`, `Url`, `Id`), so it applies no initialism table: `api-url-id`
-becomes `ApiUrlId`.
+`api-url-id` becomes `APIURLID` and the Java constant `API_URL_ID`. .NET
+follows the Framework Design Guidelines instead (`Api`, `Url`, `Id`), so it
+applies no initialism table: `api-url-id` becomes `ApiUrlId`.
 
 The generator never invents a name: an identifier is either the converted key
 or an alias the user chose. These are errors, each naming the flag and
