@@ -18,6 +18,7 @@ import {
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
+import { deprecation, methodDoc } from './doc.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const GO: TargetId = 'go';
@@ -138,29 +139,48 @@ function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const value = `(${type}, error)`;
   const detail = `(${type}, ldreason.EvaluationDetail, error)`;
   const forms = [
-    { suffix: '', doc: `evaluates the ${goString(flag.name)} flag.`, params, result: value, call: `${method}(${key}, context, fallback)` },
-    { suffix: 'Detail', doc: `is ${name} with the evaluation reason.`, params, result: detail, call: `${method}Detail(${key}, context, fallback)` },
-    { suffix: 'Ctx', doc: `is ${name} with a Go context for SDK hooks.`, params: ctxParams, result: value, call: `${method}Ctx(ctx, ${key}, context, fallback)` },
-    { suffix: 'DetailCtx', doc: `is ${name}Detail with a Go context for SDK hooks.`, params: ctxParams, result: detail, call: `${method}DetailCtx(ctx, ${key}, context, fallback)` },
+    { suffix: '', doc: methodDoc(name, flag), params, result: value, call: `${method}(${key}, context, fallback)` },
+    { suffix: 'Detail', doc: variantDoc(`${name}Detail is ${name} with the evaluation reason.`, flag), params, result: detail, call: `${method}Detail(${key}, context, fallback)` },
+    { suffix: 'Ctx', doc: variantDoc(`${name}Ctx is ${name} with a Go context for SDK hooks.`, flag), params: ctxParams, result: value, call: `${method}Ctx(ctx, ${key}, context, fallback)` },
+    { suffix: 'DetailCtx', doc: variantDoc(`${name}DetailCtx is ${name}Detail with a Go context for SDK hooks.`, flag), params: ctxParams, result: detail, call: `${method}DetailCtx(ctx, ${key}, context, fallback)` },
   ];
   for (const form of forms) {
     w.line();
-    w.line(`// ${name}${form.suffix} ${form.doc}`);
+    for (const text of form.doc) w.line(text === '' ? '//' : `// ${text}`);
     w.block(`func (f *Flags) ${name}${form.suffix}(${form.params}) ${form.result} {`, '}', () => {
       w.line(`return f.client.${form.call}`);
     });
   }
 }
 
-/** The `Key…` constants, `=`-aligned the way gofmt aligns a run of single-line specs (by rune count). */
+/** A variant's one-line doc, plus the `Deprecated:` paragraph for a deprecated flag. */
+function variantDoc(summary: string, flag: Flag): string[] {
+  const deprecated = deprecation(flag);
+  return deprecated === undefined ? [summary] : [summary, '', deprecated];
+}
+
+/**
+ * The `Key…` constants, `=`-aligned the way gofmt aligns a run of single-line
+ * specs (by rune count). A deprecated constant's `// Deprecated:` line ends
+ * the run before it, so that constant starts a new one.
+ */
 function emitKeys(w: Writer, flags: readonly Flag[], names: Map<Flag, string>): void {
-  const width = Math.max(...flags.map((flag) => [...`Key${names.get(flag)!}`].length));
+  const runs: Flag[][] = [];
+  for (const flag of flags) {
+    if (flag.deprecated || runs.length === 0) runs.push([flag]);
+    else runs[runs.length - 1]!.push(flag);
+  }
   w.line();
   w.line('// Flag keys, for code that needs the raw key.');
   w.block('const (', ')', () => {
-    for (const flag of flags) {
-      const constant = `Key${names.get(flag)!}`;
-      w.line(`${constant}${' '.repeat(width - [...constant].length)} = ${goString(flag.key)}`);
+    for (const run of runs) {
+      const width = Math.max(...run.map((flag) => [...`Key${names.get(flag)!}`].length));
+      for (const flag of run) {
+        const deprecated = deprecation(flag);
+        if (deprecated !== undefined) w.line(`// ${deprecated}`);
+        const constant = `Key${names.get(flag)!}`;
+        w.line(`${constant}${' '.repeat(width - [...constant].length)} = ${goString(flag.key)}`);
+      }
     }
   });
 }

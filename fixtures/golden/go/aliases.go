@@ -45,6 +45,11 @@ type Flags struct{ client Client }
 func New(client Client) *Flags { return &Flags{client: client} }
 
 // TwoFactorEnabled evaluates the "Two-factor auth" flag.
+//
+// Key starts with a digit, so ts-server needs an alias.
+//
+// key: "2fa-enabled"
+// https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled
 func (f *Flags) TwoFactorEnabled(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyTwoFactorEnabled, context, fallback)
 }
@@ -65,6 +70,9 @@ func (f *Flags) TwoFactorEnabledDetailCtx(ctx gocontext.Context, context ldconte
 }
 
 // Checkout evaluates the "Checkout" flag.
+//
+// key: "checkout"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout
 func (f *Flags) Checkout(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckout, context, fallback)
 }
@@ -85,6 +93,11 @@ func (f *Flags) CheckoutDetailCtx(ctx gocontext.Context, context ldcontext.Conte
 }
 
 // CheckoutDetailPage evaluates the "Checkout detail page" flag.
+//
+// Would collide with checkoutDetail() of flag checkout without its alias.
+//
+// key: "checkout-detail"
+// https://app.launchdarkly.com/projects/my-project/flags/checkout-detail
 func (f *Flags) CheckoutDetailPage(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyCheckoutDetailPage, context, fallback)
 }
@@ -105,6 +118,9 @@ func (f *Flags) CheckoutDetailPageDetailCtx(ctx gocontext.Context, context ldcon
 }
 
 // DefaultTheme evaluates the "Default theme" flag.
+//
+// key: "default"
+// https://app.launchdarkly.com/projects/my-project/flags/default
 func (f *Flags) DefaultTheme(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeyDefaultTheme, context, fallback)
 }
@@ -125,6 +141,9 @@ func (f *Flags) DefaultThemeDetailCtx(ctx gocontext.Context, context ldcontext.C
 }
 
 // SearchV3 evaluates the "Search v3" flag.
+//
+// key: "search-v3"
+// https://app.launchdarkly.com/projects/my-project/flags/search-v3
 func (f *Flags) SearchV3(context ldcontext.Context, fallback bool) (bool, error) {
 	return f.client.BoolVariation(KeySearchV3, context, fallback)
 }
