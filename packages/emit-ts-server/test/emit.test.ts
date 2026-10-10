@@ -1,22 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Flag, FlagModel } from '@launchtarqly/core';
 import { tsServerEmitter } from '../src/index.js';
-
-function boolFlag(key: string, extra: Partial<Flag> = {}): Flag {
-  return {
-    key,
-    name: key,
-    description: '',
-    kind: 'boolean',
-    clientSideAvailability: { usingEnvironmentId: false, usingMobileKey: true },
-    tags: [],
-    deprecated: false,
-    archived: false,
-    aliases: {},
-    uiUrl: `https://app.launchdarkly.com/projects/my-project/flags/${key}`,
-    ...extra,
-  };
-}
+import { modelFlag } from '../../core/test/builders.js';
 
 const cfg = { id: 'ts-server', out: 'src/flags.generated.ts', sdkMajor: 9 } as const;
 const ctx = { generatorVersion: '0.3.0' };
@@ -25,7 +10,7 @@ describe('ts-server emitter', () => {
   it('emits a Flags class and FlagKeys for boolean flags', () => {
     const model: FlagModel = {
       projectKey: 'my-project',
-      flags: [boolFlag('checkout-v2'), boolFlag('dark_mode')],
+      flags: [modelFlag('checkout-v2'), modelFlag('dark_mode')],
     };
     const files = tsServerEmitter.emit(model, cfg, ctx);
     expect(files).toEqual([
@@ -91,9 +76,9 @@ export const FlagKeys = {
     const model: FlagModel = {
       projectKey: 'my-project',
       flags: [
-        { ...boolFlag('checkout-config'), kind: 'json' },
-        { ...boolFlag('max-items'), kind: 'number', numberType: 'int' },
-        { ...boolFlag('pricing-tier'), kind: 'string' },
+        { ...modelFlag('checkout-config'), kind: 'json' },
+        { ...modelFlag('max-items'), kind: 'number', numberType: 'int' },
+        { ...modelFlag('pricing-tier'), kind: 'string' },
       ],
     };
     const [file] = tsServerEmitter.emit(model, cfg, ctx);
@@ -165,7 +150,7 @@ export const FlagKeys = {
     }
 
     it('documents each method with name, description, key, tags, maintainer and UI link', () => {
-      const flag = boolFlag('checkout-v2', {
+      const flag = modelFlag('checkout-v2', {
         name: 'Checkout V2',
         description: 'Routes eligible users to the rewritten checkout flow.',
         tags: ['checkout', 'q3'],
@@ -207,12 +192,12 @@ export const FlagKeys = {
     }
 
     it('shows a team maintainer as "team <name>"', () => {
-      const flag = boolFlag('checkout-v2', { maintainer: { kind: 'team', key: 'payments', name: 'Payments' } });
+      const flag = modelFlag('checkout-v2', { maintainer: { kind: 'team', key: 'payments', name: 'Payments' } });
       expect(firstDoc(flag)).toContain(' * key: `checkout-v2` · maintainer: team Payments\n');
     });
 
     it('escapes */ in the name and description', () => {
-      const flag = boolFlag('a', { name: 'Glob */ name', description: 'Matches src/**/*.ts */ and more' });
+      const flag = modelFlag('a', { name: 'Glob */ name', description: 'Matches src/**/*.ts */ and more' });
       expect(firstDoc(flag)).toBe(`  /**
    * Glob *\\/ name
    *
@@ -225,7 +210,7 @@ export const FlagKeys = {
     });
 
     it('writes each line of a multi-line description as its own comment line', () => {
-      const flag = boolFlag('a', { name: 'A', description: 'First line.\n\nSecond paragraph.' });
+      const flag = modelFlag('a', { name: 'A', description: 'First line.\n\nSecond paragraph.' });
       expect(firstDoc(flag)).toBe(`  /**
    * A
    *
@@ -247,7 +232,7 @@ export const FlagKeys = {
 
     it('marks the method, its Detail variant and its FlagKeys entry @deprecated with the message', () => {
       const text = emitOne(
-        boolFlag('old-checkout', { name: 'Old checkout', deprecated: true, deprecationMessage: 'Use checkout-v2.' }),
+        modelFlag('old-checkout', { name: 'Old checkout', deprecated: true, deprecationMessage: 'Use checkout-v2.' }),
       );
       expect(text).toContain(`   * https://app.launchdarkly.com/projects/my-project/flags/old-checkout
    *
@@ -265,19 +250,19 @@ export const FlagKeys = {
     });
 
     it('uses a generic message naming the flag, with no date, when there is no message', () => {
-      const text = emitOne(boolFlag('old-checkout', { name: 'Old checkout', deprecated: true }));
+      const text = emitOne(modelFlag('old-checkout', { name: 'Old checkout', deprecated: true }));
       expect(text).toContain('   * @deprecated The `old-checkout` flag is deprecated.\n');
       expect(text).toContain('  /** @deprecated The `old-checkout` flag is deprecated. */\n');
       expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     });
 
     it('escapes */ in the deprecation message', () => {
-      const text = emitOne(boolFlag('a', { deprecated: true, deprecationMessage: 'see */ docs' }));
+      const text = emitOne(modelFlag('a', { deprecated: true, deprecationMessage: 'see */ docs' }));
       expect(text).toContain('  /** @deprecated see *\\/ docs */\n');
     });
 
     it('adds no @deprecated to flags that are not deprecated', () => {
-      expect(emitOne(boolFlag('a'))).not.toContain('@deprecated');
+      expect(emitOne(modelFlag('a'))).not.toContain('@deprecated');
     });
   });
 });

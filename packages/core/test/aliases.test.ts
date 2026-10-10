@@ -1,30 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CodegenError, normalize, type ApiFlag, type Snapshot } from '../src/index.js';
-
-function flagWithProperties(customProperties: ApiFlag['customProperties']): ApiFlag {
-  return {
-    key: 'my-flag',
-    name: 'My flag',
-    kind: 'boolean',
-    variations: [{ value: true }, { value: false }],
-    archived: false,
-    deprecated: false,
-    tags: [],
-    ...(customProperties ? { customProperties } : {}),
-  };
-}
-
-function snapshot(flag: ApiFlag): Snapshot {
-  return {
-    snapshotVersion: 1,
-    projectKey: 'my-project',
-    baseUri: 'https://app.launchdarkly.com',
-    flagPages: [{ items: [flag] }],
-  };
-}
+import { CodegenError, normalize, type ApiFlag } from '../src/index.js';
+import { apiFlag, snapshotOf } from './builders.js';
 
 function aliasesOf(customProperties: ApiFlag['customProperties']) {
-  return normalize(snapshot(flagWithProperties(customProperties))).flags[0]?.aliases;
+  return normalize(snapshotOf([apiFlag('my-flag', customProperties ? { customProperties } : {})])).flags[0]?.aliases;
 }
 
 describe('aliases from codegen.name custom properties', () => {

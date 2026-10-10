@@ -6,20 +6,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
+import { generatedKeys, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
 
 // Unfiltered: checkout-v2 [checkout, q3], beta.dark_mode [], AllowGuestCheckout [checkout]
 // (and legacy-search, which is archived).
 const unfiltered = join(SNAPSHOTS_DIR, 'boolean-flags.json');
 const target = { id: 'ts-server', out: 'flags.ts', sdkMajor: 9 };
 const ALL_KEYS = ['AllowGuestCheckout', 'beta.dark_mode', 'checkout-v2'];
-
-/** Flag keys in the generated `FlagKeys` object, sorted. */
-async function generatedKeys(dir: string): Promise<string[]> {
-  const text = await readFile(join(dir, 'flags.ts'), 'utf8');
-  const block = text.slice(text.indexOf('FlagKeys'));
-  return [...block.matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]!).sort();
-}
 
 async function generate(config: object, args: string[] = [], env: Record<string, string> = {}) {
   const dir = await projectDir({ project: 'my-project', targets: [target], ...config });

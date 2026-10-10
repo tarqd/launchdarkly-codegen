@@ -1,6 +1,8 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import type { ApiFlag } from '@launchtarqly/core';
+import { snapshotOf } from '../../core/test/builders.js';
 import { run, type RunIO } from '../src/index.js';
 
 export const REPO_ROOT = resolve(import.meta.dirname, '../../..');
@@ -16,6 +18,20 @@ export async function projectDir(config: unknown, filename = 'launchdarkly-codeg
   const text = typeof config === 'string' ? config : JSON.stringify(config, null, 2);
   await writeFile(join(dir, filename), text);
   return dir;
+}
+
+/** Writes `snapshot.json` in `dir`: a `my-project` snapshot with one page of `items`. Returns its path. */
+export async function writeSnapshot(dir: string, items: ApiFlag[]): Promise<string> {
+  const path = join(dir, 'snapshot.json');
+  await writeFile(path, JSON.stringify(snapshotOf(items)));
+  return path;
+}
+
+/** Flag keys in the `FlagKeys` object of the ts-server file `dir/file`, sorted. */
+export async function generatedKeys(dir: string, file = 'flags.ts'): Promise<string[]> {
+  const text = await readFile(join(dir, file), 'utf8');
+  const block = text.slice(text.indexOf('FlagKeys'));
+  return [...block.matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]!).sort();
 }
 
 export interface CliResult {

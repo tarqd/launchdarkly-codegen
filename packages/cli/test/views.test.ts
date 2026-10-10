@@ -6,22 +6,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
+import { jsonResponse } from '../../core/test/builders.js';
+import { generatedKeys, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
 
 // Flags: checkout-v2, beta.dark_mode, AllowGuestCheckout (and legacy-search, archived).
 const unfiltered = join(SNAPSHOTS_DIR, 'boolean-flags.json');
 const target = { id: 'ts-server', out: 'flags.ts', sdkMajor: 9 };
 const VIEWS_PATH = '/api/v2/projects/my-project/views/';
-
-/** Flag keys in the generated `FlagKeys` object, sorted. */
-async function generatedKeys(dir: string): Promise<string[]> {
-  const text = await readFile(join(dir, 'flags.ts'), 'utf8');
-  const block = text.slice(text.indexOf('FlagKeys'));
-  return [...block.matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]!).sort();
-}
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 /**
  * A fake LaunchDarkly API: the flags list from boolean-flags.json and, for
@@ -36,13 +27,13 @@ async function fakeApi(views: Record<string, string[]>) {
     const apiVersion = new Headers(init?.headers).get('LD-API-Version');
     requests.push({ url, apiVersion });
     const offset = Number(url.searchParams.get('offset') ?? 0);
-    if (!url.pathname.startsWith(VIEWS_PATH)) return json(pages[offset / 2]);
+    if (!url.pathname.startsWith(VIEWS_PATH)) return jsonResponse(pages[offset / 2]);
     if (apiVersion !== 'beta') {
-      return json({ code: 'forbidden', message: 'This API is in beta. To use it, your request must include the header `LD-API-Version: beta`.' }, 403);
+      return jsonResponse({ code: 'forbidden', message: 'This API is in beta. To use it, your request must include the header `LD-API-Version: beta`.' }, 403);
     }
     const viewKey = decodeURIComponent(url.pathname.slice(VIEWS_PATH.length).split('/')[0]!);
     const members = views[viewKey];
-    if (members === undefined) return json({ code: 'not_found', message: 'View not found' }, 404);
+    if (members === undefined) return jsonResponse({ code: 'not_found', message: 'View not found' }, 404);
     const base = `${url.pathname}?limit=2`;
     const _links: Record<string, { href: string; type: string }> = {
       self: { href: offset ? `${base}&offset=${offset}` : base, type: 'application/json' },
@@ -54,7 +45,7 @@ async function fakeApi(views: Record<string, string[]>) {
       resourceKey,
       resourceType: 'flag',
     }));
-    return json({ _links, items, totalCount: members.length });
+    return jsonResponse({ _links, items, totalCount: members.length });
   };
   return { fetch, requests };
 }
@@ -118,7 +109,7 @@ describe('view on a live fetch', () => {
 
   it('exits 2 when the account has no access to views (403)', async () => {
     const dir = await projectDir({ project: 'my-project', targets: [target] });
-    const fetch = async () => json({ code: 'forbidden', message: 'Access to the requested resource was denied' }, 403);
+    const fetch = async () => jsonResponse({ code: 'forbidden', message: 'Access to the requested resource was denied' }, 403);
     const result = await runCli(['generate', '--view', 'payments'], dir, { env: ENV, fetch });
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toMatch(/views are not available for project `my-project`.*Enterprise/);

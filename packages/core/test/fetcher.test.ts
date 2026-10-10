@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CodegenError, fetchSnapshot, normalize, type ApiFlag, type FetchDeps } from '../src/index.js';
+import { CodegenError, fetchSnapshot, normalize, type FetchDeps } from '../src/index.js';
+import { apiFlag, BASE_URI, jsonResponse } from './builders.js';
 
-const BASE = 'https://app.launchdarkly.com';
-
-function flag(key: string): ApiFlag {
-  return {
-    key,
-    name: key,
-    kind: 'boolean',
-    variations: [{ value: true }, { value: false }],
-    archived: false,
-    deprecated: false,
-    tags: [],
-  };
-}
+const BASE = BASE_URI;
 
 /** A response body shaped like `GET /api/v2/flags/{projectKey}` (LD-API-Version 20240415). */
 function page(keys: string[], next?: string) {
@@ -21,14 +10,7 @@ function page(keys: string[], next?: string) {
     self: { href: '/api/v2/flags/my-project?limit=100&sort=key', type: 'application/json' },
   };
   if (next) links.next = { href: next, type: 'application/json' };
-  return { items: keys.map(flag), totalCount: 3, _links: links };
-}
-
-function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json', ...headers },
-  });
+  return { items: keys.map((key) => apiFlag(key)), totalCount: 3, _links: links };
 }
 
 /** A fake transport that replays `responses` in order and records each request. */
@@ -56,7 +38,7 @@ const request = { projectKey: 'my-project', baseUri: BASE, accessToken: 'api-123
 
 describe('fetchSnapshot', () => {
   it('lists flags with the pinned API version, limit=100 sorted by key, and the token', async () => {
-    const api = fakeApi(json(page(['a', 'b'])));
+    const api = fakeApi(jsonResponse(page(['a', 'b'])));
     const snapshot = await fetchSnapshot(request, api.deps);
 
     expect(api.requests).toHaveLength(1);
@@ -78,7 +60,7 @@ describe('fetchSnapshot', () => {
     const p1 = page(['a', 'b'], '/api/v2/flags/my-project?limit=100&offset=100&sort=key');
     const p2 = page(['c', 'd'], `${BASE}/api/v2/flags/my-project?limit=100&offset=200&sort=key`);
     const p3 = page(['e']);
-    const api = fakeApi(json(p1), json(p2), json(p3));
+    const api = fakeApi(jsonResponse(p1), jsonResponse(p2), jsonResponse(p3));
     const snapshot = await fetchSnapshot(request, api.deps);
 
     expect(snapshot.flagPages).toEqual([p1, p2, p3]);
@@ -95,7 +77,7 @@ describe('fetchSnapshot', () => {
     // Offset paging repeats a flag when one is created mid-fetch.
     const p1 = page(['a', 'b'], '/api/v2/flags/my-project?limit=100&offset=100&sort=key');
     const p2 = page(['b', 'c']);
-    const snapshot = await fetchSnapshot(request, fakeApi(json(p1), json(p2)).deps);
+    const snapshot = await fetchSnapshot(request, fakeApi(jsonResponse(p1), jsonResponse(p2)).deps);
 
     expect(snapshot.flagPages).toEqual([p1, p2]);
     expect(normalize(snapshot).flags.map((f) => f.key)).toEqual(['a', 'b', 'c']);
@@ -104,11 +86,11 @@ describe('fetchSnapshot', () => {
   describe('on 429', () => {
     const NOW = 1_700_000_000_000;
     const limited = (headers: Record<string, string> = {}) =>
-      json({ code: 'rate_limited', message: "You've exceeded the API rate limit. Try again later." }, 429, headers);
+      jsonResponse({ code: 'rate_limited', message: "You've exceeded the API rate limit. Try again later." }, 429, headers);
 
     // Jitter is random() * 1s; the fake random() is 0.5, so every wait has +500ms.
     it('waits Retry-After seconds, plus jitter, then retries', async () => {
-      const api = fakeApi(limited({ 'Retry-After': '3', 'X-Ratelimit-Reset': String(NOW + 9000) }), json(page(['a'])));
+      const api = fakeApi(limited({ 'Retry-After': '3', 'X-Ratelimit-Reset': String(NOW + 9000) }), jsonResponse(page(['a'])));
       const snapshot = await fetchSnapshot(request, api.deps);
       expect(api.sleeps).toEqual([3500]);
       expect(api.requests).toHaveLength(2);
@@ -120,14 +102,14 @@ describe('fetchSnapshot', () => {
         limited({ 'X-Ratelimit-Reset': String(NOW + 2000), 'X-Ratelimit-Auth-Token-Reset': String(NOW + 4000) }),
         limited({ 'X-Ratelimit-Auth-Token-Reset': String(NOW + 1000) }),
         limited({ 'X-Ratelimit-Reset': String(NOW - 5000) }), // clock skew: already past
-        json(page(['a'])),
+        jsonResponse(page(['a'])),
       );
       await fetchSnapshot(request, api.deps);
       expect(api.sleeps).toEqual([4500, 1500, 500]);
     });
 
     it('otherwise backs off exponentially from 1s', async () => {
-      const api = fakeApi(limited(), limited(), limited(), json(page(['a'])));
+      const api = fakeApi(limited(), limited(), limited(), jsonResponse(page(['a'])));
       await fetchSnapshot(request, api.deps);
       expect(api.sleeps).toEqual([1500, 2500, 4500]);
     });
@@ -145,7 +127,7 @@ describe('fetchSnapshot', () => {
   });
 
   it('turns an API error into an exit-2 error with the status, code and message', async () => {
-    const api = fakeApi(json({ code: 'not_found', message: 'Invalid resource identifier' }, 404));
+    const api = fakeApi(jsonResponse({ code: 'not_found', message: 'Invalid resource identifier' }, 404));
     const err = await fetchSnapshot(request, api.deps).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CodegenError);
     expect((err as CodegenError).message).toContain('/api/v2/flags/my-project');
@@ -161,14 +143,14 @@ describe('fetchSnapshot', () => {
   });
 
   it('never puts the access token in an error message', async () => {
-    const api = fakeApi(json({ code: 'unauthorized', message: 'Invalid access token' }, 401));
+    const api = fakeApi(jsonResponse({ code: 'unauthorized', message: 'Invalid access token' }, 401));
     const err = (await fetchSnapshot(request, api.deps).catch((e: unknown) => e)) as Error;
     expect(err.message).toContain('401');
     expect(err.message).not.toContain('api-123');
   });
 
   it('accepts a base URI with a trailing slash or a path-less EU instance', async () => {
-    const api = fakeApi(json(page(['a'])));
+    const api = fakeApi(jsonResponse(page(['a'])));
     await fetchSnapshot({ ...request, baseUri: 'https://app.eu.launchdarkly.com/' }, api.deps);
     expect(api.requests[0]!.url.href).toMatch(/^https:\/\/app\.eu\.launchdarkly\.com\/api\/v2\/flags\/my-project\?/);
   });
@@ -176,7 +158,7 @@ describe('fetchSnapshot', () => {
 
 describe('fetchSnapshot with a tag filter', () => {
   it('sends filter=tags:a+b with the + percent-encoded, and records the tags in the snapshot', async () => {
-    const api = fakeApi(json(page(['a'])));
+    const api = fakeApi(jsonResponse(page(['a'])));
     const snapshot = await fetchSnapshot({ ...request, tags: ['checkout', 'billing'] }, api.deps);
 
     const { url } = api.requests[0]!;
@@ -187,7 +169,7 @@ describe('fetchSnapshot with a tag filter', () => {
   });
 
   it('sends no filter and records no tags when none are configured', async () => {
-    const api = fakeApi(json(page(['a'])));
+    const api = fakeApi(jsonResponse(page(['a'])));
     const snapshot = await fetchSnapshot({ ...request, tags: [] }, api.deps);
     expect(api.requests[0]!.url.searchParams.has('filter')).toBe(false);
     expect(snapshot).not.toHaveProperty('tags');
@@ -224,7 +206,7 @@ describe('fetchSnapshot with a view', () => {
   const viewRequest = { ...request, view: 'payments' };
 
   it('lists the view members with LD-API-Version: beta, then the flags list, and records both', async () => {
-    const api = fakeApi(json(viewPage(['b', 'a'])), json(page(['a', 'b', 'c'])));
+    const api = fakeApi(jsonResponse(viewPage(['b', 'a'])), jsonResponse(page(['a', 'b', 'c'])));
     const snapshot = await fetchSnapshot(viewRequest, api.deps);
 
     const [members, flags] = api.requests;
@@ -244,10 +226,10 @@ describe('fetchSnapshot with a view', () => {
 
   it('pages the members by _links.next', async () => {
     const api = fakeApi(
-      json(viewPage(['a', 'b'], { limit: 2, total: 5 })),
-      json(viewPage(['c', 'd'], { offset: 2, limit: 2, total: 5 })),
-      json(viewPage(['e'], { offset: 4, limit: 2, total: 5 })),
-      json(page(['a'])),
+      jsonResponse(viewPage(['a', 'b'], { limit: 2, total: 5 })),
+      jsonResponse(viewPage(['c', 'd'], { offset: 2, limit: 2, total: 5 })),
+      jsonResponse(viewPage(['e'], { offset: 4, limit: 2, total: 5 })),
+      jsonResponse(page(['a'])),
     );
     const snapshot = await fetchSnapshot(viewRequest, api.deps);
     expect(api.requests.slice(0, 3).map((r) => r.url.searchParams.get('offset'))).toEqual([null, '2', '4']);
@@ -258,7 +240,7 @@ describe('fetchSnapshot with a view', () => {
   it('stops paging the members once totalCount is reached, even if _links.next is present', async () => {
     const full = viewPage(['a', 'b'], { limit: 2, total: 2 });
     full._links.next = { href: '/api/v2/projects/my-project/views/payments/linked/flags?limit=2&offset=2', type: 'application/json' };
-    const api = fakeApi(json(full), json(page(['a'])));
+    const api = fakeApi(jsonResponse(full), jsonResponse(page(['a'])));
     const snapshot = await fetchSnapshot(viewRequest, api.deps);
     expect(api.requests).toHaveLength(2);
     expect(snapshot.view?.memberKeys).toEqual(['a', 'b']);
@@ -267,7 +249,7 @@ describe('fetchSnapshot with a view', () => {
   it('stops paging the members on an empty page', async () => {
     const empty = viewPage([], { offset: 2, limit: 2, total: 9 });
     empty._links.next = { href: '/api/v2/projects/my-project/views/payments/linked/flags?limit=2&offset=4', type: 'application/json' };
-    const api = fakeApi(json(viewPage(['a', 'b'], { limit: 2, total: 9 })), json(empty), json(page(['a'])));
+    const api = fakeApi(jsonResponse(viewPage(['a', 'b'], { limit: 2, total: 9 })), jsonResponse(empty), jsonResponse(page(['a'])));
     const snapshot = await fetchSnapshot(viewRequest, api.deps);
     expect(api.requests).toHaveLength(3);
     expect(snapshot.view?.memberKeys).toEqual(['a', 'b']);
@@ -282,18 +264,18 @@ describe('fetchSnapshot with a view', () => {
       totalCount: 2,
       newTopLevel: { x: 1 },
     };
-    const snapshot = await fetchSnapshot(viewRequest, fakeApi(json(body), json(page(['a']))).deps);
+    const snapshot = await fetchSnapshot(viewRequest, fakeApi(jsonResponse(body), jsonResponse(page(['a']))).deps);
     expect(snapshot.view).toEqual({ key: 'payments', memberKeys: ['a', 'b'] });
   });
 
   it('URL-encodes the view key and keeps its case', async () => {
-    const api = fakeApi(json(viewPage([])), json(page([])));
+    const api = fakeApi(jsonResponse(viewPage([])), jsonResponse(page([])));
     await fetchSnapshot({ ...request, view: 'Team A' }, api.deps);
     expect(api.requests[0]!.url.pathname).toBe('/api/v2/projects/my-project/views/Team%20A/linked/flags');
   });
 
   it('rejects a member item without a string resourceKey as exit 2', async () => {
-    const err = await fetchSnapshot(viewRequest, fakeApi(json({ items: [{ key: 'a' }], totalCount: 1 })).deps).catch(
+    const err = await fetchSnapshot(viewRequest, fakeApi(jsonResponse({ items: [{ key: 'a' }], totalCount: 1 })).deps).catch(
       (e: unknown) => e,
     );
     expect(err).toBeInstanceOf(CodegenError);
@@ -302,7 +284,7 @@ describe('fetchSnapshot with a view', () => {
 
   // Live, 2026-10-10: an unknown view key returns 404 {"code":"not_found","message":"View not found"}.
   it('turns 404 View not found into an exit-2 error naming the view and project', async () => {
-    const api = fakeApi(json({ code: 'not_found', message: 'View not found' }, 404));
+    const api = fakeApi(jsonResponse({ code: 'not_found', message: 'View not found' }, 404));
     const err = await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CodegenError);
     expect((err as CodegenError).exitCode).toBe(2);
@@ -315,7 +297,7 @@ describe('fetchSnapshot with a view', () => {
 
   // An account without views was not verifiable live; a 403 means views are not available.
   it('turns a 403 into an exit-2 error saying views need an Enterprise plan', async () => {
-    const api = fakeApi(json({ code: 'forbidden', message: 'Access to the requested resource was denied' }, 403));
+    const api = fakeApi(jsonResponse({ code: 'forbidden', message: 'Access to the requested resource was denied' }, 403));
     const err = await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CodegenError);
     expect((err as CodegenError).exitCode).toBe(2);
@@ -325,7 +307,7 @@ describe('fetchSnapshot with a view', () => {
   });
 
   it('keeps the generic error for a 404 that is not about the view (unknown project)', async () => {
-    const api = fakeApi(json({ code: 'not_found', message: 'Project not found' }, 404));
+    const api = fakeApi(jsonResponse({ code: 'not_found', message: 'Project not found' }, 404));
     const err = (await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e)) as Error;
     expect(err).toBeInstanceOf(CodegenError);
     expect(err.message).toContain('404');
