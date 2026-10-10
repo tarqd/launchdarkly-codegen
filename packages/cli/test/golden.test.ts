@@ -8,7 +8,10 @@ import { basename, dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GOLDEN_DIR, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
 
-const TARGETS = [{ id: 'ts-server', ext: '.ts', extra: { sdkMajor: 9 } }];
+const TARGETS = [
+  { id: 'ts-server', ext: '.ts', extra: { sdkMajor: 9 } },
+  { id: 'go', ext: '.go', extra: { sdkMajor: 7, package: 'ldflags' } },
+];
 
 const snapshots = (await readdir(SNAPSHOTS_DIR)).filter((f) => f.endsWith('.json')).sort();
 

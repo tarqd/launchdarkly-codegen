@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lowerCamel } from '../src/index.js';
+import { lowerCamel, upperCamel } from '../src/index.js';
 
 describe('lowerCamel', () => {
   it('converts the DESIGN.md example key', () => {
@@ -36,5 +36,20 @@ describe('lowerCamel', () => {
 
   it('drops characters that are not letters or digits without splitting', () => {
     expect(lowerCamel('enable:new+flow@v2')).toBe('enablenewflowv2');
+  });
+});
+
+describe('upperCamel', () => {
+  it('converts the DESIGN.md example key', () => {
+    expect(upperCamel('checkout-v2.new_flow')).toBe('CheckoutV2NewFlow');
+  });
+
+  it('capitalizes every word, lowercasing the rest', () => {
+    expect(upperCamel('BETA_FEATURE')).toBe('BetaFeature');
+    expect(upperCamel('beta.dark_mode')).toBe('BetaDarkMode');
+  });
+
+  it('keeps a leading digit, for the identifier check to reject', () => {
+    expect(upperCamel('2fa-enabled')).toBe('2faEnabled');
   });
 });

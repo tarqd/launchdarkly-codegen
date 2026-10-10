@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/emit-ts-server" },
+    { "path": "packages/emit-go" },
     { "path": "packages/cli" }
   ]
 }
