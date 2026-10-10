@@ -152,6 +152,45 @@ describe('--target', () => {
   });
 });
 
+describe('go target', () => {
+  const goTarget = { id: 'go', out: 'internal/ldflags/flags_gen.go', sdkMajor: 7, package: 'ldflags' };
+  const withGo = (extra: Record<string, unknown>) => ({ ...minimal, targets: [{ ...goTarget, ...extra }] });
+
+  it('generates one Go file at out that imports only go-sdk-common', async () => {
+    const dir = await projectDir(withGo({}));
+    const result = await generate(dir);
+    expect(result.stderr).toBe('');
+    expect(result.exitCode).toBe(0);
+    const text = await readFile(join(dir, 'internal/ldflags/flags_gen.go'), 'utf8');
+    expect(text).toContain('\npackage ldflags\n');
+    const imports = text.slice(text.indexOf('import ('), text.indexOf(')\n', text.indexOf('import (')));
+    expect([...imports.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual([
+      'context',
+      'github.com/launchdarkly/go-sdk-common/v3/ldcontext',
+      'github.com/launchdarkly/go-sdk-common/v3/ldreason',
+      'github.com/launchdarkly/go-sdk-common/v3/ldvalue',
+    ]);
+  });
+
+  it.each([
+    ['a missing package', { package: undefined }, 'package'],
+    ['a package that is a Go keyword', { package: 'func' }, 'package'],
+    ['an out that is not a .go file', { out: 'internal/ldflags/' }, 'out'],
+  ])('exits 2 on %s, naming the key', async (_name, extra, key) => {
+    const dir = await projectDir(withGo(extra));
+    const result = await generate(dir);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(new RegExp(`\\b${key}\\b`));
+  });
+
+  it('rejects an sdkMajor other than 7', async () => {
+    const dir = await projectDir(withGo({ sdkMajor: 6 }));
+    const result = await generate(dir);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain('sdkMajor');
+  });
+});
+
 describe('access token', () => {
   it('comes from LD_ACCESS_TOKEN or --access-token, CLI first', async () => {
     const cwd = await projectDir(minimal);
