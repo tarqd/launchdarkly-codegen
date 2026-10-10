@@ -57,8 +57,6 @@ jobs:
           cache: maven
           cache-dependency-path: fixtures/compile/java/pom.xml
       - run: pnpm install --frozen-lockfile
-      # Select by package path, not -t: test names are matched as substrings,
-      # so -t go would also pick up "java golden output…" (golden).
       - run: pnpm test:compile 'packages/emit-${{ matrix.target }}/'
 
   # Packs @launchtarqly/codegen, installs the tarball into a scratch project

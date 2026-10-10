@@ -13,6 +13,18 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## When `gh` GraphQL is blocked
+
+Claude Code cloud sessions block GitHub's GraphQL API, so `gh issue view`, `gh issue list`, `gh issue create`, `gh pr view` and `gh pr edit` fail there with HTTP 403. The REST API through `gh api` still works:
+
+- **Read an issue**: `gh api repos/{owner}/{repo}/issues/<n> --jq '{title, body, state, labels: [.labels[].name]}'`, with comments from `gh api repos/{owner}/{repo}/issues/<n>/comments --jq '.[].body'`.
+- **List issues**: `gh api 'repos/{owner}/{repo}/issues?state=open&per_page=50'`. The result includes PRs, which you can drop with `select(.pull_request == null)`.
+- **Create an issue**: `gh api repos/{owner}/{repo}/issues -f title="..." -F body=@body.md -f 'labels[]=needs-triage'`.
+- **Comment**: `gh api repos/{owner}/{repo}/issues/<n>/comments -F body=@comment.md`.
+- **Close**: `gh api -X PATCH repos/{owner}/{repo}/issues/<n> -f state=closed -f state_reason=completed`.
+- **Blockers**: `gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocked_by`.
+- **PRs**: `gh api repos/{owner}/{repo}/pulls?head={owner}:<branch>` finds a branch's PR, and `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -F body=@pr.md` edits one.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
