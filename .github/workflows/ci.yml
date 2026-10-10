@@ -49,7 +49,7 @@ jobs:
       - if: matrix.target == 'go'
         run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:compile -t '${{ matrix.target }}'
+      - run: pnpm test:compile 'packages/emit-${{ matrix.target }}/'
 
   # Packs @launchtarqly/codegen, installs the tarball into a scratch project
   # with npm, and runs its bin (`generate`, then `check`) on a fixture snapshot.
