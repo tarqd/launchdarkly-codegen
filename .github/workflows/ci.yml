@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ts-server, java]
+        target: [ts-server, dotnet, java]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,6 +36,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        if: matrix.target == 'dotnet'
+        with:
+          dotnet-version: 8.0.x
       # JDK 21 runs javac (--release 8), javadoc and google-java-format; the runner ships mvn.
       - if: matrix.target == 'java'
         uses: actions/setup-java@v4

@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@launchtarqly/core": "workspace:*",
+    "@launchtarqly/emit-dotnet": "workspace:*",
     "@launchtarqly/emit-java": "workspace:*",
     "@launchtarqly/emit-ts-server": "workspace:*",
     "esbuild": "0.28.2",

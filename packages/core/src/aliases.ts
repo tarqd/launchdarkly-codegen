@@ -7,7 +7,7 @@ import type { Flag, TargetId } from './model.js';
 import { singlePropertyValue } from './properties.js';
 import type { ApiFlag } from './snapshot.js';
 
-export const TARGET_IDS: readonly TargetId[] = ['ts-server', 'ts-browser', 'go', 'java'];
+export const TARGET_IDS: readonly TargetId[] = ['ts-server', 'ts-browser', 'go', 'java', 'dotnet'];
 
 const NAME_PROPERTY = 'codegen.name';
 

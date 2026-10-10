@@ -6,13 +6,13 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: implemented for `core` and the `ts-server` and `java` targets
-(`packages/core`, `emit-ts-server`, `emit-java`). `core` and `ts-server` have
-no open decisions left; the shared design (flag model, naming, emitter
-interface) has been checked against Go and Java with a compiling prototype. The full emitter specs for
-`go` and `ts-browser` are later work. Facts that
-could not be confirmed from a primary source are listed at the end, to be
-checked during implementation.
+Status: `core` and three targets, `ts-server`, `dotnet` and `java`, are
+built. The `go` target is fully specified below but not built yet;
+`ts-browser` has an outline, and its full spec is later work. Before any
+target past `ts-server` was specified, the shared design (flag model, naming,
+emitter interface) was checked against Go and Java with compiling prototypes.
+Facts from research that still lack a primary-source check are listed under To
+verify during implementation.
 
 ## Goals
 
@@ -274,11 +274,14 @@ suggesting `codegen.name.<target>`:
   match `^\p{Lu}[\p{L}\p{Nd}_]*$`: an exported name must start with an
   upper-case letter, so an alias like `checkout` or `日本` is an error. C#
   keywords are all lowercase too, so .NET checks its own names (`Flags`,
-  `FlagKeys`; a member can't share its class's name, CS0542) and the
-  `System.Object` members (`Equals`, `GetHashCode`, `ToString`, `GetType`,
-  `MemberwiseClone`, `Finalize`, `ReferenceEquals`). An alias, which can be
-  in any case, is also checked against the C# keywords. The generator never
-  escapes a name with `@`.
+  `FlagKeys`, since a member can't share its class's name, CS0542; and the
+  wrapper's private field `_client`) and the `System.Object` members
+  (`Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`,
+  `Finalize`, `ReferenceEquals`). An alias, which can be in any case, is also
+  checked against the C# keywords, and must be a C# identifier, so Unicode
+  letters are allowed (`日本` is a valid .NET alias; the compile test builds
+  one). A C# keyword and a `System.Object` member fail with the same "is a
+  reserved word" error. The generator never escapes a name with `@`.
 - **Collision.** The check covers every identifier a target emits: flag
   methods, their `Detail` variants (and Go's `Ctx` variants), and key
   constants. For example, flag `checkout`'s detail method and a flag named
@@ -305,7 +308,8 @@ interface EmitContext {
 `sdkMajors` is the one place a target's supported SDK majors are listed;
 config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
 one. `summarizeChanges` is optional and only used by `check`: it reads the
-file on disk and the new output back into flags (key, identifier, kind) and
+file on disk and the new output back into flags (key, identifier, kind, and
+for a number flag the `int` or `double` type when the output shows it) and
 returns the one-line summary from core's `summarizeFlagChanges`, or
 `undefined` when the old file can't be read back, in which case `check`
 prints the diff alone. Only the emitter knows its own output format, so the
@@ -1004,9 +1008,10 @@ reads that constant (`Keys.X`) gives the identifier, its name as for
 ts-server (the CONSTANT_CASE name is lossy: aliases `apiUrlId` and
 `apiURLId` both give `API_URL_ID`, so a rename between them must still show
 as `renamed`), and the kind, its return type: `boolean`, `String`, `double`,
-`int` or `LDValue`, each only with its own SDK method. `int` and `double` are reported as separate
-kinds, so switching `codegen.number` shows as `changed kind (k: double →
-int)`. A file with no `Keys` class, anything but string constants in it, or a
+`int` or `LDValue`, each only with its own SDK method. `int` and `double`
+are read back as a number flag with that number type, as for dotnet, so
+switching `codegen.number` shows as `changed kind (k: number (double) →
+number (int))`. A file with no `Keys` class, anything but string constants in it, or a
 constant no primary method reads gives no summary, and `check` prints the
 diff alone.
 
@@ -1058,9 +1063,10 @@ warning.
 
 Target options:
 
-- `namespace` (required): dotted C# identifiers, none of them a keyword. A
-  last segment of `Flags` or `FlagKeys` is rejected (exit 2), because code in
-  the parent namespace would then resolve `Flags` to the namespace (CS0118).
+- `namespace` (required): dotted C# identifiers (Unicode letters allowed),
+  none of them a keyword. A last segment of `Flags` or `FlagKeys` is rejected
+  (exit 2), because code in the parent namespace would then resolve `Flags` to
+  the namespace (CS0118).
 - `out` is the path of the one generated `.cs` file (for example
   `src/Billing/FeatureFlags/Flags.g.cs`); a value not ending in `.cs` is exit 2.
   The `.g.cs` suffix is recommended, not required, since the
@@ -1226,7 +1232,26 @@ namespace MyApp.FeatureFlags
 The full doc comment (name, description, trailer, link) sits on the main
 method, and a deprecated flag's adds a `<remarks>Deprecated: ...</remarks>`.
 The `Detail` method and the key constant get a one-line summary with a
-`<see cref>` to the main method, plus the same `[Obsolete]`.
+`<see cref>` to the main method, plus the same `[Obsolete]`. A description of
+several paragraphs (separated by blank lines) becomes one `<para>` per
+paragraph. Without a `deprecationMessage`, the `[Obsolete]` text is
+ts-server's generic one, ``The `<key>` flag is deprecated.`` (the backticks
+are literal). The `#if NET5_0_OR_GREATER` / `#else` / `#endif` lines sit at
+column 0 (C# convention), written with core's `Writer.directive`. The flag
+name and the `<remarks>` deprecation text go on one line, each run of
+new-lines (including U+0085, U+2028 and U+2029, which also end a `///`
+line) folded to a space. String literals escape `\`, `"`, `\n`, `\r` and
+`\t`, and write every other control character and U+2028/U+2029 as `\uXXXX`.
+Characters XML 1.0 forbids in a doc comment (most C0 controls) become U+FFFD.
+
+`check` reads a stale file back through `FlagKeys` (each constant's name and
+key) and the `_client.<Kind>Variation(FlagKeys.<Name>, …)` call in each main
+method (the kind). `IntVariation` and `DoubleVariation` read back as a number
+flag with its type, so switching a flag's `codegen.number` shows in the
+summary line as `changed kind (<key>: number (int) → number (double))`. A
+file whose `FlagKeys` holds anything besides doc comments, `#if` lines,
+attributes and `public const string` constants with a matching method gets
+the diff alone.
 
 The compile fixture `fixtures/compile/dotnet/` builds every golden file with
 `TreatWarningsAsErrors`, `AnalysisLevel=latest-all`, `AnalysisMode=All`,
@@ -1236,7 +1261,11 @@ The compile fixture `fixtures/compile/dotnet/` builds every golden file with
 pre-.NET 5 deprecation branch). `modern` also builds a copy with the
 `<auto-generated/>` line removed, so every analyzer still runs on the output,
 and the test asserts `dotnet format --verify-no-changes --include-generated`
-changes nothing. CI installs .NET 8 with `actions/setup-dotnet`.
+changes nothing. The test also builds one file it emits itself, rather than
+from a snapshot (every target runs every snapshot), with a Unicode namespace,
+`日本` and `Größe` aliases, and new-lines and control characters in the name,
+description and deprecation message. CI installs .NET 8 with
+`actions/setup-dotnet`.
 
 ### No runtime packages
 
@@ -1343,6 +1372,7 @@ packages/
   emit-ts-browser/
   emit-go/
   emit-java/
+  emit-dotnet/
 fixtures/
   snapshots/       recorded API responses used as inputs
   golden/<target>/ expected output per snapshot
@@ -1437,9 +1467,9 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`, `emit-dotnet`. `emit-java` has shipped: golden
-   output for every snapshot, the Maven compile fixture in CI, and `check`
-   summaries.
+3. `emit-go`, `emit-java`, `emit-dotnet`. `emit-dotnet` and `emit-java` have
+   shipped: golden output for every snapshot, a compile fixture in CI (dotnet
+   build, Maven), and `check` summaries.
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.

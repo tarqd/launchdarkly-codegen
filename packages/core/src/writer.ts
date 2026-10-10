@@ -41,6 +41,12 @@ export class Writer {
     return this;
   }
 
+  /** Appends one line at column 0 whatever the indentation, for preprocessor directives such as C#'s `#if`. */
+  directive(text: string): this {
+    this.lines.push(text);
+    return this;
+  }
+
   /** Runs `body` one indentation level deeper. */
   indent(body: () => void): this {
     this.depth++;

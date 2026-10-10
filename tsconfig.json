@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/emit-ts-server" },
+    { "path": "packages/emit-dotnet" },
     { "path": "packages/emit-java" },
     { "path": "packages/cli" }
   ]

@@ -9,7 +9,7 @@
  */
 
 import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
-import { JAVA_KINDS, type JavaKind, type JavaKindName } from './kinds.js';
+import { generatedKind, JAVA_KINDS, type JavaKind, type JavaKindName } from './kinds.js';
 
 /** Each primary method's return type, and the kind it is. */
 const BY_TYPE = new Map(
@@ -67,10 +67,10 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
   const keys = KEYS.exec(code);
   if (!keys) return undefined;
 
-  const readers = new Map<string, { identifier: string; kind: JavaKindName }>();
+  const readers = new Map<string, Omit<GeneratedFlag, 'key'>>();
   for (const [, type, identifier, call, constant] of code.matchAll(METHOD)) {
     const java = BY_TYPE.get(type!);
-    if (java !== undefined && java.method === call) readers.set(constant!, { identifier: identifier!, kind: java.kind });
+    if (java !== undefined && java.method === call) readers.set(constant!, { identifier: identifier!, ...generatedKind(java.kind) });
   }
 
   const body = keys[1]!;

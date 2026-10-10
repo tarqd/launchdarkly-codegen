@@ -14,6 +14,7 @@ import { GOLDEN_DIR, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
  */
 const TARGETS: { id: string; ext: string; extra: Record<string, unknown>; outFileName?: string }[] = [
   { id: 'ts-server', ext: '.ts', extra: { sdkMajor: 9 } },
+  { id: 'dotnet', ext: '.g.cs', extra: { sdkMajor: 8, namespace: 'MyApp.FeatureFlags' } },
   { id: 'java', ext: '.java', extra: { sdkMajor: 7, package: 'com.example.flags' }, outFileName: 'Flags.java' },
 ];
 

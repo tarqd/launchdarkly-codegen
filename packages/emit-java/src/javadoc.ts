@@ -5,7 +5,7 @@
  * 1.37.0 would (ADR 0004).
  */
 
-import { deprecationText, maintainerText, type Flag } from '@launchtarqly/core';
+import { deprecationText, maintainerLabel, type Flag } from '@launchtarqly/core';
 import { CONTINUATION, MAX_WIDTH } from './layout.js';
 
 /**
@@ -141,7 +141,7 @@ function descriptionParagraphs(description: string): string[] {
 function trailer(flag: Flag): string {
   const parts = [`key: {@code ${flag.key}}`];
   if (flag.tags.length > 0) parts.push(`tags: ${escapeJavadoc(flag.tags.join(', '))}`);
-  if (flag.maintainer) parts.push(`maintainer: ${escapeJavadoc(maintainerText(flag.maintainer))}`);
+  if (flag.maintainer) parts.push(`maintainer: ${escapeJavadoc(maintainerLabel(flag.maintainer))}`);
   return `${parts.join(' · ')}<br>\n${flag.uiUrl}`;
 }
 

@@ -23,7 +23,7 @@ describe('aliases from codegen.name custom properties', () => {
         'codegen.name': { name: 'Name', value: ['shared'] },
         'codegen.name.ts-server': { name: 'TS name', value: ['serverName'] },
       }),
-    ).toEqual({ 'ts-server': 'serverName', 'ts-browser': 'shared', go: 'shared', java: 'shared' });
+    ).toEqual({ 'ts-server': 'serverName', 'ts-browser': 'shared', go: 'shared', java: 'shared', dotnet: 'shared' });
   });
 
   it('treats an empty array as unset, so the fallback applies', () => {

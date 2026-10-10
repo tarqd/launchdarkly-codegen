@@ -5,10 +5,15 @@
  * emitter writes from this table and `check` reads back against it.
  */
 
-import type { Flag, GeneratedKind } from '@launchtarqly/core';
+import type { Flag, FlagKind, GeneratedFlag } from '@launchtarqly/core';
 
 /** The kinds a flag is emitted as: a number flag is always `int` or `double`. */
-export type JavaKindName = Exclude<GeneratedKind, 'number'>;
+export type JavaKindName = Exclude<FlagKind, 'number'> | 'int' | 'double';
+
+/** How `check` reports a java kind: `int` and `double` are number flags with that number type. */
+export function generatedKind(kind: JavaKindName): Pick<GeneratedFlag, 'kind' | 'numberType'> {
+  return kind === 'int' || kind === 'double' ? { kind: 'number', numberType: kind } : { kind };
+}
 
 export interface JavaKind {
   /** The value method's return type and the fallback's type. */

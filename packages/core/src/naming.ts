@@ -30,6 +30,11 @@ export function lowerCamel(key: string): string {
     .join('');
 }
 
+/** `checkout-v2.new_flow` → `CheckoutV2NewFlow`. Acronyms are ordinary words: `api-url` → `ApiUrl`. */
+export function upperCamel(key: string): string {
+  return splitWords(key).map(capitalize).join('');
+}
+
 /** `checkoutV2NewFlow` (or `checkout-v2.new_flow`) → `CHECKOUT_V2_NEW_FLOW` */
 export function constantCase(name: string): string {
   return splitWords(name)

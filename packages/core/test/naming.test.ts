@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { constantCase, lowerCamel } from '../src/index.js';
+import { constantCase, lowerCamel, upperCamel } from '../src/index.js';
 
 describe('lowerCamel', () => {
   it('converts the DESIGN.md example key', () => {
@@ -63,5 +63,24 @@ describe('constantCase', () => {
     expect(constantCase('apiUrlId')).toBe('API_URL_ID');
     expect(constantCase('apiURLId')).toBe('API_URL_ID');
     expect(constantCase('twoFactorEnabled')).toBe('TWO_FACTOR_ENABLED');
+  });
+});
+
+describe('upperCamel', () => {
+  it('capitalizes every word, including the first', () => {
+    expect(upperCamel('checkout-v2.new_flow')).toBe('CheckoutV2NewFlow');
+  });
+
+  it('treats acronyms as ordinary words, with no initialism table', () => {
+    expect(upperCamel('api-url-id')).toBe('ApiUrlId');
+    expect(upperCamel('HTTPServerTimeout')).toBe('HttpServerTimeout');
+  });
+
+  it('keeps a key that is already UpperCamel', () => {
+    expect(upperCamel('AllowGuestCheckout')).toBe('AllowGuestCheckout');
+  });
+
+  it('keeps a leading digit, for the identifier check to reject', () => {
+    expect(upperCamel('2fa-enabled')).toBe('2faEnabled');
   });
 });

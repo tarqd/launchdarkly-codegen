@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { normalize, parseSnapshot, type GeneratedFlag } from '@launchtarqly/core';
 import { parseJavaFlags, summarizeJavaChanges } from '../src/index.js';
 import { flagNames } from '../src/naming.js';
+import { generatedKind, javaKind } from '../src/kinds.js';
 
 const FIXTURES = resolve(import.meta.dirname, '../../../fixtures');
 const GOLDEN = join(FIXTURES, 'golden/java');
@@ -16,7 +17,7 @@ function snapshotFlags(name: string): GeneratedFlag[] {
   return model.flags.map((flag) => ({
     key: flag.key,
     identifier: names.get(flag)!.method,
-    kind: flag.kind === 'number' ? (flag.numberType ?? 'double') : flag.kind,
+    ...generatedKind(javaKind(flag)),
   }));
 }
 
@@ -34,7 +35,7 @@ const FLAG_KINDS = readFileSync(join(GOLDEN, 'flag-kinds.java'), 'utf8');
 describe('parseJavaFlags on hand-edited files', () => {
   it('reads a key with escaped characters', () => {
     const text = FLAG_KINDS.replace('SAMPLE_RATE = "sample-rate";', 'SAMPLE_RATE = "say \\"hi\\" \\\\o/";');
-    expect(parseJavaFlags(text)?.at(-1)).toEqual({ key: 'say "hi" \\o/', identifier: 'sampleRate', kind: 'double' });
+    expect(parseJavaFlags(text)?.at(-1)).toEqual({ key: 'say "hi" \\o/', identifier: 'sampleRate', kind: 'number', numberType: 'double' });
   });
 
   it('returns undefined for a file without Keys', () => {
@@ -75,7 +76,7 @@ describe('summarizeJavaChanges', () => {
       .replaceAll('BANNER_IDS', 'HERO_IDS')
       .replace('"banner-ids"', '"hero-ids"');
     expect(summarizeJavaChanges(FLAG_KINDS, next)).toBe(
-      'flags: 1 added (hero-ids), 1 removed (banner-ids), 1 renamed (pricing-tier: pricingTier → tier), 1 changed kind (max-cart-items: int → double)',
+      'flags: 1 added (hero-ids), 1 removed (banner-ids), 1 renamed (pricing-tier: pricingTier → tier), 1 changed kind (max-cart-items: number (int) → number (double))',
     );
   });
 
