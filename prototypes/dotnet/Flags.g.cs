@@ -72,7 +72,11 @@ namespace MyApp.FeatureFlags
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value for <paramref name="context"/>.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
         [System.Obsolete("Use cart-limits instead.")]
+#endif
         public double MaxCartItems(Context context, double fallback)
         {
             return _client.DoubleVariation(FlagKeys.MaxCartItems, context, fallback);
@@ -82,7 +86,11 @@ namespace MyApp.FeatureFlags
         /// <param name="context">The context to evaluate the flag for.</param>
         /// <param name="fallback">The value to use if the flag can't be evaluated.</param>
         /// <returns>The flag's value with the reason it was chosen.</returns>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
         [System.Obsolete("Use cart-limits instead.")]
+#endif
         public EvaluationDetail<double> MaxCartItemsDetail(Context context, double fallback)
         {
             return _client.DoubleVariationDetail(FlagKeys.MaxCartItems, context, fallback);
@@ -119,7 +127,11 @@ namespace MyApp.FeatureFlags
         public const string PricingTier = "pricing-tier";
 
         /// <summary>Key of the "Max Cart Items" flag.</summary>
+#if NET5_0_OR_GREATER
+        [System.Obsolete("Use cart-limits instead.", DiagnosticId = "LDFLAG001", UrlFormat = "https://app.launchdarkly.com/projects/my-project/flags/max-cart-items")]
+#else
         [System.Obsolete("Use cart-limits instead.")]
+#endif
         public const string MaxCartItems = "max-cart-items";
 
         /// <summary>Key of the "Checkout Config" flag.</summary>

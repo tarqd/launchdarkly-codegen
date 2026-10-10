@@ -18,11 +18,11 @@ namespace Consumer
             EvaluationDetail<bool> b = flags.CheckoutV2Detail(context, false);
             string c = flags.PricingTier(context, "basic");
             EvaluationDetail<string> d = flags.PricingTierDetail(context, "basic");
-#pragma warning disable CS0618 // calls a deprecated flag on purpose
+#pragma warning disable LDFLAG001, CS0618 // calls a deprecated flag on purpose
             double e = flags.MaxCartItems(context, 1.5);
             EvaluationDetail<double> f = flags.MaxCartItemsDetail(context, 1.5);
             string g = FlagKeys.MaxCartItems;
-#pragma warning restore CS0618
+#pragma warning restore LDFLAG001, CS0618
             LdValue h = flags.CheckoutConfig(context, LdValue.Null);
             EvaluationDetail<LdValue> i = flags.CheckoutConfigDetail(context, LdValue.Null);
             return string.Join(",", a, b.Value, c, d.Value, e, f.Value, g, h, i.Value, FlagKeys.CheckoutV2, FlagKeys.PricingTier, FlagKeys.CheckoutConfig);
