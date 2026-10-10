@@ -6,12 +6,19 @@
 
 import type { FlagKind } from '../model.js';
 
+/**
+ * A flag's kind as read back from a target's output: a FlagKind, or for a
+ * number flag `int` or `double` when the target's API tells them apart
+ * (ADR 0001), so switching `codegen.number` shows as a changed kind.
+ */
+export type GeneratedKind = FlagKind | 'int' | 'double';
+
 /** A flag as read back from generated text. */
 export interface GeneratedFlag {
   key: string;
   /** The identifier the target emitted for the flag. */
   identifier: string;
-  kind: FlagKind;
+  kind: GeneratedKind;
 }
 
 function part(count: number, label: string, items: string[]): string | undefined {

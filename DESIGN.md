@@ -8,8 +8,9 @@ a compile-time concern instead of a runtime one.
 
 Status: design, pre-implementation. `core` and the `ts-server` target have no
 open decisions left; the shared design (flag model, naming, emitter interface)
-has been checked against Go and Java with a compiling prototype. The full
-emitter specs for `go`, `java` and `ts-browser` are later work. Facts that
+has been checked against Go and Java with a compiling prototype. The `java`
+target is built (`emit-java`). The full emitter specs for `go` and
+`ts-browser` are later work. Facts that
 could not be confirmed from a primary source are listed at the end, to be
 checked during implementation.
 
@@ -994,6 +995,19 @@ public final class Flags {
 }
 ```
 
+**`check` summary.** `summarizeChanges` (`packages/emit-java/src/flag-changes.ts`)
+reads a `Flags.java` back into flags. Comments are dropped and whitespace is
+squeezed out of the code (kept only between two words), so every line break
+above reads the same as the one-line form. Each `Keys` constant gives the
+identifier (the CONSTANT_CASE name) and the key (its string literal). The
+kind is the return type of the primary method whose `client.xVariation` call
+reads that constant: `boolean`, `String`, `double`, `int` or `LDValue`, each
+only with its own SDK method. `int` and `double` are reported as separate
+kinds, so switching `codegen.number` shows as `changed kind (k: double →
+int)`. A file with no `Keys` class, anything but string constants in it, or a
+constant no primary method reads gives no summary, and `check` prints the
+diff alone.
+
 **Compile fixture.** `fixtures/compile/java/` is a Maven project (one
 `pom.xml`, no `package.json`) pinning `launchdarkly-java-server-sdk` 7.17.2.
 The compile test copies the golden file into it and runs three checks,
@@ -1421,7 +1435,9 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`, `emit-dotnet`.
+3. `emit-go`, `emit-java`, `emit-dotnet`. `emit-java` has shipped: golden
+   output for every snapshot, the Maven compile fixture in CI, and `check`
+   summaries.
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.

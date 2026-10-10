@@ -6,9 +6,12 @@
 
 import { Writer, type Emitter, type Flag, type FlagKind, type TargetId } from '@launchtarqly/core';
 import { classDoc, isDeprecated, javadocLines, keyConstantDoc, methodDoc, type Javadoc } from './javadoc.js';
+import { summarizeJavaChanges } from './flag-changes.js';
 import { callLines, constantLines, signatureLines } from './layout.js';
 import { flagNames, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
+
+export { parseJavaFlags, summarizeJavaChanges } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const JAVA: TargetId = 'java';
@@ -109,6 +112,7 @@ export const javaEmitter: Emitter = {
   id: JAVA,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [7],
+  summarizeChanges: summarizeJavaChanges,
   emit(model, cfg, ctx) {
     const options = javaOptions(cfg);
     const names = flagNames(model);
