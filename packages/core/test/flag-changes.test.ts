@@ -85,8 +85,8 @@ describe('parseTsServerFlags', () => {
 
   it.each(readdirSync(GOLDEN).filter((f) => f.endsWith('.ts')))('parses the %s golden file', (name) => {
     const text = readFileSync(join(GOLDEN, name), 'utf8');
-    const entries = /export const FlagKeys = \{\n([\s\S]*?)\n\}/.exec(text)![1]!.split('\n');
-    expect(parseTsServerFlags(text)).toHaveLength(entries.length);
+    const keys = /export const FlagKeys = \{\n([\s\S]*?)\n\}/.exec(text)![1]!.match(/^ {2}\w+: '[^']*',$/gm)!;
+    expect(parseTsServerFlags(text)?.map((f) => `  ${f.identifier}: '${f.key}',`)).toEqual(keys);
   });
 
   it('unescapes quoted keys', () => {
