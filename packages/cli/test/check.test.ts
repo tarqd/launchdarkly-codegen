@@ -297,6 +297,22 @@ describe('check --from-snapshot', () => {
     });
   });
 
+  it('prints each normalizer warning once with several targets', async () => {
+    const dir = await projectDir({
+      project: 'my-project',
+      targets: [
+        { id: 'ts-server', out: 'flags.ts', sdkMajor: 9 },
+        { id: 'go', out: 'flags/flags.go', sdkMajor: 7, package: 'flags' },
+      ],
+    });
+    const snap = await writeSnapshot(dir, [multivariateFlag('mixed-values', ['a', 1])]);
+    const result = await runCli(['check', '--from-snapshot', snap], dir);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe(
+      'warning: flag mixed-values: variations mix value types (string, number); treating it as json\n',
+    );
+  });
+
   it('does not touch a stale file', async () => {
     const dir = await generatedProject();
     const path = join(dir, OUT);
