@@ -26,6 +26,12 @@ export interface Config {
   /** Tag filter: only flags with all of these tags. Absent means no filter. */
   tags?: string[];
   targets: TargetConfig[];
+  check?: CheckConfig;
+}
+
+export interface CheckConfig {
+  /** A missing output file is stale (default `true`); `false` skips it. */
+  failOnMissingOutput?: boolean;
 }
 
 export interface LoadedConfig {
@@ -116,7 +122,7 @@ export interface ResolveOptions {
 }
 
 /** Top-level config keys other than the scalar settings in settings.ts. */
-const STRUCTURED_KEYS = ['targets'];
+const STRUCTURED_KEYS = ['targets', 'check'];
 
 /**
  * Reads the config file, layers env and CLI settings over it, validates the
@@ -156,6 +162,7 @@ export async function resolveConfig({
   const targets = selectTargets(parseTargets(raw.targets, emitters, fail), cli.target);
   // baseUri always has a default in SETTINGS.
   const config: Config = { ...rest, project, baseUri: normalizeBaseUri(baseUri!), targets };
+  if (raw.check !== undefined) config.check = parseCheckConfig(raw.check, fail);
   return { config, path, dir: file.dir };
 }
 
@@ -200,4 +207,13 @@ function selectTargets(targets: TargetConfig[], selected: unknown): TargetConfig
     }
   }
   return targets.filter((t) => ids.includes(t.id));
+}
+
+function parseCheckConfig(raw: unknown, fail: (msg: string) => never): CheckConfig {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail('`check` must be an object');
+  const { failOnMissingOutput } = raw as Record<string, unknown>;
+  if (failOnMissingOutput !== undefined && typeof failOnMissingOutput !== 'boolean') {
+    fail('`check.failOnMissingOutput` must be a boolean');
+  }
+  return failOnMissingOutput === undefined ? {} : { failOnMissingOutput: failOnMissingOutput as boolean };
 }

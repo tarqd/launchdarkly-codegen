@@ -99,10 +99,7 @@ describe('installed into a fresh project', () => {
     );
   });
 
-  // `check` lands in #22; this runs as soon as the CLI's usage text lists it.
-  it('passes `check` right after `generate`', async (ctx) => {
-    const usage = await bin(['--help']);
-    if (!/\bcheck\b/.test(usage.stdout)) ctx.skip();
+  it('passes `check` right after `generate`', async () => {
     await bin(['generate', '--from-snapshot', SNAPSHOT]);
     const result = await bin(['check', '--from-snapshot', SNAPSHOT]);
     expect(result.stderr).toBe('');
