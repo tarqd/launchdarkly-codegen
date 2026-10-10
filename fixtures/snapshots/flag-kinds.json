@@ -1,0 +1,102 @@
+{
+  "snapshotVersion": 1,
+  "projectKey": "my-project",
+  "baseUri": "https://app.launchdarkly.com",
+  "flagPages": [
+    {
+      "items": [
+        {
+          "key": "checkout-v2",
+          "name": "Checkout V2",
+          "kind": "boolean",
+          "variations": [
+            { "_id": "b1", "value": true },
+            { "_id": "b2", "value": false }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": [],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "pricing-tier",
+          "name": "Pricing tier",
+          "description": "Which pricing tier a customer sees.",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "s1", "value": "free", "name": "Free" },
+            { "_id": "s2", "value": "pro", "name": "Pro" },
+            { "_id": "s3", "value": "enterprise", "name": "Enterprise" }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": true, "usingMobileKey": false },
+          "tags": ["billing"],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "sample-rate",
+          "name": "Sample rate",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "d1", "value": 0.1 },
+            { "_id": "d2", "value": 0.5 },
+            { "_id": "d3", "value": 1 }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": [],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "max-cart-items",
+          "name": "Max cart items",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "i1", "value": 10 },
+            { "_id": "i2", "value": 50 },
+            { "_id": "i3", "value": 2147483647 }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": [],
+          "customProperties": {
+            "codegen.number": { "name": "codegen.number", "value": ["int"] }
+          },
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "checkout-config",
+          "name": "Checkout config",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "j1", "value": { "steps": ["cart", "pay"], "express": false } },
+            { "_id": "j2", "value": { "steps": ["pay"], "express": true } }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": [],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "banner-ids",
+          "name": "Banner ids",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "a1", "value": [1, 2] },
+            { "_id": "a2", "value": [] }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": [],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        }
+      ],
+      "totalCount": 6
+    }
+  ]
+}

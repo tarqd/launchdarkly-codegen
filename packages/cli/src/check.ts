@@ -5,7 +5,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { CodegenError, summarizeFlagChanges, unifiedDiff, type Snapshot } from '@launchtarqly/core';
+import { CodegenError, summarizeFlagChanges, unifiedDiff, type NormalizeOptions, type Snapshot } from '@launchtarqly/core';
 import type { Config } from './config.js';
 import { generateFiles } from './generate.js';
 
@@ -15,12 +15,22 @@ export interface CheckResult {
   report: string;
 }
 
-export async function checkFiles(config: Config, snapshot: Snapshot, baseDir: string): Promise<CheckResult> {
+export async function checkFiles(
+  config: Config,
+  snapshot: Snapshot,
+  baseDir: string,
+  options: NormalizeOptions = {},
+): Promise<CheckResult> {
   const failOnMissingOutput = config.check?.failOnMissingOutput ?? true;
   // Generate every target before reading anything, so a config, model or API
-  // error (exit 2) is never preceded by partial drift output.
-  const outputs = config.targets.flatMap((target) =>
-    generateFiles({ ...config, targets: [target] }, snapshot).map((file) => ({ target, file })),
+  // error (exit 2) is never preceded by partial drift output. Targets are
+  // generated one at a time to know which target wrote which file; normalizer
+  // warnings are the same each time, so only the first pass reports them.
+  const outputs = config.targets.flatMap((target, i) =>
+    generateFiles({ ...config, targets: [target] }, snapshot, i === 0 ? options : {}).map((file) => ({
+      target,
+      file,
+    })),
   );
 
   let stale = false;

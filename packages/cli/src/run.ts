@@ -68,12 +68,13 @@ async function loadInputs(args: string[], io: RunIO) {
     throw new CodegenError('live fetching is not implemented yet; pass --from-snapshot <file>');
   }
   const snapshot = await readSnapshot(resolve(io.cwd, snapshotPath));
-  return { config, dir, snapshot };
+  const warn = (message: string) => io.stderr(`warning: ${message}\n`);
+  return { config, dir, snapshot, warn };
 }
 
 async function generateCommand(args: string[], io: RunIO): Promise<number> {
-  const { config, dir, snapshot } = await loadInputs(args, io);
-  const written = await writeFiles(generateFiles(config, snapshot), dir);
+  const { config, dir, snapshot, warn } = await loadInputs(args, io);
+  const written = await writeFiles(generateFiles(config, snapshot, { warn }), dir);
   for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
   return 0;
 }
@@ -82,8 +83,8 @@ async function checkCommand(args: string[], io: RunIO): Promise<number> {
   // Config, fetch and model errors (exit 2) all happen inside loadInputs and
   // checkFiles' generation step, before any file is compared, so an API
   // failure can never be reported as drift.
-  const { config, dir, snapshot } = await loadInputs(args, io);
-  const result = await checkFiles(config, snapshot, dir);
+  const { config, dir, snapshot, warn } = await loadInputs(args, io);
+  const result = await checkFiles(config, snapshot, dir, { warn });
   io.stdout(result.report);
   return result.stale ? 1 : 0;
 }
