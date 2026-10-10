@@ -29,3 +29,10 @@ export function lowerCamel(key: string): string {
     .map((word, i) => (i === 0 ? word : capitalize(word)))
     .join('');
 }
+
+/** `checkoutV2NewFlow` (or `checkout-v2.new_flow`) → `CHECKOUT_V2_NEW_FLOW` */
+export function constantCase(name: string): string {
+  return splitWords(name)
+    .map((word) => word.toUpperCase())
+    .join('_');
+}
