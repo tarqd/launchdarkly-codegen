@@ -14,6 +14,9 @@ export const KIND_METHODS: Record<FlagKind, { method: string; type: string }> = 
   json: { method: 'jsonVariation', type: 'unknown' },
 };
 
+/** Every SDK method a flag's primary method may call. */
+export const SDK_METHODS: readonly string[] = Object.values(KIND_METHODS).map(({ method }) => method);
+
 const KINDS_BY_METHOD: ReadonlyMap<string, FlagKind> = new Map(
   Object.entries(KIND_METHODS).map(([kind, { method }]) => [method, kind as FlagKind]),
 );

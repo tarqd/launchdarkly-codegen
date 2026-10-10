@@ -65,15 +65,15 @@ export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlag
 
 /**
  * `check`'s summary for a stale file: both sides read back with the target's
- * `readFlags`, then compared. `undefined` when either side can't be read
- * back; the diff then stands alone.
+ * `readFlags`, then compared. `undefined` when the target has no `readFlags`
+ * or either side can't be read back; the diff then stands alone.
  */
 export function summarizeReadBack(
-  readFlags: (text: string) => readonly GeneratedFlag[] | undefined,
+  target: { readFlags?(text: string): readonly GeneratedFlag[] | undefined },
   oldText: string,
   newText: string,
 ): string | undefined {
-  const oldFlags = readFlags(oldText);
-  const newFlags = readFlags(newText);
+  const oldFlags = target.readFlags?.(oldText);
+  const newFlags = target.readFlags?.(newText);
   return oldFlags && newFlags ? summarizeFlagChanges(oldFlags, newFlags) : undefined;
 }

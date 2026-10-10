@@ -311,10 +311,10 @@ one. `readFlags` is optional and only used by `check`: it reads the
 emitter's own output back into flags (key, identifier, kind, and for a
 number flag the `int` or `double` type when the output shows it), or returns
 `undefined` when the text doesn't look like that output. For a stale file,
-`check` hands it to core's `summarizeReadBack`, which reads both the file on
-disk and the new output and compares them with `summarizeFlagChanges`. When
-either side can't be read back, or the emitter has no `readFlags`, `check`
-prints the diff alone. Only the emitter knows its own output format,
+`check` hands the emitter to core's `summarizeReadBack`, which reads both the
+file on disk and the new output and compares them with
+`summarizeFlagChanges`. When either side can't be read back, or the emitter
+has no `readFlags`, `check` prints the diff alone. Only the emitter knows its own output format,
 so the parsing lives in the emitter package, not in `core` or the CLI. The
 go, ts-server and dotnet emitters keep the strings and patterns their writer
 and parser both rely on (class and field names, SDK method names, how the

@@ -5,19 +5,17 @@
  */
 
 import type { FlagKind, GeneratedFlag } from '@launchtarqly/core';
-import { AS_CONST, CLIENT_FIELD, FLAG_KEYS_OPEN, KIND_METHODS, kindOfSdkMethod } from './output.js';
+import { AS_CONST, CLIENT_FIELD, FLAG_KEYS_OPEN, kindOfSdkMethod, SDK_METHODS } from './output.js';
 
 /** `text` matched literally inside a RegExp. */
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const SDK_METHODS = Object.values(KIND_METHODS).map(({ method }) => method);
-
 // `name(...): Promise<...> {` followed by `return this.client.<kind>Variation(`.
 // `Variation\s*\(` skips the `...VariationDetail(` methods. Signatures may wrap.
 const METHOD = new RegExp(
-  String.raw`(?:^|\n)[ \t]*(\w+)[ \t]*\([^{;]*?\{\s*return\s+this\.${CLIENT_FIELD}\.(${SDK_METHODS.join('|')})\s*\(`,
+  String.raw`(?:^|\n)[ \t]*(\w+)[ \t]*\([^{;]*?\{\s*return\s+this\.${escapeRegExp(CLIENT_FIELD)}\.(${SDK_METHODS.join('|')})\s*\(`,
   'g',
 );
 const KEYS = new RegExp(String.raw`\n${escapeRegExp(FLAG_KEYS_OPEN)}\n([\s\S]*?)\n\}(?:${escapeRegExp(AS_CONST)})?;`);

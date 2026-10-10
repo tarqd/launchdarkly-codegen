@@ -44,9 +44,7 @@ export async function checkFiles(
     const oldText = onDisk?.toString('utf8');
     report += unifiedDiff(file.path, oldText, file.contents);
     // The summary is read back from both sides; if either can't be, the diff stands alone.
-    const { readFlags } = emitter;
-    const summary =
-      oldText === undefined || readFlags === undefined ? undefined : summarizeReadBack(readFlags, oldText, file.contents);
+    const summary = oldText === undefined ? undefined : summarizeReadBack(emitter, oldText, file.contents);
     if (summary !== undefined) report += `${summary}\n`;
   }
   return { stale, report };
