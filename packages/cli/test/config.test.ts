@@ -175,6 +175,8 @@ describe('go target', () => {
   it.each([
     ['a missing package', { package: undefined }, 'package'],
     ['a package that is a Go keyword', { package: 'func' }, 'package'],
+    ['a package with a hyphen', { package: 'ld-flags' }, 'package'],
+    ['a package that is not lowercase', { package: 'LdFlags' }, 'package'],
     ['an out that is not a .go file', { out: 'internal/ldflags/' }, 'out'],
   ])('exits 2 on %s, naming the key', async (_name, extra, key) => {
     const dir = await projectDir(withGo(extra));

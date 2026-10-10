@@ -2,7 +2,8 @@ import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GENERATOR_VERSION } from '../src/index.js';
-import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
+import { customProperty, multivariateFlag } from '../../core/test/builders.js';
+import { projectDir, runCli, SNAPSHOTS_DIR, writeSnapshot } from './helpers.js';
 
 const snapshot = join(SNAPSHOTS_DIR, 'boolean-flags.json');
 const OUT = 'src/flags.generated.ts';
@@ -94,6 +95,17 @@ describe('check --from-snapshot', () => {
         const result = await runCli(['check', '--from-snapshot', snapshot], dir);
         expect(result.exitCode).toBe(1);
         expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: CheckoutVersion2 → CheckoutV2\)\n$/);
+      });
+
+      it('reports switching codegen.number as a changed kind', async () => {
+        const dir = await projectDir(goConfig);
+        const asInt = { customProperties: customProperty('codegen.number', ['int']) };
+        const intSnapshot = await writeSnapshot(dir, [multivariateFlag('max-items', [10, 20], asInt)]);
+        expect((await runCli(['generate', '--from-snapshot', intSnapshot], dir)).exitCode).toBe(0);
+        const doubleSnapshot = await writeSnapshot(dir, [multivariateFlag('max-items', [10, 20])]);
+        const result = await runCli(['check', '--from-snapshot', doubleSnapshot], dir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 changed kind \(max-items: number \(int\) → number \(double\)\)\n$/);
       });
 
       it('prints only the diff for a hand-mangled go file', async () => {

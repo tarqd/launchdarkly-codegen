@@ -29,14 +29,14 @@ const OLD = goEmitter.emit(
 )[0]!.contents;
 
 describe('parseGoFlags', () => {
-  it('reads key, identifier and kind for every Key constant', () => {
+  it('reads key, identifier, kind and number type for every Key constant', () => {
     expect(parseGoFlags(OLD)).toEqual([
       { key: 'checkout-config', identifier: 'CheckoutConfig', kind: 'json' },
       { key: 'checkout-v2', identifier: 'CheckoutV2', kind: 'boolean' },
-      { key: 'max-items', identifier: 'MaxItems', kind: 'number' },
+      { key: 'max-items', identifier: 'MaxItems', kind: 'number', numberType: 'int' },
       { key: 'old-thing', identifier: 'OldThing', kind: 'boolean' },
       { key: 'pricing-tier', identifier: 'PricingTier', kind: 'string' },
-      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number' },
+      { key: 'sample-rate', identifier: 'SampleRate', kind: 'number', numberType: 'double' },
     ]);
   });
 
@@ -46,7 +46,12 @@ describe('parseGoFlags', () => {
     const identifiers = new Map(
       [...text.matchAll(/^\tKey(\w+) += "([^"]*)"$/gm)].map(([, identifier, key]) => [key!, identifier!]),
     );
-    const expected = normalize(snapshot).flags.map((f) => ({ key: f.key, identifier: identifiers.get(f.key), kind: f.kind }));
+    const expected = normalize(snapshot).flags.map((f) => ({
+      key: f.key,
+      identifier: identifiers.get(f.key),
+      kind: f.kind,
+      ...(f.numberType !== undefined && { numberType: f.numberType }),
+    }));
     expect(parseGoFlags(text)).toEqual(expected);
   });
 
@@ -87,6 +92,11 @@ describe('summarizeGoChanges', () => {
     expect(summarizeGoChanges(OLD, next)).toBe(
       'flags: 1 added (new-thing), 1 removed (old-thing), 1 renamed (max-items: MaxItems → ItemLimit), 1 changed kind (checkout-config: json → string)',
     );
+  });
+
+  it('reports switching a number flag between int and float64 as a changed kind', () => {
+    const next = OLD.replaceAll('fallback int) (int, error)', 'fallback float64) (float64, error)');
+    expect(summarizeGoChanges(OLD, next)).toBe('flags: 1 changed kind (max-items: number (int) → number (double))');
   });
 
   it('says so when no flag changed (for example a generator upgrade)', () => {

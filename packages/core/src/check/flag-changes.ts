@@ -12,6 +12,21 @@ export interface GeneratedFlag {
   /** The identifier the target emitted for the flag. */
   identifier: string;
   kind: FlagKind;
+  /**
+   * Number flags only, when the target's output tells `int` from `double`
+   * (go does, ts-server doesn't). Compared only when both sides have it.
+   */
+  numberType?: 'int' | 'double';
+}
+
+/** `json`, or `number (int)` when the number type is known. */
+function kindLabel(flag: GeneratedFlag): string {
+  return flag.numberType === undefined ? flag.kind : `${flag.kind} (${flag.numberType})`;
+}
+
+function kindChanged(o: GeneratedFlag, n: GeneratedFlag): boolean {
+  if (o.kind !== n.kind) return true;
+  return o.numberType !== undefined && n.numberType !== undefined && o.numberType !== n.numberType;
 }
 
 function part(count: number, label: string, items: string[]): string | undefined {
@@ -39,7 +54,7 @@ export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlag
     else if (!n) removed.push(key);
     else {
       if (o.identifier !== n.identifier) renamed.push(`${key}: ${o.identifier} → ${n.identifier}`);
-      if (o.kind !== n.kind) changedKind.push(`${key}: ${o.kind} → ${n.kind}`);
+      if (kindChanged(o, n)) changedKind.push(`${key}: ${kindLabel(o)} → ${kindLabel(n)}`);
     }
   }
 

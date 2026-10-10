@@ -3,7 +3,7 @@
  * Doc comments, Sanitizing doc text).
  */
 
-import type { Flag } from '@launchtarqly/core';
+import { defaultDeprecationMessage, docTrailer, type Flag } from '@launchtarqly/core';
 
 /**
  * The primary method's doc comment, one entry per comment line without the
@@ -20,7 +20,7 @@ export function methodDoc(ident: string, flag: Flag): string[] {
     if (reinterpretable(p)) paragraphs[paragraphs.length - 1]!.push(...p);
     else paragraphs.push(p);
   }
-  paragraphs.push([trailer(flag), flag.uiUrl]);
+  paragraphs.push([oneLine(docTrailer(flag, quoted)), flag.uiUrl]);
   const deprecated = deprecation(flag);
   if (deprecated !== undefined) paragraphs.push([deprecated]);
   return paragraphs.flatMap((p, i) => (i === 0 ? p : ['', ...p]));
@@ -47,14 +47,9 @@ function isOldHeading(line: string): boolean {
   return true;
 }
 
-/** `key: "<key>" · tags: … · maintainer: …`. */
-function trailer(flag: Flag): string {
-  const parts = [`key: "${flag.key}"`];
-  if (flag.tags.length > 0) parts.push(`tags: ${flag.tags.join(', ')}`);
-  if (flag.maintainer) {
-    parts.push(`maintainer: ${flag.maintainer.kind === 'team' ? `team ${flag.maintainer.name}` : flag.maintainer.email}`);
-  }
-  return oneLine(parts.join(' · '));
+/** A flag key in doc text: Go doc comments have no inline-code syntax, so it is quoted. */
+function quoted(text: string): string {
+  return `"${text}"`;
 }
 
 /**
@@ -64,10 +59,14 @@ function trailer(flag: Flag): string {
 export function deprecation(flag: Flag): string | undefined {
   if (!flag.deprecated) return undefined;
   const message = oneLine(flag.deprecationMessage ?? '');
-  return `Deprecated: ${message === '' ? `The "${flag.key}" flag is deprecated.` : message}`;
+  return `Deprecated: ${message === '' ? defaultDeprecationMessage(flag, quoted) : message}`;
 }
 
-/** One description line as gofmt leaves it alone: no control characters, NUL or BOM, no tabs, trimmed. */
+/**
+ * One description line as gofmt leaves it alone: no control characters, NUL
+ * or BOM, no tabs, trimmed, and the ` `` ` and `''` pairs gofmt would turn
+ * into curly quotes already rewritten to “ and ”.
+ */
 function cleanLine(line: string): string {
   return line
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f\ufeff]/g, '')

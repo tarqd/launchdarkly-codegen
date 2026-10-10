@@ -20,6 +20,7 @@ import {
 } from '@launchtarqly/core';
 import { deprecation, methodDoc } from './doc.js';
 import { summarizeGoChanges } from './flag-changes.js';
+import { FLAGS_STRUCT, goKind, keyConstant, KEYS_COMMENT, KIND_METHODS, METHOD_FORMS } from './output.js';
 
 export { parseGoFlags, summarizeGoChanges } from './flag-changes.js';
 
@@ -61,58 +62,32 @@ const NAMING: IdentifierRules = {
   invalidReason: 'is not an exported Go identifier (it must start with an upper-case letter)',
 };
 
-/** Names the file declares itself, which no flag may take. */
+/**
+ * Names the file declares itself, which no flag may take. The `client` field
+ * is left out: it is lower-case, and the export rule already keeps every flag
+ * identifier upper-case.
+ */
 const GENERATOR_NAMES = ['Client', 'Flags', 'New'];
 
-/** The method suffixes each flag gets besides its own name. */
-const VARIANT_SUFFIXES = ['Detail', 'Ctx', 'DetailCtx'];
+/** A flag and the identifier the file names it by. */
+interface NamedFlag {
+  flag: Flag;
+  name: string;
+}
 
-/** Each flag's name, after checking every identifier the file will emit (DESIGN.md → Naming). */
-function flagNames(model: FlagModel): Map<Flag, string> {
+/** Each flag with its name, after checking every identifier the file will emit (DESIGN.md → Naming). */
+function namedFlags(model: FlagModel): NamedFlag[] {
   const convert = (key: string) => upperCamel(key, { initialisms: GO_INITIALISMS });
-  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, GO, convert)]));
+  const named = model.flags.map((flag) => ({ flag, name: flagIdentifier(flag, GO, convert) }));
   const emitted: EmittedIdentifier[] = GENERATOR_NAMES.map((identifier) => ({ identifier }));
-  for (const [flag, name] of names) {
+  for (const { flag, name } of named) {
     emitted.push(
-      { flagKey: flag.key, identifier: name, primary: true },
-      ...VARIANT_SUFFIXES.map((suffix) => ({ flagKey: flag.key, identifier: `${name}${suffix}` })),
-      { flagKey: flag.key, identifier: `Key${name}` },
+      ...METHOD_FORMS.map(({ suffix }) => ({ flagKey: flag.key, identifier: `${name}${suffix}`, primary: suffix === '' })),
+      { flagKey: flag.key, identifier: keyConstant(name) },
     );
   }
   checkIdentifiers(NAMING, emitted);
-  return names;
-}
-
-/** An SDK evaluation method family and the Go type it takes and returns. */
-interface KindMethod {
-  method: string;
-  type: string;
-}
-
-const BOOL: KindMethod = { method: 'BoolVariation', type: 'bool' };
-const STRING: KindMethod = { method: 'StringVariation', type: 'string' };
-const FLOAT64: KindMethod = { method: 'Float64Variation', type: 'float64' };
-const INT: KindMethod = { method: 'IntVariation', type: 'int' };
-const JSON_VALUE: KindMethod = { method: 'JSONVariation', type: 'ldvalue.Value' };
-
-/**
- * Every kind the `Client` interface lists, in its order. Always all five, so a
- * project's first flag of a kind never changes the interface.
- */
-const CLIENT_KINDS: readonly KindMethod[] = [BOOL, STRING, FLOAT64, INT, JSON_VALUE];
-
-/** The SDK method family for a flag. Number flags are `float64` unless `codegen.number: int` (ADR 0001). */
-function kindMethod(flag: Flag): KindMethod {
-  switch (flag.kind) {
-    case 'boolean':
-      return BOOL;
-    case 'string':
-      return STRING;
-    case 'number':
-      return flag.numberType === 'int' ? INT : FLOAT64;
-    case 'json':
-      return JSON_VALUE;
-  }
+  return named;
 }
 
 /** A Go interpreted string literal. */
@@ -120,38 +95,37 @@ function goString(value: string): string {
   return JSON.stringify(value);
 }
 
+/** A form's parameter list (after `valueParam`, the kind's Go `type`) and results. */
+function signature(form: (typeof METHOD_FORMS)[number], type: string, valueParam: string) {
+  const params = `${form.ctx ? 'ctx gocontext.Context, ' : ''}${valueParam} ${type}`;
+  const result = form.detail ? `(${type}, ldreason.EvaluationDetail, error)` : `(${type}, error)`;
+  return { params, result };
+}
+
 function emitClient(w: Writer): void {
   w.line('// Client is the subset of the LaunchDarkly client that Flags calls: the typed');
   w.line('// evaluation methods for every flag kind. *ld.LDClient satisfies it.');
   w.block('type Client interface {', '}', () => {
-    for (const { method, type } of CLIENT_KINDS) {
-      const params = `key string, context ldcontext.Context, defaultVal ${type}`;
-      w.line(`${method}(${params}) (${type}, error)`);
-      w.line(`${method}Detail(${params}) (${type}, ldreason.EvaluationDetail, error)`);
-      w.line(`${method}Ctx(ctx gocontext.Context, ${params}) (${type}, error)`);
-      w.line(`${method}DetailCtx(ctx gocontext.Context, ${params}) (${type}, ldreason.EvaluationDetail, error)`);
+    for (const { method, type } of Object.values(KIND_METHODS)) {
+      for (const form of METHOD_FORMS) {
+        const { params, result } = signature(form, type, 'key string, context ldcontext.Context, defaultVal');
+        w.line(`${method}${form.suffix}(${params}) ${result}`);
+      }
     }
   });
 }
 
-function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
-  const { method, type } = kindMethod(flag);
-  const key = `Key${name}`;
-  const params = `context ldcontext.Context, fallback ${type}`;
-  const ctxParams = `ctx gocontext.Context, ${params}`;
-  const value = `(${type}, error)`;
-  const detail = `(${type}, ldreason.EvaluationDetail, error)`;
-  const forms = [
-    { suffix: '', doc: methodDoc(name, flag), params, result: value, call: `${method}(${key}, context, fallback)` },
-    { suffix: 'Detail', doc: variantDoc(`${name}Detail is ${name} with the evaluation reason.`, flag), params, result: detail, call: `${method}Detail(${key}, context, fallback)` },
-    { suffix: 'Ctx', doc: variantDoc(`${name}Ctx is ${name} with a Go context for SDK hooks.`, flag), params: ctxParams, result: value, call: `${method}Ctx(ctx, ${key}, context, fallback)` },
-    { suffix: 'DetailCtx', doc: variantDoc(`${name}DetailCtx is ${name}Detail with a Go context for SDK hooks.`, flag), params: ctxParams, result: detail, call: `${method}DetailCtx(ctx, ${key}, context, fallback)` },
-  ];
-  for (const form of forms) {
+function emitFlagMethods(w: Writer, { flag, name }: NamedFlag): void {
+  const { method, type } = KIND_METHODS[goKind(flag)];
+  const key = keyConstant(name);
+  for (const form of METHOD_FORMS) {
+    const { params, result } = signature(form, type, 'context ldcontext.Context, fallback');
+    const doc = form.variantSummary ? variantDoc(form.variantSummary(name), flag) : methodDoc(name, flag);
+    const args = `${form.ctx ? 'ctx, ' : ''}${key}, context, fallback`;
     w.line();
-    for (const text of form.doc) w.line(text === '' ? '//' : `// ${text}`);
-    w.block(`func (f *Flags) ${name}${form.suffix}(${form.params}) ${form.result} {`, '}', () => {
-      w.line(`return f.client.${form.call}`);
+    for (const text of doc) w.line(text === '' ? '//' : `// ${text}`);
+    w.block(`func (f *Flags) ${name}${form.suffix}(${params}) ${result} {`, '}', () => {
+      w.line(`return f.client.${method}${form.suffix}(${args})`);
     });
   }
 }
@@ -167,21 +141,21 @@ function variantDoc(summary: string, flag: Flag): string[] {
  * specs (by rune count). A deprecated constant's `// Deprecated:` line ends
  * the run before it, so that constant starts a new one.
  */
-function emitKeys(w: Writer, flags: readonly Flag[], names: Map<Flag, string>): void {
-  const runs: Flag[][] = [];
-  for (const flag of flags) {
-    if (flag.deprecated || runs.length === 0) runs.push([flag]);
-    else runs[runs.length - 1]!.push(flag);
+function emitKeys(w: Writer, flags: readonly NamedFlag[]): void {
+  const runs: NamedFlag[][] = [];
+  for (const named of flags) {
+    if (named.flag.deprecated || runs.length === 0) runs.push([named]);
+    else runs[runs.length - 1]!.push(named);
   }
   w.line();
-  w.line('// Flag keys, for code that needs the raw key.');
+  w.line(KEYS_COMMENT);
   w.block('const (', ')', () => {
     for (const run of runs) {
-      const width = Math.max(...run.map((flag) => [...`Key${names.get(flag)!}`].length));
-      for (const flag of run) {
+      const width = Math.max(...run.map(({ name }) => [...keyConstant(name)].length));
+      for (const { flag, name } of run) {
         const deprecated = deprecation(flag);
         if (deprecated !== undefined) w.line(`// ${deprecated}`);
-        const constant = `Key${names.get(flag)!}`;
+        const constant = keyConstant(name);
         w.line(`${constant}${' '.repeat(width - [...constant].length)} = ${goString(flag.key)}`);
       }
     }
@@ -194,9 +168,8 @@ export const goEmitter: Emitter = {
   sdkMajors: [7],
   emit(model, cfg, ctx) {
     const pkg = packageName(cfg);
-    const names = flagNames(model);
     // The Flag model is sorted by key, so methods and constants are too.
-    const flags = model.flags;
+    const flags = namedFlags(model);
     const w = new Writer({ indent: '\t', commentPrefix: '//' });
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
     w.line();
@@ -213,12 +186,12 @@ export const goEmitter: Emitter = {
     emitClient(w);
     w.line();
     w.line(`// Flags evaluates the flags of project ${model.projectKey}.`);
-    w.line('type Flags struct{ client Client }');
+    w.line(FLAGS_STRUCT);
     w.line();
     w.line('// New returns a Flags that evaluates through client.');
     w.line('func New(client Client) *Flags { return &Flags{client: client} }');
-    for (const flag of flags) emitFlagMethods(w, flag, names.get(flag)!);
-    if (flags.length > 0) emitKeys(w, flags, names);
+    for (const named of flags) emitFlagMethods(w, named);
+    if (flags.length > 0) emitKeys(w, flags);
     return [{ path: cfg.out, contents: w.toString() }];
   },
   summarizeChanges: summarizeGoChanges,

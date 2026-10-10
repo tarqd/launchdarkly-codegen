@@ -302,8 +302,9 @@ interface EmitContext {
 `sdkMajors` is the one place a target's supported SDK majors are listed;
 config loading rejects any other `sdkMajor` (exit 2), so `emit` never sees
 one. `summarizeChanges` is optional and only used by `check`: it reads the
-file on disk and the new output back into flags (key, identifier, kind) and
-returns the one-line summary from core's `summarizeFlagChanges`, or
+file on disk and the new output back into flags (key, identifier, kind,
+and a number flag's `int` or `double` type when the output tells them apart)
+and returns the one-line summary from core's `summarizeFlagChanges`, or
 `undefined` when the old file can't be read back, in which case `check`
 prints the diff alone. Only the emitter knows its own output format, so the
 parsing lives in the emitter package, not in `core` or the CLI.
@@ -545,8 +546,9 @@ branch.
 
 **Check summary.** `summarizeChanges` reads a go file back from the `Key…`
 constants (identifier and key) and the primary methods' signatures (kind).
-`int` and `float64` both read as a number flag, so switching
-`codegen.number` shows in the diff but not as a changed kind. A file that
+`int` and `float64` read back as a number flag's number type, so switching
+`codegen.number` shows as a changed kind, e.g.
+`max-items: number (int) → number (double)`. A file that
 can't be read back (hand-edited, or not go output) gets no summary, and
 `check` prints the diff alone.
 
