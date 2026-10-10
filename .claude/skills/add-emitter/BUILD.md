@@ -20,7 +20,7 @@ Then run `pnpm install`.
 
 Invoke the `tdd` skill. Each item below is a behaviour with its own failing test, in `packages/emit-<id>/test/`:
 
-- **Naming.** Run every name through `flagIdentifier(flag, <id>, convert)`, so aliases win. Collect **every** identifier the file emits into `checkIdentifiers`: each flag's method marked `primary`, its `Detail`/`Ctx` variants, its key constant, and the emitter's own names with no `flagKey` (`Flags`, `New`, `Client`, `client`). Give it the target's own reserved-word set and identifier `pattern`.
+- **Naming.** Get every flag's name from core's `nameFlags(model, rules)`, so aliases win and every name is checked. Declare the target's `NamingRules`: its `convert`, reserved-word set and identifier `pattern`, its `ownNames` (`Flags`, `New`, `Client`, `client`), and `derived`, which lists **every** other name the file emits for a flag: its `Detail`/`Ctx` variants and its key constant. Build those names in the output with the same functions `derived` uses.
 - **Shared converters.** Converters that more than one target will need (UpperCamel, CONSTANT_CASE, Go initialisms) belong in `packages/core/src/naming.ts` next to `lowerCamel`. Invoke `codebase-design` to keep that module deep, and test the converters there.
 - **Kinds.** Map all four kinds to the SDK's typed method. For number flags, `numberType` chooses between `int` and `double`.
 - **Doc comments and deprecation.** Use `Writer.docComment(lines, escape)` with this target's escape function, or `line` comments for line-comment languages. Put the deprecation annotation on the method, every variant and the key constant.

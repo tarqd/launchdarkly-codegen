@@ -4,17 +4,14 @@
  */
 
 import {
-  checkIdentifiers,
   CodegenError,
-  flagIdentifier,
   GO_INITIALISMS,
+  nameFlags,
   upperCamel,
   Writer,
-  type EmittedIdentifier,
   type Emitter,
   type Flag,
-  type FlagModel,
-  type IdentifierRules,
+  type NamingRules,
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
@@ -54,40 +51,26 @@ function packageName(cfg: TargetConfig): string {
   return pkg;
 }
 
-const NAMING: IdentifierRules = {
+/** Each flag's name is its method; the other method forms and its key constant are built from it. */
+const NAMING: NamingRules = {
   target: GO,
+  convert: (key) => upperCamel(key, { initialisms: GO_INITIALISMS }),
   // Go keywords are all lowercase, so the export rule already excludes them.
   reserved: new Set(),
   pattern: /^\p{Lu}[\p{L}\p{Nd}_]*$/u,
   invalidReason: 'is not an exported Go identifier (it must start with an upper-case letter)',
+  // Names the file declares itself, which no flag may take. The `client` field
+  // is left out: it is lower-case, and the export rule already keeps every flag
+  // identifier upper-case.
+  ownNames: ['Client', 'Flags', 'New'],
+  // Every method form (the bare one repeats the flag's name) and the key constant.
+  derived: (name) => [...METHOD_FORMS.map(({ suffix }) => `${name}${suffix}`), keyConstant(name)],
 };
-
-/**
- * Names the file declares itself, which no flag may take. The `client` field
- * is left out: it is lower-case, and the export rule already keeps every flag
- * identifier upper-case.
- */
-const GENERATOR_NAMES = ['Client', 'Flags', 'New'];
 
 /** A flag and the identifier the file names it by. */
 interface NamedFlag {
   flag: Flag;
   name: string;
-}
-
-/** Each flag with its name, after checking every identifier the file will emit (DESIGN.md → Naming). */
-function namedFlags(model: FlagModel): NamedFlag[] {
-  const convert = (key: string) => upperCamel(key, { initialisms: GO_INITIALISMS });
-  const named = model.flags.map((flag) => ({ flag, name: flagIdentifier(flag, GO, convert) }));
-  const emitted: EmittedIdentifier[] = GENERATOR_NAMES.map((identifier) => ({ identifier }));
-  for (const { flag, name } of named) {
-    emitted.push(
-      ...METHOD_FORMS.map(({ suffix }) => ({ flagKey: flag.key, identifier: `${name}${suffix}`, primary: suffix === '' })),
-      { flagKey: flag.key, identifier: keyConstant(name) },
-    );
-  }
-  checkIdentifiers(NAMING, emitted);
-  return named;
 }
 
 /** A Go interpreted string literal. */
@@ -169,7 +152,7 @@ export const goEmitter: Emitter = {
   emit(model, cfg, ctx) {
     const pkg = packageName(cfg);
     // The Flag model is sorted by key, so methods and constants are too.
-    const flags = namedFlags(model);
+    const flags = [...nameFlags(model, NAMING)].map(([flag, name]): NamedFlag => ({ flag, name }));
     const w = new Writer({ indent: '\t', commentPrefix: '//' });
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
     w.line();

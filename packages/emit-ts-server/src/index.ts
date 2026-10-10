@@ -4,18 +4,15 @@
  */
 
 import {
-  checkIdentifiers,
   deprecationText,
   docTrailer,
   ECMASCRIPT_RESERVED_WORDS,
-  flagIdentifier,
   lowerCamel,
+  nameFlags,
   Writer,
-  type EmittedIdentifier,
   type Emitter,
   type Flag,
-  type FlagModel,
-  type IdentifierRules,
+  type NamingRules,
   type TargetId,
 } from '@launchtarqly/core';
 import { parseTsServerFlags } from './flag-changes.js';
@@ -28,27 +25,16 @@ export const TS_SERVER: TargetId = 'ts-server';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';
 
-const NAMING: IdentifierRules = {
+/** Each flag's name is its method and its FlagKeys entry; `Detail` names the detail method. */
+const NAMING: NamingRules = {
   target: TS_SERVER,
+  convert: lowerCamel,
   reserved: ECMASCRIPT_RESERVED_WORDS,
   pattern: /^[A-Za-z_$][A-Za-z0-9_$]*$/,
+  // Members of the generated `Flags` class that flag methods must not shadow.
+  ownNames: ['constructor', CLIENT_FIELD],
+  derived: (name) => [`${name}Detail`],
 };
-/** Members of the generated `Flags` class that flag methods must not shadow. */
-const CLASS_MEMBERS = ['constructor', CLIENT_FIELD];
-
-/** Each flag's name, after checking every identifier the file will emit. */
-function flagNames(model: FlagModel): Map<Flag, string> {
-  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, TS_SERVER, lowerCamel)]));
-  const emitted: EmittedIdentifier[] = CLASS_MEMBERS.map((identifier) => ({ identifier }));
-  for (const [flag, name] of names) {
-    emitted.push(
-      { flagKey: flag.key, identifier: name, primary: true }, // method and FlagKeys entry
-      { flagKey: flag.key, identifier: `${name}Detail` },
-    );
-  }
-  checkIdentifiers(NAMING, emitted);
-  return names;
-}
 
 /** A single-quoted TypeScript string literal. */
 function tsString(value: string): string {
@@ -93,7 +79,7 @@ export const tsServerEmitter: Emitter = {
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [9],
   emit(model, cfg, ctx) {
-    const names = flagNames(model);
+    const names = nameFlags(model, NAMING);
     const w = new Writer();
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
     w.line();
