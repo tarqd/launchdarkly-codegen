@@ -75,6 +75,38 @@ describe('check --from-snapshot', () => {
       expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: checkoutVersion2 → checkoutV2\)\n$/);
     });
 
+    describe('for a go file', () => {
+      const GO_OUT = 'internal/ldflags/flags_gen.go';
+      const goConfig = { project: 'my-project', targets: [{ id: 'go', out: GO_OUT, sdkMajor: 7, package: 'ldflags' }] };
+
+      it('follows the diff of a stale go file', async () => {
+        const dir = await generatedProject(goConfig);
+        const path = join(dir, GO_OUT);
+        // As if the committed file predates a rename of checkout-v2's identifier and the removal of a flag.
+        const committed = (await readFile(path, 'utf8'))
+          .replaceAll('CheckoutV2', 'CheckoutVersion2')
+          .replace('\tKeyBetaDarkMode ', '\tKeyZombie = "zombie"\n\tKeyBetaDarkMode ')
+          .replace(
+            '\n// Flag keys',
+            '\nfunc (f *Flags) Zombie(context ldcontext.Context, fallback bool) (bool, error) {\n\treturn f.client.BoolVariation(KeyZombie, context, fallback)\n}\n\n// Flag keys',
+          );
+        await writeFile(path, committed);
+        const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: CheckoutVersion2 → CheckoutV2\)\n$/);
+      });
+
+      it('prints only the diff for a hand-mangled go file', async () => {
+        const dir = await generatedProject(goConfig);
+        const path = join(dir, GO_OUT);
+        await writeFile(path, (await readFile(path, 'utf8')).replace('const (', 'var ('));
+        const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+        expect(result).toMatchObject({ exitCode: 1, stderr: '' });
+        expect(result.stdout).toContain('-var (\n+const (\n');
+        expect(result.stdout).not.toContain('flags:');
+      });
+    });
+
     it('is left out when the existing file cannot be parsed, but the diff is still printed', async () => {
       const dir = await generatedProject();
       await writeFile(join(dir, OUT), 'hand-edited nonsense\n');
