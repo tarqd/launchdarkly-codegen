@@ -288,6 +288,32 @@ suggesting `codegen.name.<target>`:
   `checkout-detail` both want `CheckoutDetail`. Java would otherwise silently
   overload them when the parameter types differ. Both keys are named.
 
+All of this sits behind one function in core, which every emitter calls
+instead of checking names itself:
+
+```ts
+nameFlags(model: FlagModel, rules: NamingRules): Map<Flag, string>
+
+interface NamingRules {
+  target: TargetId;
+  convert: (key: string) => string;     // for flags with no alias
+  reserved: ReadonlySet<string>;
+  pattern: RegExp;                       // a valid identifier in the language
+  invalidReason?: string;                // why a name fails `pattern`
+  ownNames: readonly string[];           // names the emitter declares itself
+  derived?: (name: string) => readonly string[]; // Detail/Ctx variants, key constants
+}
+```
+
+It returns each flag's **flag name** (the alias or converted key). The emitter
+builds the derived names in its output with the same functions it passes as
+`derived`. Every name, flag name and derived alike, gets the leading-digit,
+pattern and reserved-word checks, flag by flag in model order, before any
+collision is reported. A derived name is checked because it can fail where
+the flag name passes: the Java alias `$` is a valid method, but its constant
+would be empty. Go's initialism table (ADR 0002) is part of the go target's
+`convert`.
+
 ### Emitters
 
 Each emitter implements one interface:

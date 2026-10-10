@@ -44,3 +44,11 @@ _Avoid_: base URL, host, server
 **Alias**:
 An identifier the user chooses for a flag in one target (or all targets), set through the `codegen.name` custom properties. Required whenever the converted key is reserved, starts with a digit, or collides with another generated name; the generator never invents a name itself.
 _Avoid_: name override, rename
+
+**Flag name**:
+A flag's identifier in one target: its alias, or its key converted to the target's casing. The generator checks it and builds every other name for the flag from it.
+_Avoid_: primary identifier
+
+**Derived name**:
+Any other identifier a target emits for a flag, built from its flag name: a `Detail` or `Ctx` method, a key constant. Checked like the flag name and included in the collision check.
+_Avoid_: variant (for key constants)

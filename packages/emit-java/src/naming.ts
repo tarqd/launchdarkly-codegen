@@ -1,19 +1,17 @@
 /**
  * Java names for each flag (DESIGN.md → Naming, java row): the method in
  * lowerCamel and the `Keys` constant in CONSTANT_CASE, both from the flag's
- * java alias when it has one. Every name the file emits is checked before
+ * java alias when it has one. Core checks every name the file emits before
  * it is used.
  */
 
 import {
-  checkIdentifiers,
   constantCase,
-  flagIdentifier,
   lowerCamel,
-  type EmittedIdentifier,
+  nameFlags,
   type Flag,
   type FlagModel,
-  type IdentifierRules,
+  type NamingRules,
   type TargetId,
 } from '@launchtarqly/core';
 
@@ -49,14 +47,17 @@ const JAVA_UNUSABLE_NAMES = [
   'wait', 'notify', 'notifyAll', 'equals', 'hashCode', 'toString', 'getClass', 'clone', 'finalize',
 ];
 
-const NAMING: IdentifierRules = {
+const NAMING: NamingRules = {
   target: JAVA,
+  convert: lowerCamel,
   reserved: new Set([...JAVA_RESERVED_WORDS, ...JAVA_UNUSABLE_NAMES]),
   pattern: JAVA_IDENTIFIER,
+  // The class, its nested class and its field.
+  ownNames: ['Flags', 'Keys', 'client'],
+  // The constant is checked like the method: an alias such as `_1x` or `$`
+  // converts to a constant that isn't an identifier.
+  derived: (method) => [`${method}Detail`, constantCase(method)],
 };
-
-/** The names the emitter itself declares: the class, its nested class and its field. */
-const EMITTER_NAMES = ['Flags', 'Keys', 'client'];
 
 export interface JavaFlagNames {
   /** The value method; the detail method is this plus `Detail`. */
@@ -70,21 +71,10 @@ export interface JavaFlagNames {
  * Throws a CodegenError (exit 2) naming the flag and `codegen.name.java`.
  */
 export function flagNames(model: FlagModel): Map<Flag, JavaFlagNames> {
-  const names = new Map(
-    model.flags.map((flag): [Flag, JavaFlagNames] => {
-      const method = flagIdentifier(flag, JAVA, lowerCamel);
-      return [flag, { method, constant: constantCase(method) }];
-    }),
+  return new Map(
+    [...nameFlags(model, NAMING)].map(([flag, method]): [Flag, JavaFlagNames] => [
+      flag,
+      { method, constant: constantCase(method) },
+    ]),
   );
-  const emitted: EmittedIdentifier[] = EMITTER_NAMES.map((identifier) => ({ identifier }));
-  for (const [flag, { method, constant }] of names) {
-    emitted.push(
-      { flagKey: flag.key, identifier: method, primary: true },
-      { flagKey: flag.key, identifier: `${method}Detail` },
-      // Primary too: an alias such as `_1x` or `$` converts to a constant that isn't an identifier.
-      { flagKey: flag.key, identifier: constant, primary: true },
-    );
-  }
-  checkIdentifiers(NAMING, emitted);
-  return names;
 }
