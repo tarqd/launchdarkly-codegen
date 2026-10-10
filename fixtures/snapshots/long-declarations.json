@@ -1,0 +1,84 @@
+{
+  "snapshotVersion": 1,
+  "projectKey": "storefront-checkout-and-payments-experience-platform",
+  "baseUri": "https://app.launchdarkly.com",
+  "flagPages": [
+    {
+      "items": [
+        {
+          "key": "enable-checkout-experience-redesign-with-progressive-disclosure",
+          "name": "Checkout experience redesign with progressive disclosure",
+          "description": "Shows the redesigned checkout, which reveals the shipping, billing and payment sections one at a time as the shopper completes each of them.\nShoppers who started checkout before the flag turned on keep the old flow until their cart expires.\n\nOwned jointly with the design systems group; ask in the checkout channel before changing targeting during a sale.",
+          "kind": "boolean",
+          "variations": [
+            { "_id": "a1", "value": true },
+            { "_id": "a2", "value": false }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "temporary": true,
+          "tags": ["checkout", "design-systems", "experiment", "frontend", "growth", "payments", "q3-2026", "redesign", "shipping", "web"],
+          "maintainerTeamKey": "checkout-platform",
+          "_maintainerTeam": {
+            "key": "checkout-platform",
+            "name": "Checkout Platform Reliability, Payments Experience and Fraud Prevention Engineering",
+            "_links": { "self": { "href": "/api/v2/teams/checkout-platform", "type": "application/json" } }
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "legacy-recommendations-carousel",
+          "name": "Legacy recommendations carousel",
+          "kind": "boolean",
+          "variations": [
+            { "_id": "b1", "value": true },
+            { "_id": "b2", "value": false }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": ["recommendations"],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": true
+        },
+        {
+          "key": "max-concurrent-payment-authorization-retries-per-region",
+          "name": "Max concurrent payment authorization retries per region",
+          "description": "How many authorization retries a region may run at once.",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "c1", "value": 1 },
+            { "_id": "c2", "value": 4 },
+            { "_id": "c3", "value": 16 }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": ["payments"],
+          "customProperties": {
+            "codegen.number": { "name": "codegen.number", "value": ["int"] }
+          },
+          "archived": false,
+          "deprecated": false
+        },
+        {
+          "key": "storefront-search-ranking-model-personalized-recommendations-experiment-holdout-group-config",
+          "name": "Search ranking holdout config",
+          "description": "The holdout group configuration for the personalized search ranking experiment.",
+          "kind": "multivariate",
+          "variations": [
+            { "_id": "d1", "value": { "holdout": 0.05, "model": "baseline" } },
+            { "_id": "d2", "value": { "holdout": 0.1, "model": "personalized" } }
+          ],
+          "clientSideAvailability": { "usingEnvironmentId": false, "usingMobileKey": false },
+          "tags": ["experiment", "search"],
+          "customProperties": {},
+          "archived": false,
+          "deprecated": true
+        }
+      ],
+      "totalCount": 4,
+      "_links": {
+        "self": { "href": "/api/v2/flags/storefront-checkout-and-payments-experience-platform?limit=20&offset=0&sort=key", "type": "application/json" }
+      }
+    }
+  ]
+}

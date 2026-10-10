@@ -740,10 +740,15 @@ all the rules the emitted shapes need:
   `(`, with the arguments on one line 4 deeper; if that line passes 100 too,
   one argument per line. A constant that passes 100 breaks after `=`, the
   literal 4 deeper.
+- When even `type name(` or `type NAME =` passes 100, it also breaks after the
+  return or field type, the name 4 deeper and the rest laid out from there
+  (parameters or literal 8 deeper). A `Keys.NAME,` argument that still passes
+  100 on its own line breaks before the `.`, which goes 4 deeper still.
 - Every member is preceded by a blank line, the first one in a class body
   excepted.
 - An annotation on a method goes on its own line; `@Deprecated` on a constant
-  stays on the same line.
+  stays on the same line, unless that line would pass 100: then it goes on
+  its own line and the rest of the constant is laid out as above.
 
 The complete sample: the prototype from add-emitter step 2, on
 [`prototype/java-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/java-emitter/prototypes/java-emitter).

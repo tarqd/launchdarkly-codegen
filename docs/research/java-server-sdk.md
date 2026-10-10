@@ -356,7 +356,8 @@ generator has to reject these names itself.
   - Annotations: a method annotation always goes on its own line. `@Deprecated public boolean m()`
     becomes `@Deprecated\n  public boolean m()`, although the guide (§4.8.5.3) would allow the
     one-line form. A field annotation goes **on the same line**: `@Deprecated\n public static final
-    String K2` becomes `@Deprecated public static final String K2` (§4.8.5.4 allows this).
+    String K2` becomes `@Deprecated public static final String K2` (§4.8.5.4 allows this),
+    as long as that line fits in 100 columns; otherwise the annotation stays on its own line.
   - An empty constructor body `private Keys() {\n}` becomes `private Keys() {}`. A one-line
     constructor body `{ this.client = client; }` is expanded to multiple lines.
   - A long method signature wraps after `(` with a +4 continuation indent.
