@@ -13,8 +13,8 @@ import (
 	"github.com/launchdarkly/go-sdk-common/v3/ldvalue"
 )
 
-// Client is the subset of the LaunchDarkly client that Flags calls.
-// *ld.LDClient satisfies it.
+// Client is the subset of the LaunchDarkly client that Flags calls: the typed
+// evaluation methods for every flag kind. *ld.LDClient satisfies it.
 type Client interface {
 	BoolVariation(key string, context ldcontext.Context, defaultVal bool) (bool, error)
 	BoolVariationDetail(key string, context ldcontext.Context, defaultVal bool) (bool, ldreason.EvaluationDetail, error)
@@ -24,6 +24,14 @@ type Client interface {
 	StringVariationDetail(key string, context ldcontext.Context, defaultVal string) (string, ldreason.EvaluationDetail, error)
 	StringVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal string) (string, error)
 	StringVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal string) (string, ldreason.EvaluationDetail, error)
+	Float64Variation(key string, context ldcontext.Context, defaultVal float64) (float64, error)
+	Float64VariationDetail(key string, context ldcontext.Context, defaultVal float64) (float64, ldreason.EvaluationDetail, error)
+	Float64VariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal float64) (float64, error)
+	Float64VariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal float64) (float64, ldreason.EvaluationDetail, error)
+	IntVariation(key string, context ldcontext.Context, defaultVal int) (int, error)
+	IntVariationDetail(key string, context ldcontext.Context, defaultVal int) (int, ldreason.EvaluationDetail, error)
+	IntVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal int) (int, error)
+	IntVariationDetailCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal int) (int, ldreason.EvaluationDetail, error)
 	JSONVariation(key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, error)
 	JSONVariationDetail(key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, ldreason.EvaluationDetail, error)
 	JSONVariationCtx(ctx gocontext.Context, key string, context ldcontext.Context, defaultVal ldvalue.Value) (ldvalue.Value, error)
