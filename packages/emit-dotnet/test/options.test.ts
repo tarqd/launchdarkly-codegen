@@ -26,6 +26,32 @@ describe('dotnet target options', () => {
     expect(() => emitWith({ namespace })).toThrow(/dotnet target: `namespace`/);
   });
 
+  it.each([
+    ['MyApp.namespace.Flags2', 'namespace'],
+    ['class', 'class'],
+    ['MyApp.string', 'string'],
+  ])('rejects the namespace %s, whose segment %s is a C# keyword', (namespace, segment) => {
+    expect(() => emitWith({ namespace })).toThrow(
+      new CodegenError(`dotnet target: \`namespace\` segment "${segment}" is a C# keyword; got ${JSON.stringify(namespace)}`),
+    );
+  });
+
+  it.each(['MyApp.Flags', 'MyApp.FlagKeys', 'Flags'])(
+    'rejects the namespace %s, whose last segment would hide the generated class (CS0118)',
+    (namespace) => {
+      const last = namespace.split('.').pop();
+      expect(() => emitWith({ namespace })).toThrow(
+        new CodegenError(
+          `dotnet target: \`namespace\` must not end in ${last}, the name of a generated class (code in the parent namespace would resolve ${last} to the namespace); got ${JSON.stringify(namespace)}`,
+        ),
+      );
+    },
+  );
+
+  it('accepts Flags or FlagKeys as a segment other than the last, and Unicode identifiers', () => {
+    expect(emitWith({ namespace: 'Flags.Größe' })[0]?.contents).toContain('\nnamespace Flags.Größe\n{\n');
+  });
+
   it('accepts .cs output paths, with or without .g', () => {
     expect(emitWith({ out: 'src/Flags.cs' })[0]?.path).toBe('src/Flags.cs');
     expect(emitWith({ out: 'src/Flags.g.cs' })[0]?.path).toBe('src/Flags.g.cs');
