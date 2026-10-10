@@ -8,16 +8,13 @@
  * one-line form.
  */
 
-import { summarizeFlagChanges, type GeneratedFlag, type GeneratedKind } from '@launchtarqly/core';
+import { summarizeFlagChanges, type GeneratedFlag } from '@launchtarqly/core';
+import { JAVA_KINDS, type JavaKind, type JavaKindName } from './kinds.js';
 
-/** Each primary method's return type, its flag kind and the SDK method it calls. */
-const KINDS: Record<string, { kind: GeneratedKind; call: string }> = {
-  boolean: { kind: 'boolean', call: 'boolVariation' },
-  String: { kind: 'string', call: 'stringVariation' },
-  double: { kind: 'double', call: 'doubleVariation' },
-  int: { kind: 'int', call: 'intVariation' },
-  LDValue: { kind: 'json', call: 'jsonValueVariation' },
-};
+/** Each primary method's return type, and the kind it is. */
+const BY_TYPE = new Map(
+  (Object.entries(JAVA_KINDS) as [JavaKindName, JavaKind][]).map(([kind, java]) => [java.type, { kind, ...java }]),
+);
 
 const IDENT = String.raw`[A-Za-z_$][\w$]*`;
 const STRING = String.raw`"(?:[^"\\\n]|\\.)*"`;
@@ -68,10 +65,10 @@ export function parseJavaFlags(text: string): GeneratedFlag[] | undefined {
   const keys = KEYS.exec(code);
   if (!keys) return undefined;
 
-  const kinds = new Map<string, GeneratedKind>();
+  const kinds = new Map<string, JavaKindName>();
   for (const [, type, , call, constant] of code.matchAll(METHOD)) {
-    const method = KINDS[type!];
-    if (method !== undefined && method.call === call) kinds.set(constant!, method.kind);
+    const java = BY_TYPE.get(type!);
+    if (java !== undefined && java.method === call) kinds.set(constant!, java.kind);
   }
 
   const body = keys[1]!;

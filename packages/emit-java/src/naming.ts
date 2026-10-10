@@ -17,7 +17,11 @@ import {
   type TargetId,
 } from '@launchtarqly/core';
 
-const JAVA: TargetId = 'java';
+/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+export const JAVA: TargetId = 'java';
+
+/** A Java identifier, ASCII only so the generated file reads the same in every encoding. */
+export const JAVA_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 /**
  * Words that can't be a Java identifier: the 51 JLS 21 §3.9 reserved
@@ -48,8 +52,7 @@ const JAVA_UNUSABLE_NAMES = [
 const NAMING: IdentifierRules = {
   target: JAVA,
   reserved: new Set([...JAVA_RESERVED_WORDS, ...JAVA_UNUSABLE_NAMES]),
-  // ASCII only, so the generated file reads the same in every encoding.
-  pattern: /^[A-Za-z_$][A-Za-z0-9_$]*$/,
+  pattern: JAVA_IDENTIFIER,
 };
 
 /** The names the emitter itself declares: the class, its nested class and its field. */

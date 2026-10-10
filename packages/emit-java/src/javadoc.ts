@@ -6,6 +6,7 @@
  */
 
 import type { Flag } from '@launchtarqly/core';
+import { CONTINUATION, MAX_WIDTH } from './layout.js';
 
 /**
  * Makes user text (a name, description, tag, maintainer or deprecation
@@ -35,11 +36,6 @@ export interface Javadoc {
   tags?: readonly string[];
 }
 
-/** google-java-format's line limit, in UTF-16 code units. */
-const MAX_WIDTH = 100;
-/** The extra indent of a block tag's continuation lines. */
-const TAG_CONTINUATION = '    ';
-
 /**
  * The lines of a `/** ... *\/` comment laid out as google-java-format 1.37.0
  * leaves it (ADR 0004), for a comment whose `/**` starts at column `indent`.
@@ -54,7 +50,7 @@ export function javadocLines(doc: Javadoc, indent: number): string[] {
   }
   const body: string[][] = [
     ...paragraphs.map((p) => fill(p, indent, '')),
-    ...(tags.length > 0 ? [tags.flatMap((t) => fill(t, indent, TAG_CONTINUATION))] : []),
+    ...(tags.length > 0 ? [tags.flatMap((t) => fill(t, indent, CONTINUATION))] : []),
   ];
   const lines = body.flatMap((block, i) => [...(i > 0 ? [''] : []), ...block]);
   return ['/**', ...lines.map((l) => (l === '' ? ' *' : ` * ${l}`)), ' */'];

@@ -7,9 +7,9 @@
  */
 
 /** google-java-format's line limit, in UTF-16 code units. */
-const MAX_WIDTH = 100;
-/** The extra indent of a continuation line. */
-const CONTINUATION = '    ';
+export const MAX_WIDTH = 100;
+/** The extra indent of a continuation line, a block tag's in Javadoc included. */
+export const CONTINUATION = '    ';
 
 function fits(line: string, indent: number): boolean {
   return indent + line.length <= MAX_WIDTH;

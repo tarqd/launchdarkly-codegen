@@ -4,43 +4,22 @@
  * google-java-format 1.37.0's canonical form (ADR 0004).
  */
 
-import { Writer, type Emitter, type Flag, type FlagKind, type TargetId } from '@launchtarqly/core';
+import { Writer, type Emitter, type Flag } from '@launchtarqly/core';
 import { classDoc, isDeprecated, javadocLines, keyConstantDoc, methodDoc, type Javadoc } from './javadoc.js';
 import { summarizeJavaChanges } from './flag-changes.js';
-import { callLines, constantLines, signatureLines } from './layout.js';
-import { flagNames, type JavaFlagNames } from './naming.js';
+import { JAVA_KINDS, javaKind } from './kinds.js';
+import { callLines, constantLines, signatureLines, type Call, type Signature } from './layout.js';
+import { flagNames, JAVA, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
 
 export { parseJavaFlags, summarizeJavaChanges } from './flag-changes.js';
-
-/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
-export const JAVA: TargetId = 'java';
+export { JAVA } from './naming.js';
 
 /** The one file the target writes, inside the `out` directory. */
 const FILE_NAME = 'Flags.java';
 
 const SDK = 'com.launchdarkly.sdk';
 const CLIENT_INTERFACE = `${SDK}.server.interfaces.LDClientInterface`;
-
-/** The SDK method prefix, Java type and boxed type of each kind. */
-interface KindMethod {
-  method: string;
-  type: string;
-  boxed: string;
-}
-
-function kindMethod(flag: Flag): KindMethod {
-  const byKind: Record<FlagKind, KindMethod> = {
-    boolean: { method: 'boolVariation', type: 'boolean', boxed: 'Boolean' },
-    string: { method: 'stringVariation', type: 'String', boxed: 'String' },
-    number:
-      flag.numberType === 'int'
-        ? { method: 'intVariation', type: 'int', boxed: 'Integer' }
-        : { method: 'doubleVariation', type: 'double', boxed: 'Double' },
-    json: { method: 'jsonValueVariation', type: 'LDValue', boxed: 'LDValue' },
-  };
-  return byKind[flag.kind];
-}
 
 /** Exactly the imports the file uses, in ASCII order (google-java-format deletes unused ones). */
 function imports(flags: readonly Flag[]): string[] {
@@ -57,50 +36,43 @@ const KEYS_MEMBER_INDENT = 4;
 /** The column a method's statements start at. */
 const METHOD_BODY_INDENT = 4;
 
-/** Writes `doc` laid out for a member at column `indent`. */
-function writeDoc(w: Writer, doc: Javadoc, indent: number): void {
-  for (const line of javadocLines(doc, indent)) w.line(line);
+/** One evaluation method: `signature` returning `call`, under `doc`. */
+interface EvaluationMethod {
+  doc: Javadoc;
+  signature: Signature;
+  call: Call;
 }
 
 /**
- * Writes a method's comment and, when the comment has `@deprecated`, the
- * `@Deprecated` annotation on its own line. javac doesn't warn when one half
- * of the pair is missing, so both come from the one comment.
+ * Writes one evaluation method. When its comment has `@deprecated`, the
+ * `@Deprecated` annotation goes on its own line: javac doesn't warn when one
+ * half of the pair is missing, so both come from the one comment.
  */
-function writeMethodDoc(w: Writer, doc: Javadoc): void {
-  writeDoc(w, doc, MEMBER_INDENT);
-  if (isDeprecated(doc)) w.line('@Deprecated');
-}
-
-/** Writes `lines` at the current indentation. */
-function writeLines(w: Writer, lines: readonly string[]): void {
-  for (const line of lines) w.line(line);
-}
-
-/** Writes one evaluation method: `head name(context, fallback)` returning `client.call(key, context, fallback)`. */
-function emitMethod(w: Writer, doc: Javadoc, head: string, name: string, call: string, key: string, type: string): void {
+function emitMethod(w: Writer, { doc, signature, call }: EvaluationMethod): void {
   w.line();
-  writeMethodDoc(w, doc);
-  writeLines(w, signatureLines({ head, name, params: ['LDContext context', `${type} fallback`] }, MEMBER_INDENT));
+  for (const line of javadocLines(doc, MEMBER_INDENT)) w.line(line);
+  if (isDeprecated(doc)) w.line('@Deprecated');
+  for (const line of signatureLines(signature, MEMBER_INDENT)) w.line(line);
   w.indent(() => {
-    writeLines(w, callLines({ head: `return client.${call}`, args: [key, 'context', 'fallback'] }, METHOD_BODY_INDENT));
+    for (const line of callLines(call, METHOD_BODY_INDENT)) w.line(line);
   });
   w.line('}');
 }
 
 function emitFlagMethods(w: Writer, flag: Flag, names: JavaFlagNames): void {
-  const { method, type, boxed } = kindMethod(flag);
-  const key = `Keys.${names.constant}`;
-  emitMethod(w, methodDoc(flag, 'value'), `public ${type}`, names.method, method, key, type);
-  emitMethod(
-    w,
-    methodDoc(flag, 'detail'),
-    `public EvaluationDetail<${boxed}>`,
-    `${names.method}Detail`,
-    `${method}Detail`,
-    key,
-    type,
-  );
+  const { method, detailMethod, type, boxed } = JAVA_KINDS[javaKind(flag)];
+  const params = ['LDContext context', `${type} fallback`];
+  const args = [`Keys.${names.constant}`, 'context', 'fallback'];
+  emitMethod(w, {
+    doc: methodDoc(flag, 'value'),
+    signature: { head: `public ${type}`, name: names.method, params },
+    call: { head: `return client.${method}`, args },
+  });
+  emitMethod(w, {
+    doc: methodDoc(flag, 'detail'),
+    signature: { head: `public EvaluationDetail<${boxed}>`, name: `${names.method}Detail`, params },
+    call: { head: `return client.${detailMethod}`, args },
+  });
 }
 
 /** A double-quoted Java string literal. */
@@ -122,7 +94,7 @@ export const javaEmitter: Emitter = {
     w.line();
     for (const name of imports(model.flags)) w.line(`import ${name};`);
     w.line();
-    writeDoc(w, classDoc(model.projectKey), CLASS_INDENT);
+    for (const line of javadocLines(classDoc(model.projectKey), CLASS_INDENT)) w.line(line);
     w.block('public final class Flags {', '}', () => {
       w.inlineDocComment('The wrapped SDK client.');
       w.line('private final LDClientInterface client;');
@@ -140,14 +112,14 @@ export const javaEmitter: Emitter = {
         for (const flag of model.flags) {
           w.line();
           const doc = keyConstantDoc(flag);
-          writeDoc(w, doc, KEYS_MEMBER_INDENT);
+          for (const line of javadocLines(doc, KEYS_MEMBER_INDENT)) w.line(line);
           const constant = {
             ...(isDeprecated(doc) ? { annotation: '@Deprecated' } : {}),
             head: 'public static final String',
             name: names.get(flag)!.constant,
             value: javaString(flag.key),
           };
-          writeLines(w, constantLines(constant, KEYS_MEMBER_INDENT));
+          for (const line of constantLines(constant, KEYS_MEMBER_INDENT)) w.line(line);
         }
       });
     });
