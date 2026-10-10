@@ -7,8 +7,8 @@ import {
   checkIdentifiers,
   CodegenError,
   deprecationText,
+  docTrailer,
   flagIdentifier,
-  maintainerLabel,
   upperCamel,
   Writer,
   type EmittedIdentifier,
@@ -192,10 +192,8 @@ function sdkMethod(flag: Flag): SdkMethod {
 function summaryLines(flag: Flag): string[] {
   const lines = [xmlText(oneLine(flag.name))];
   if (flag.description.trim() !== '') lines.push(...paragraphs(flag.description));
-  const trailer = [`key: <c>${xmlText(flag.key)}</c>`];
-  if (flag.tags.length > 0) trailer.push(`tags: ${xmlText(flag.tags.join(', '))}`);
-  if (flag.maintainer) trailer.push(`maintainer: ${xmlText(maintainerLabel(flag.maintainer))}`);
-  lines.push(`<para>${trailer.join(' · ')}</para>`, `<para><see href="${xmlAttribute(flag.uiUrl)}"/></para>`);
+  const trailer = docTrailer(flag, (key) => `<c>${xmlText(key)}</c>`, xmlText);
+  lines.push(`<para>${trailer}</para>`, `<para><see href="${xmlAttribute(flag.uiUrl)}"/></para>`);
   return lines;
 }
 
@@ -213,6 +211,11 @@ function emitObsolete(w: Writer, message: string, uiUrl: string): void {
   w.directive('#endif');
 }
 
+/** A flag key in an `[Obsolete]` message, which is plain text: Markdown-style backticks. */
+function markdownCode(text: string): string {
+  return `\`${text}\``;
+}
+
 const PARAM_DOCS = [
   '/// <param name="context">The context to evaluate the flag for.</param>',
   '/// <param name="fallback">The value to use if the flag can\'t be evaluated.</param>',
@@ -221,7 +224,7 @@ const PARAM_DOCS = [
 function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
   const { method, type } = sdkMethod(flag);
   const title = xmlText(oneLine(flag.name));
-  const deprecation = deprecationText(flag);
+  const deprecation = deprecationText(flag, markdownCode);
   w.line('/// <summary>');
   for (const text of summaryLines(flag)) w.line(`/// ${text}`);
   w.line('/// </summary>');
@@ -284,7 +287,7 @@ export const dotnetEmitter: Emitter = {
         model.flags.forEach((flag, i) => {
           if (i > 0) w.line();
           const name = names.get(flag)!;
-          const deprecation = deprecationText(flag);
+          const deprecation = deprecationText(flag, markdownCode);
           w.line(`/// <summary>Key of the flag behind <see cref="Flags.${name}"/>.</summary>`);
           if (deprecation !== undefined) emitObsolete(w, deprecation, flag.uiUrl);
           w.line(`public const string ${name} = ${csString(flag.key)};`);

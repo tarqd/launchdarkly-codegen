@@ -6,10 +6,10 @@
 import {
   checkIdentifiers,
   deprecationText,
+  docTrailer,
   ECMASCRIPT_RESERVED_WORDS,
   flagIdentifier,
   lowerCamel,
-  maintainerLabel,
   Writer,
   type EmittedIdentifier,
   type Emitter,
@@ -59,13 +59,15 @@ function tsString(value: string): string {
 function docLines(flag: Flag): string[] {
   const lines = [flag.name, ''];
   if (flag.description.trim() !== '') lines.push(...flag.description.trim().split(/\r?\n/), '');
-  const trailer = [`key: \`${flag.key}\``];
-  if (flag.tags.length > 0) trailer.push(`tags: ${flag.tags.join(', ')}`);
-  if (flag.maintainer) trailer.push(`maintainer: ${maintainerLabel(flag.maintainer)}`);
-  lines.push(trailer.join(' · '), flag.uiUrl);
-  const deprecation = deprecationText(flag);
+  lines.push(docTrailer(flag, inlineCode), flag.uiUrl);
+  const deprecation = deprecationText(flag, inlineCode);
   if (deprecation !== undefined) lines.push('', `@deprecated ${deprecation}`);
   return lines;
+}
+
+/** TSDoc inline code. */
+function inlineCode(text: string): string {
+  return `\`${text}\``;
 }
 
 /** The SDK method prefix and TypeScript type for each Flag kind. */
@@ -115,7 +117,7 @@ export const tsServerEmitter: Emitter = {
     w.line();
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
-        const deprecation = deprecationText(flag);
+        const deprecation = deprecationText(flag, inlineCode);
         if (deprecation !== undefined) w.inlineDocComment(`@deprecated ${deprecation}`);
         w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }

@@ -2,10 +2,11 @@
 
 import type { Emitter } from '@launchtarqly/core';
 import { dotnetEmitter } from '@launchtarqly/emit-dotnet';
+import { goEmitter } from '@launchtarqly/emit-go';
 import { javaEmitter } from '@launchtarqly/emit-java';
 import { tsServerEmitter } from '@launchtarqly/emit-ts-server';
 
-export const BUILT_IN_EMITTERS: readonly Emitter[] = [tsServerEmitter, dotnetEmitter, javaEmitter];
+export const BUILT_IN_EMITTERS: readonly Emitter[] = [tsServerEmitter, dotnetEmitter, goEmitter, javaEmitter];
 
 /**
  * The emitter for a target id. Config loading has already rejected unknown

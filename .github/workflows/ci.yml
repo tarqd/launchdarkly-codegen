@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ts-server, dotnet, java]
+        target: [ts-server, dotnet, go, java]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -40,6 +40,14 @@ jobs:
         if: matrix.target == 'dotnet'
         with:
           dotnet-version: 8.0.x
+      # Go 1.25 is go-server-sdk v7's floor; staticcheck 2025.1.1 is pinned with it (DESIGN.md → go → Toolchain).
+      - uses: actions/setup-go@v5
+        if: matrix.target == 'go'
+        with:
+          go-version: '1.25.0'
+          cache-dependency-path: fixtures/compile/go/go.sum
+      - if: matrix.target == 'go'
+        run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
       # JDK 21 runs javac (--release 8), javadoc and google-java-format; the runner ships mvn.
       - if: matrix.target == 'java'
         uses: actions/setup-java@v4

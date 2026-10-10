@@ -15,6 +15,8 @@ export interface IdentifierRules {
   reserved: ReadonlySet<string>;
   /** What a valid identifier looks like in the target's language. */
   pattern: RegExp;
+  /** Why a name that fails `pattern` is rejected; defaults to "is not a valid identifier". */
+  invalidReason?: string;
 }
 
 export interface EmittedIdentifier {
@@ -61,7 +63,7 @@ export function checkIdentifiers(rules: IdentifierRules, identifiers: readonly E
   for (const { identifier, flagKey, primary } of identifiers) {
     if (!primary || flagKey === undefined) continue;
     if (/^[0-9]/.test(identifier)) fail(flagKey, identifier, 'starts with a digit');
-    if (!rules.pattern.test(identifier)) fail(flagKey, identifier, 'is not a valid identifier');
+    if (!rules.pattern.test(identifier)) fail(flagKey, identifier, rules.invalidReason ?? 'is not a valid identifier');
     if (rules.reserved.has(identifier)) fail(flagKey, identifier, 'is a reserved word');
   }
 

@@ -35,6 +35,9 @@ importers:
       '@launchtarqly/emit-dotnet':
         specifier: workspace:*
         version: link:../emit-dotnet
+      '@launchtarqly/emit-go':
+        specifier: workspace:*
+        version: link:../emit-go
       '@launchtarqly/emit-java':
         specifier: workspace:*
         version: link:../emit-java
@@ -51,6 +54,12 @@ importers:
   packages/core: {}
 
   packages/emit-dotnet:
+    dependencies:
+      '@launchtarqly/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/emit-go:
     dependencies:
       '@launchtarqly/core':
         specifier: workspace:*

@@ -5,7 +5,7 @@
  * 1.37.0 would (ADR 0004).
  */
 
-import { deprecationText, maintainerLabel, type Flag } from '@launchtarqly/core';
+import { deprecationText, docTrailer, type Flag } from '@launchtarqly/core';
 import { CONTINUATION, MAX_WIDTH } from './layout.js';
 
 /**
@@ -137,16 +137,16 @@ function descriptionParagraphs(description: string): string[] {
     .map(escapeJavadoc);
 }
 
-/** `key: {@code k} · tags: … · maintainer: …<br>` and the UI link. Keys need no escaping. */
+/** Inline code in Javadoc. Keys need no escaping. */
+const javadocCode = (key: string): string => `{@code ${key}}`;
+
+/** `key: {@code k} · tags: … · maintainer: …<br>` and the UI link. */
 function trailer(flag: Flag): string {
-  const parts = [`key: {@code ${flag.key}}`];
-  if (flag.tags.length > 0) parts.push(`tags: ${escapeJavadoc(flag.tags.join(', '))}`);
-  if (flag.maintainer) parts.push(`maintainer: ${escapeJavadoc(maintainerLabel(flag.maintainer))}`);
-  return `${parts.join(' · ')}<br>\n${flag.uiUrl}`;
+  return `${docTrailer(flag, javadocCode, escapeJavadoc)}<br>\n${flag.uiUrl}`;
 }
 
 /** The `@deprecated` tag, when the flag is deprecated. */
 function deprecatedTag(flag: Flag): string[] {
-  const text = deprecationText(flag, (key) => `{@code ${key}}`, escapeJavadoc);
+  const text = deprecationText(flag, javadocCode, escapeJavadoc);
   return text === undefined ? [] : [`@deprecated ${text}`];
 }
