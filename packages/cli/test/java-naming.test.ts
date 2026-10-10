@@ -43,13 +43,9 @@ describe('java names', () => {
     expect(text).toContain('public static final String CHECKOUT_V2_NEW_FLOW = "checkout-v2.new_flow";');
     expect(text).toContain('public static final String API_URL_ID = "api-url-id";');
   });
-
-  it('allows contextual keywords other than yield', async () => {
-    const result = await generate(apiFlag('var'), apiFlag('record'), apiFlag('sealed'));
-    expect(result).toMatchObject({ exitCode: 0, stderr: '' });
-  });
 });
 
+// Each naming rule is tested in packages/emit-java/test/naming.test.ts; these check the CLI's exit code and message.
 describe('java naming failures exit 2 and suggest codegen.name.java', () => {
   async function expectFailure(items: ApiFlag[], ...fragments: string[]) {
     const result = await generate(...items);
@@ -61,41 +57,9 @@ describe('java naming failures exit 2 and suggest codegen.name.java', () => {
   it('a leading digit', () =>
     expectFailure([apiFlag('2fa-enabled')], 'flag 2fa-enabled: java identifier "2faEnabled" starts with a digit'));
 
-  it.each([
-    ['a keyword', 'class'],
-    ['the keyword _', '_'],
-    ['a literal', 'null'],
-    ['yield', 'yield'],
-    ['an Object method', 'hashCode'],
-  ])('a reserved word: %s', (_case, alias) =>
-    expectFailure([named('ok-flag', { 'codegen.name.java': alias })], `flag ok-flag: java identifier "${alias}" is a reserved word`));
-
-  it.each(['true', 'false', 'wait', 'notify', 'notifyAll', 'equals', 'toString', 'getClass', 'clone', 'finalize'])(
-    'a reserved word converted from the key: %s',
-    (key) => expectFailure([apiFlag(key)], `"${key}" is a reserved word`),
-  );
-
-  it.each(['not valid', 'é', '1abc', 'a-b'])('an invalid alias: %s', (alias) =>
-    expectFailure([named('ok-flag', { 'codegen.name.java': alias })], 'flag ok-flag: java identifier'));
-
-  it('an alias whose constant would not be a valid identifier', () =>
-    expectFailure([named('ok-flag', { 'codegen.name.java': '$' })], 'flag ok-flag:'));
-
-  it('a Detail variant colliding with another flag', () =>
-    expectFailure(
-      [apiFlag('checkout'), apiFlag('checkout-detail')],
-      'java identifier "checkoutDetail" is produced by flags checkout and checkout-detail',
-    ));
-
   it('a constant collision', () =>
     expectFailure(
       [apiFlag('api-url-id'), named('other-flag', { 'codegen.name.java': 'apiURLId' })],
       'java identifier "API_URL_ID" is produced by flags api-url-id and other-flag',
-    ));
-
-  it.each(['Flags', 'Keys', 'client'])('a collision with %s', (alias) =>
-    expectFailure(
-      [named('ok-flag', { 'codegen.name.java': alias })],
-      `flag ok-flag: java identifier "${alias}" collides with a name the generator uses`,
     ));
 });
