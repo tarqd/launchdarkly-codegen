@@ -6,9 +6,8 @@
 import { resolve } from 'node:path';
 import { summarizeReadBack, unifiedDiff, type NormalizeOptions, type Snapshot } from '@launchtarqly/core';
 import type { Config } from './config.js';
-import { emitterFor } from './emitters.js';
 import { readIfExists } from './fs.js';
-import { generateFiles } from './generate.js';
+import { generateTargets } from './generate.js';
 
 export interface CheckResult {
   stale: boolean;
@@ -24,14 +23,9 @@ export async function checkFiles(
 ): Promise<CheckResult> {
   const failOnMissingOutput = config.check?.failOnMissingOutput ?? true;
   // Generate every target before reading anything, so a config, model or API
-  // error (exit 2) is never preceded by partial drift output. Targets are
-  // generated one at a time to know which target wrote which file; normalizer
-  // warnings are the same each time, so only the first pass reports them.
-  const outputs = config.targets.flatMap((target, i) =>
-    generateFiles({ ...config, targets: [target] }, snapshot, i === 0 ? options : {}).map((file) => ({
-      emitter: emitterFor(target.id),
-      file,
-    })),
+  // error (exit 2) is never preceded by partial drift output.
+  const outputs = generateTargets(config, snapshot, options).flatMap(({ emitter, files }) =>
+    files.map((file) => ({ emitter, file })),
   );
 
   let stale = false;
