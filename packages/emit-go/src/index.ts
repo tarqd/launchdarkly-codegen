@@ -19,6 +19,9 @@ import {
   type TargetId,
 } from '@launchtarqly/core';
 import { deprecation, methodDoc } from './doc.js';
+import { summarizeGoChanges } from './flag-changes.js';
+
+export { parseGoFlags, summarizeGoChanges } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const GO: TargetId = 'go';
@@ -218,6 +221,7 @@ export const goEmitter: Emitter = {
     if (flags.length > 0) emitKeys(w, flags, names);
     return [{ path: cfg.out, contents: w.toString() }];
   },
+  summarizeChanges: summarizeGoChanges,
 };
 
 export default goEmitter;

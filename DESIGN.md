@@ -6,10 +6,10 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: design, pre-implementation. `core` and the `ts-server` target have no
-open decisions left; the shared design (flag model, naming, emitter interface)
-has been checked against Go and Java with a compiling prototype. The full
-emitter specs for `go`, `java` and `ts-browser` are later work. Facts that
+Status: `core`, the `ts-server` target and the `go` target are built; the
+shared design (flag model, naming, emitter interface) has also been checked
+against Java with a compiling prototype. The full emitter specs for `java` and
+`ts-browser` are later work. Facts that
 could not be confirmed from a primary source are listed at the end, to be
 checked during implementation.
 
@@ -519,6 +519,15 @@ inputs on the prototype branch and re-fuzzed by the compile test:
   always stable. So a one-line description with no final period joins the
   summary paragraph.
 
+**Naming.** Identifiers are UpperCamel with staticcheck's default
+initialisms upper-cased (ADR 0002), so `checkout-v2` is `CheckoutV2` and
+`api-url` is `APIURL`. The table has no plural forms, so `banner-ids` becomes
+`BannerIds`, not `BannerIDs`; plural initialisms are tracked in
+[#47](https://github.com/tarqd/launchdarkly-codegen/issues/47). Every
+identifier the file declares (each flag's four methods and its constant, plus
+`Client`, `Flags` and `New`) goes through the collision check, and every one,
+aliases included, must be an exported Go identifier.
+
 **Constants.** `Key` + the flag's identifier, in one `const ( )` group sorted
 by flag key. A `// Deprecated:` line ends gofmt's `=` alignment run, which the
 emitter reproduces: alignment is per run of consecutive single-line specs,
@@ -527,10 +536,19 @@ padded by rune count.
 **Toolchain.** The output passes `gofmt -l`, `go vet ./...` and
 `staticcheck -checks all` (2025.1.1) on Go 1.25, the SDK's own floor: its
 `go.mod` says `go 1.25.0` since v7.15.5. The compile fixture and CI pin those
-versions, since staticcheck 2026.2.1 fails on go1.27.2. The working prototype
-is on the
+versions, since staticcheck 2026.2.1 fails on go1.27.2. The compile test
+(`packages/emit-go/test/go.compile.test.ts`) copies every golden file into
+`fixtures/compile/go`, runs those checks, and re-fuzzes the doc sanitizer
+against gofmt. The original prototype is on the
 [`prototype/go-emitter`](https://github.com/tarqd/launchdarkly-codegen/tree/prototype/go-emitter/prototypes/go-emitter)
 branch.
+
+**Check summary.** `summarizeChanges` reads a go file back from the `Key…`
+constants (identifier and key) and the primary methods' signatures (kind).
+`int` and `float64` both read as a number flag, so switching
+`codegen.number` shows in the diff but not as a changed kind. A file that
+can't be read back (hand-edited, or not go output) gets no summary, and
+`check` prints the diff alone.
 
 Complete output for the three example flags, with `checkout-config`
 deprecated (`codegen.deprecated: Use checkout-layout instead.`):
@@ -1128,7 +1146,7 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`, `emit-dotnet`.
+3. `emit-go` (shipped), `emit-java`, `emit-dotnet`.
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.
