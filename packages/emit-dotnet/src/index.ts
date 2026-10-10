@@ -17,6 +17,9 @@ import {
   type TargetConfig,
   type TargetId,
 } from '@launchtarqly/core';
+import { summarizeDotnetChanges } from './flag-changes.js';
+
+export { parseDotnetFlags, summarizeDotnetChanges } from './flag-changes.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const DOTNET: TargetId = 'dotnet';
@@ -226,6 +229,7 @@ export const dotnetEmitter: Emitter = {
   id: DOTNET,
   // Config validation checks each target's `sdkMajor` against this list.
   sdkMajors: [8],
+  summarizeChanges: summarizeDotnetChanges,
   emit(model, cfg, ctx) {
     const { namespace } = targetOptions(cfg);
     const names = flagNames(model);

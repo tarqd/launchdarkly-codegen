@@ -6,10 +6,10 @@ languages. Consumers construct their own SDK client and hand it to the
 generated wrapper. The wrapper's only job is to make flag keys and value types
 a compile-time concern instead of a runtime one.
 
-Status: design, pre-implementation. `core` and the `ts-server` target have no
-open decisions left; the shared design (flag model, naming, emitter interface)
-has been checked against Go and Java with a compiling prototype. The full
-emitter specs for `go`, `java` and `ts-browser` are later work. Facts that
+Status: `core`, the `ts-server` target and the `dotnet` target are built; the
+shared design (flag model, naming, emitter interface) has been checked against
+Go and Java with a compiling prototype. The `go` and `java` emitters are
+specified but not built yet, and the full `ts-browser` spec is later work. Facts that
 could not be confirmed from a primary source are listed at the end, to be
 checked during implementation.
 
@@ -273,11 +273,14 @@ suggesting `codegen.name.<target>`:
   match `^\p{Lu}[\p{L}\p{Nd}_]*$`: an exported name must start with an
   upper-case letter, so an alias like `checkout` or `日本` is an error. C#
   keywords are all lowercase too, so .NET checks its own names (`Flags`,
-  `FlagKeys`; a member can't share its class's name, CS0542) and the
+  `FlagKeys`, since a member can't share its class's name, CS0542; and the
+  wrapper's private field `_client`) and the
   `System.Object` members (`Equals`, `GetHashCode`, `ToString`, `GetType`,
   `MemberwiseClone`, `Finalize`, `ReferenceEquals`). An alias, which can be
-  in any case, is also checked against the C# keywords. The generator never
-  escapes a name with `@`.
+  in any case, is also checked against the C# keywords, and must be a C#
+  identifier, so Unicode letters are allowed (`日本` is a valid .NET alias). A
+  C# keyword and a `System.Object` member fail with the same "is a reserved
+  word" error. The generator never escapes a name with `@`.
 - **Collision.** The check covers every identifier a target emits: flag
   methods, their `Detail` variants (and Go's `Ctx` variants), and key
   constants. For example, flag `checkout`'s detail method and a flag named
@@ -1037,7 +1040,8 @@ warning.
 
 Target options:
 
-- `namespace` (required): dotted C# identifiers, none of them a keyword. A
+- `namespace` (required): dotted C# identifiers (Unicode letters allowed),
+  none of them a keyword. A
   last segment of `Flags` or `FlagKeys` is rejected (exit 2), because code in
   the parent namespace would then resolve `Flags` to the namespace (CS0118).
 - `out` is the path of the one generated `.cs` file (for example
@@ -1205,7 +1209,20 @@ namespace MyApp.FeatureFlags
 The full doc comment (name, description, trailer, link) sits on the main
 method, and a deprecated flag's adds a `<remarks>Deprecated: ...</remarks>`.
 The `Detail` method and the key constant get a one-line summary with a
-`<see cref>` to the main method, plus the same `[Obsolete]`.
+`<see cref>` to the main method, plus the same `[Obsolete]`. A description of
+several paragraphs (separated by blank lines) becomes one `<para>` per
+paragraph. Without a `deprecationMessage`, the `[Obsolete]` text is
+ts-server's generic one, ``The `<key>` flag is deprecated.`` (the backticks
+are literal). The `#if NET5_0_OR_GREATER` / `#else` / `#endif` lines sit at
+column 0 (C# convention), written with core's `Writer.directive`.
+
+`check` reads a stale file back through `FlagKeys` (each constant's name and
+key) and the `_client.<Kind>Variation(FlagKeys.<Name>, …)` call in each main
+method (the kind). `IntVariation` and `DoubleVariation` both read back as
+`number`, so switching a flag's `codegen.number` changes the diff but not the
+summary line. A file whose `FlagKeys` holds anything besides doc comments,
+`#if` lines, attributes and `public const string` constants with a matching
+method gets the diff alone.
 
 The compile fixture `fixtures/compile/dotnet/` builds every golden file with
 `TreatWarningsAsErrors`, `AnalysisLevel=latest-all`, `AnalysisMode=All`,
@@ -1322,6 +1339,7 @@ packages/
   emit-ts-browser/
   emit-go/
   emit-java/
+  emit-dotnet/
 fixtures/
   snapshots/       recorded API responses used as inputs
   golden/<target>/ expected output per snapshot
@@ -1416,7 +1434,7 @@ data):
 2. `emit-ts-server`, golden and compile fixtures, the published
    `@launchtarqly/codegen` package with its `npx` entry point. First usable
    release.
-3. `emit-go`, `emit-java`, `emit-dotnet`.
+3. `emit-go`, `emit-java`, `emit-dotnet` (`emit-dotnet` is built).
 4. `emit-ts-browser`, including legacy client SDK support via `sdkMajor`.
 5. React target.
 6. JSON schema typing if there is demand.
