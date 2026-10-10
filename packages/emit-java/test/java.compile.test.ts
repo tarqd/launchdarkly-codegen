@@ -6,14 +6,20 @@
  * -Werror, `javadoc -Xdoclint:all -Werror`, and google-java-format 1.37.0
  * `--dry-run --set-exit-if-changed`. A golden file with a directory under
  * usage/ also gets that directory's consumer code, which calls its methods.
+ * Two more cases: deprecated-use/ calls doc-comments' deprecated members from
+ * another class, which must warn [deprecation]; and emitted user text needing
+ * every Javadoc escape must pass the same three checks.
  * Needs JDK 21 and `mvn` on the PATH. Run with `pnpm test:compile`.
  */
 import { execFile } from 'node:child_process';
-import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { FlagModel } from '@launchtarqly/core';
+import { modelFlag } from '../../core/test/builders.js';
+import { javaEmitter } from '../src/index.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 const GOLDEN_DIR = join(REPO_ROOT, 'fixtures/golden/java');
@@ -70,14 +76,14 @@ describe('java golden output compiles against java-server-sdk 7.17.2', () => {
     classpath = (await readFile(cpFile, 'utf8')).trim();
   }, 600_000);
 
-  it.each(goldens)('%s', async (file) => {
+  /** Puts `flags` in place as Flags.java, with the consumer code in `usage` if given, and runs the three checks. */
+  async function checkAll(flags: string, usage?: string): Promise<string> {
     await rm(FLAGS_DIR, { recursive: true, force: true });
     await rm(USAGE_SRC_DIR, { recursive: true, force: true });
     await mkdir(FLAGS_DIR, { recursive: true });
     const flagsFile = join(FLAGS_DIR, 'Flags.java');
-    await copyFile(join(GOLDEN_DIR, file), flagsFile);
-    const usage = join(USAGE_DIR, basename(file, '.java'));
-    if (await exists(usage)) {
+    await writeFile(flagsFile, flags);
+    if (usage !== undefined && (await exists(usage))) {
       await mkdir(USAGE_SRC_DIR, { recursive: true });
       for (const source of await readdir(usage)) await copyFile(join(usage, source), join(USAGE_SRC_DIR, source));
     }
@@ -94,5 +100,43 @@ describe('java golden output compiles against java-server-sdk 7.17.2', () => {
     const format = await run('java', ['-jar', GJF_JAR, '--dry-run', '--set-exit-if-changed', flagsFile]);
     expect(format.output).toBe('');
     expect(format.ok).toBe(true);
+    return flagsFile;
+  }
+
+  it.each(goldens)('%s', async (file) => {
+    await checkAll(await readFile(join(GOLDEN_DIR, file), 'utf8'), join(USAGE_DIR, basename(file, '.java')));
+  });
+
+  it('deprecated members of doc-comments.java warn [deprecation] when used from another class, not inside Flags', async () => {
+    const flagsFile = await checkAll(await readFile(join(GOLDEN_DIR, 'doc-comments.java'), 'utf8'));
+    const outDir = await mkdtemp(join(tmpdir(), 'ld-codegen-javac-'));
+    const sources = [flagsFile, join(PROJECT_DIR, 'deprecated-use/DeprecatedUse.java')];
+    const javac = await run('javac', ['--release', '8', '-Xlint:all,-options', '-d', outDir, '-cp', classpath, ...sources]);
+    expect(javac.ok).toBe(true);
+    const warnings = javac.output.split('\n').filter((l) => l.includes('warning:'));
+    expect(warnings).toHaveLength(3);
+    for (const w of warnings) expect(w).toMatch(/^.*DeprecatedUse\.java:\d+: warning: \[deprecation\] /);
+    expect(warnings.join('\n')).toMatch(/legacyCart\(LDContext,boolean\)/);
+    expect(warnings.join('\n')).toMatch(/legacyCartDetail\(LDContext,boolean\)/);
+    expect(warnings.join('\n')).toMatch(/LEGACY_CART/);
+  });
+
+  it('user text that needs every escape passes all three checks', async () => {
+    const model: FlagModel = {
+      projectKey: 'escapes',
+      flags: [
+        modelFlag('tricky', {
+          name: 'Tricky <name> & @mention',
+          description:
+            'Matches /cart/**/*.json */ when a < b && c > d, in C:\\users\\u0041.\n@since is not a tag, nor is {@code x}.\n\nü 😀 ada@example.com',
+          tags: ['<t>', '@tag'],
+          maintainer: { kind: 'team', key: 'ops', name: '@ops & co */' },
+          deprecated: true,
+          deprecationMessage: 'Use \\u0041 @new */ <b>instead</b>.',
+        }),
+      ],
+    };
+    const cfg = { id: 'java', out: 'out', package: 'com.example.flags', sdkMajor: 7 } as const;
+    await checkAll(javaEmitter.emit(model, cfg, { generatorVersion: '0.0.0' })[0]!.contents);
   });
 });

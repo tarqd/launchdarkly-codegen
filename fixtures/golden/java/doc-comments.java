@@ -23,6 +23,13 @@ public final class Flags {
   /**
    * Checkout V2
    *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>Matches paths like /cart/**&#47;*.json *&#47; and more.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: team Payments<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -33,6 +40,13 @@ public final class Flags {
 
   /**
    * Checkout V2
+   *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>Matches paths like /cart/**&#47;*.json *&#47; and more.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: team Payments<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/checkout-v2
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -45,10 +59,17 @@ public final class Flags {
   /**
    * Legacy cart
    *
+   * <p>The pre-2024 cart.
+   *
+   * <p>key: {@code legacy-cart} · tags: checkout · maintainer: ada@example.com<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
+   * @deprecated The {@code legacy-cart} flag is deprecated.
    */
+  @Deprecated
   public boolean legacyCart(LDContext context, boolean fallback) {
     return client.boolVariation(Keys.LEGACY_CART, context, fallback);
   }
@@ -56,10 +77,17 @@ public final class Flags {
   /**
    * Legacy cart
    *
+   * <p>The pre-2024 cart.
+   *
+   * <p>key: {@code legacy-cart} · tags: checkout · maintainer: ada@example.com<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/legacy-cart
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}, with the reason it was chosen
+   * @deprecated The {@code legacy-cart} flag is deprecated.
    */
+  @Deprecated
   public EvaluationDetail<Boolean> legacyCartDetail(LDContext context, boolean fallback) {
     return client.boolVariationDetail(Keys.LEGACY_CART, context, fallback);
   }
@@ -67,10 +95,15 @@ public final class Flags {
   /**
    * Old search
    *
+   * <p>key: {@code old-search}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/old-search
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
+   * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026.
    */
+  @Deprecated
   public boolean oldSearch(LDContext context, boolean fallback) {
     return client.boolVariation(Keys.OLD_SEARCH, context, fallback);
   }
@@ -78,10 +111,15 @@ public final class Flags {
   /**
    * Old search
    *
+   * <p>key: {@code old-search}<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/old-search
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}, with the reason it was chosen
+   * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026.
    */
+  @Deprecated
   public EvaluationDetail<Boolean> oldSearchDetail(LDContext context, boolean fallback) {
     return client.boolVariationDetail(Keys.OLD_SEARCH, context, fallback);
   }
@@ -89,10 +127,17 @@ public final class Flags {
   /**
    * Promo banner
    *
+   * <p>Shows the seasonal promo banner.
+   *
+   * <p>key: {@code promo-banner} · tags: marketing<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
+   * @deprecated Use the CMS banner slot.
    */
+  @Deprecated
   public boolean promoBanner(LDContext context, boolean fallback) {
     return client.boolVariation(Keys.PROMO_BANNER, context, fallback);
   }
@@ -100,10 +145,17 @@ public final class Flags {
   /**
    * Promo banner
    *
+   * <p>Shows the seasonal promo banner.
+   *
+   * <p>key: {@code promo-banner} · tags: marketing<br>
+   * https://app.eu.launchdarkly.com/projects/storefront/flags/promo-banner
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}, with the reason it was chosen
+   * @deprecated Use the CMS banner slot.
    */
+  @Deprecated
   public EvaluationDetail<Boolean> promoBannerDetail(LDContext context, boolean fallback) {
     return client.boolVariationDetail(Keys.PROMO_BANNER, context, fallback);
   }
@@ -116,13 +168,25 @@ public final class Flags {
     /** {@code checkout-v2} */
     public static final String CHECKOUT_V2 = "checkout-v2";
 
-    /** {@code legacy-cart} */
-    public static final String LEGACY_CART = "legacy-cart";
+    /**
+     * {@code legacy-cart}
+     *
+     * @deprecated The {@code legacy-cart} flag is deprecated.
+     */
+    @Deprecated public static final String LEGACY_CART = "legacy-cart";
 
-    /** {@code old-search} */
-    public static final String OLD_SEARCH = "old-search";
+    /**
+     * {@code old-search}
+     *
+     * @deprecated Use search-v2. Removal planned for Q4 *&#47; 2026.
+     */
+    @Deprecated public static final String OLD_SEARCH = "old-search";
 
-    /** {@code promo-banner} */
-    public static final String PROMO_BANNER = "promo-banner";
+    /**
+     * {@code promo-banner}
+     *
+     * @deprecated Use the CMS banner slot.
+     */
+    @Deprecated public static final String PROMO_BANNER = "promo-banner";
   }
 }

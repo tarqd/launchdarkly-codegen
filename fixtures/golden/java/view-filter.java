@@ -23,6 +23,9 @@ public final class Flags {
   /**
    * Allow guest checkout
    *
+   * <p>key: {@code AllowGuestCheckout} · tags: checkout<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/AllowGuestCheckout
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -33,6 +36,9 @@ public final class Flags {
 
   /**
    * Allow guest checkout
+   *
+   * <p>key: {@code AllowGuestCheckout} · tags: checkout<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/AllowGuestCheckout
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -45,6 +51,11 @@ public final class Flags {
   /**
    * Checkout V2
    *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: ada@example.com<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -55,6 +66,11 @@ public final class Flags {
 
   /**
    * Checkout V2
+   *
+   * <p>Routes eligible users to the rewritten checkout flow.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: ada@example.com<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated

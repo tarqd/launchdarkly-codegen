@@ -23,6 +23,11 @@ public final class Flags {
   /**
    * Two-factor auth
    *
+   * <p>Key starts with a digit, so ts-server needs an alias.
+   *
+   * <p>key: {@code 2fa-enabled}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -33,6 +38,11 @@ public final class Flags {
 
   /**
    * Two-factor auth
+   *
+   * <p>Key starts with a digit, so ts-server needs an alias.
+   *
+   * <p>key: {@code 2fa-enabled}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -45,6 +55,9 @@ public final class Flags {
   /**
    * Checkout
    *
+   * <p>key: {@code checkout}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -55,6 +68,9 @@ public final class Flags {
 
   /**
    * Checkout
+   *
+   * <p>key: {@code checkout}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -67,6 +83,11 @@ public final class Flags {
   /**
    * Checkout detail page
    *
+   * <p>Would collide with checkoutDetail() of flag checkout without its alias.
+   *
+   * <p>key: {@code checkout-detail}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-detail
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -77,6 +98,11 @@ public final class Flags {
 
   /**
    * Checkout detail page
+   *
+   * <p>Would collide with checkoutDetail() of flag checkout without its alias.
+   *
+   * <p>key: {@code checkout-detail}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-detail
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -89,6 +115,9 @@ public final class Flags {
   /**
    * Default theme
    *
+   * <p>key: {@code default}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/default
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -99,6 +128,9 @@ public final class Flags {
 
   /**
    * Default theme
+   *
+   * <p>key: {@code default}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/default
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -111,6 +143,9 @@ public final class Flags {
   /**
    * Search v3
    *
+   * <p>key: {@code search-v3}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/search-v3
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -121,6 +156,9 @@ public final class Flags {
 
   /**
    * Search v3
+   *
+   * <p>key: {@code search-v3}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/search-v3
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated

@@ -24,6 +24,9 @@ public final class Flags {
   /**
    * Banner ids
    *
+   * <p>key: {@code banner-ids}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/banner-ids
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -34,6 +37,9 @@ public final class Flags {
 
   /**
    * Banner ids
+   *
+   * <p>key: {@code banner-ids}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/banner-ids
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -46,6 +52,9 @@ public final class Flags {
   /**
    * Checkout config
    *
+   * <p>key: {@code checkout-config}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -56,6 +65,9 @@ public final class Flags {
 
   /**
    * Checkout config
+   *
+   * <p>key: {@code checkout-config}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-config
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -68,6 +80,9 @@ public final class Flags {
   /**
    * Checkout V2
    *
+   * <p>key: {@code checkout-v2}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -78,6 +93,9 @@ public final class Flags {
 
   /**
    * Checkout V2
+   *
+   * <p>key: {@code checkout-v2}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -90,6 +108,9 @@ public final class Flags {
   /**
    * Max cart items
    *
+   * <p>key: {@code max-cart-items}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/max-cart-items
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -100,6 +121,9 @@ public final class Flags {
 
   /**
    * Max cart items
+   *
+   * <p>key: {@code max-cart-items}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/max-cart-items
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -112,6 +136,11 @@ public final class Flags {
   /**
    * Pricing tier
    *
+   * <p>Which pricing tier a customer sees.
+   *
+   * <p>key: {@code pricing-tier} · tags: billing<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -122,6 +151,11 @@ public final class Flags {
 
   /**
    * Pricing tier
+   *
+   * <p>Which pricing tier a customer sees.
+   *
+   * <p>key: {@code pricing-tier} · tags: billing<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/pricing-tier
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -134,6 +168,9 @@ public final class Flags {
   /**
    * Sample rate
    *
+   * <p>key: {@code sample-rate}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/sample-rate
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -144,6 +181,9 @@ public final class Flags {
 
   /**
    * Sample rate
+   *
+   * <p>key: {@code sample-rate}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/sample-rate
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated

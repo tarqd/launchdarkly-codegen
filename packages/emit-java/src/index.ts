@@ -5,7 +5,7 @@
  */
 
 import { Writer, type Emitter, type Flag, type FlagKind, type TargetId } from '@launchtarqly/core';
-import { classDoc, keyConstantDoc, methodDoc } from './javadoc.js';
+import { classDoc, isDeprecated, javadocLines, keyConstantDoc, methodDoc, type Javadoc } from './javadoc.js';
 import { flagNames, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
 
@@ -46,16 +46,36 @@ function imports(flags: readonly Flag[]): string[] {
   return used.sort();
 }
 
+/** The column each kind of member starts at: the class, its members, and `Keys` members. */
+const CLASS_INDENT = 0;
+const MEMBER_INDENT = 2;
+const KEYS_MEMBER_INDENT = 4;
+
+/** Writes `doc` laid out for a member at column `indent`. */
+function writeDoc(w: Writer, doc: Javadoc, indent: number): void {
+  for (const line of javadocLines(doc, indent)) w.line(line);
+}
+
+/**
+ * Writes a method's comment and, when the comment has `@deprecated`, the
+ * `@Deprecated` annotation on its own line. javac doesn't warn when one half
+ * of the pair is missing, so both come from the one comment.
+ */
+function writeMethodDoc(w: Writer, doc: Javadoc): void {
+  writeDoc(w, doc, MEMBER_INDENT);
+  if (isDeprecated(doc)) w.line('@Deprecated');
+}
+
 function emitFlagMethods(w: Writer, flag: Flag, names: JavaFlagNames): void {
   const { method, type, boxed } = kindMethod(flag);
   const key = `Keys.${names.constant}`;
   w.line();
-  w.docComment(methodDoc(flag, 'value'));
+  writeMethodDoc(w, methodDoc(flag, 'value'));
   w.block(`public ${type} ${names.method}(LDContext context, ${type} fallback) {`, '}', () => {
     w.line(`return client.${method}(${key}, context, fallback);`);
   });
   w.line();
-  w.docComment(methodDoc(flag, 'detail'));
+  writeMethodDoc(w, methodDoc(flag, 'detail'));
   w.block(`public EvaluationDetail<${boxed}> ${names.method}Detail(LDContext context, ${type} fallback) {`, '}', () => {
     w.line(`return client.${method}Detail(${key}, context, fallback);`);
   });
@@ -79,7 +99,7 @@ export const javaEmitter: Emitter = {
     w.line();
     for (const name of imports(model.flags)) w.line(`import ${name};`);
     w.line();
-    w.inlineDocComment(classDoc(model.projectKey));
+    writeDoc(w, classDoc(model.projectKey), CLASS_INDENT);
     w.block('public final class Flags {', '}', () => {
       w.inlineDocComment('The wrapped SDK client.');
       w.line('private final LDClientInterface client;');
@@ -96,8 +116,11 @@ export const javaEmitter: Emitter = {
         w.line('private Keys() {}');
         for (const flag of model.flags) {
           w.line();
-          w.inlineDocComment(keyConstantDoc(flag));
-          w.line(`public static final String ${names.get(flag)!.constant} = ${javaString(flag.key)};`);
+          const doc = keyConstantDoc(flag);
+          writeDoc(w, doc, KEYS_MEMBER_INDENT);
+          // google-java-format keeps an annotation on a field on the same line.
+          const annotation = isDeprecated(doc) ? '@Deprecated ' : '';
+          w.line(`${annotation}public static final String ${names.get(flag)!.constant} = ${javaString(flag.key)};`);
         }
       });
     });

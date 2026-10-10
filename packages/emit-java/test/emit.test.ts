@@ -43,6 +43,9 @@ public final class Flags {
   /**
    * Checkout V2
    *
+   * <p>key: {@code checkout-v2}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
    * @return the flag's value for {@code context}
@@ -53,6 +56,9 @@ public final class Flags {
 
   /**
    * Checkout V2
+   *
+   * <p>key: {@code checkout-v2}<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
    *
    * @param context the context to evaluate the flag for
    * @param fallback the value to return if the flag can't be evaluated
@@ -147,6 +153,89 @@ public final class Flags {
     public static final String B_FLAG = "b-flag";
   }
 `);
+  });
+
+  it('documents a flag with its description paragraphs and the key, tags, maintainer and link trailer', () => {
+    const out = emit(
+      modelFlag('checkout-v2', {
+        name: 'Checkout V2',
+        description: 'Routes eligible users\nto the rewritten flow.\n\n\nSecond paragraph.\n',
+        tags: ['checkout', 'q3'],
+        maintainer: { kind: 'team', key: 'payments', name: 'Payments' },
+      }),
+      modelFlag('pricing-tier', { maintainer: { kind: 'member', email: 'ada@example.com', name: 'Ada' } }),
+    );
+    const checkout = `  /**
+   * Checkout V2
+   *
+   * <p>Routes eligible users to the rewritten flow.
+   *
+   * <p>Second paragraph.
+   *
+   * <p>key: {@code checkout-v2} · tags: checkout, q3 · maintainer: team Payments<br>
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-v2
+   *
+   * @param context the context to evaluate the flag for
+   * @param fallback the value to return if the flag can't be evaluated
+   * @return the flag's value for {@code context}`;
+    expect(out).toContain(`${checkout}\n   */\n  public boolean checkoutV2(`);
+    expect(out).toContain(`${checkout}, with the reason it was chosen\n   */\n  public EvaluationDetail<Boolean> checkoutV2Detail(`);
+    expect(out).toContain('   * <p>key: {@code pricing-tier} · maintainer: ada@example.com<br>\n');
+  });
+
+  it('escapes the name, description, tags, maintainer and deprecation message, but not the key', () => {
+    const out = emit(
+      modelFlag('a-b.c_d', {
+        name: 'A <b> & c',
+        description: 'Paths like /cart/**/*.json */ and C:\\u0041.\n@since is not a tag, nor is {@code x}.',
+        tags: ['<t>'],
+        maintainer: { kind: 'team', key: 't', name: '@ops & co' },
+        deprecated: true,
+        deprecationMessage: 'Use @new */ instead.',
+      }),
+    );
+    expect(out).toContain(`  /**
+   * A &lt;b&gt; &amp; c
+   *
+   * <p>Paths like /cart/**&#47;*.json *&#47; and C:&#92;u0041. &#64;since is not a tag, nor is
+   * {&#64;code x}.
+   *
+   * <p>key: {@code a-b.c_d} · tags: &lt;t&gt; · maintainer: team &#64;ops &amp; co<br>
+`);
+    expect(out).toContain('   * @deprecated Use &#64;new *&#47; instead.\n');
+  });
+
+  it('pairs @Deprecated with the @deprecated tag on both methods and the key constant', () => {
+    const out = emit(modelFlag('legacy-cart', { name: 'Legacy cart', deprecated: true, deprecationMessage: 'Use cart-v2.' }));
+    expect(out).toContain(`   * @return the flag's value for {@code context}
+   * @deprecated Use cart-v2.
+   */
+  @Deprecated
+  public boolean legacyCart(LDContext context, boolean fallback) {`);
+    expect(out).toContain(`   * @return the flag's value for {@code context}, with the reason it was chosen
+   * @deprecated Use cart-v2.
+   */
+  @Deprecated
+  public EvaluationDetail<Boolean> legacyCartDetail(LDContext context, boolean fallback) {`);
+    expect(out).toContain(`    /**
+     * {@code legacy-cart}
+     *
+     * @deprecated Use cart-v2.
+     */
+    @Deprecated public static final String LEGACY_CART = "legacy-cart";
+`);
+    expect(out.match(/@Deprecated/g)).toHaveLength(3);
+    expect(out.match(/@deprecated/g)).toHaveLength(3);
+  });
+
+  it('falls back to a generic deprecation message naming the flag', () => {
+    expect(emit(modelFlag('old-search', { deprecated: true }))).toContain(
+      '   * @deprecated The {@code old-search} flag is deprecated.\n',
+    );
+  });
+
+  it('marks nothing deprecated for a live flag', () => {
+    expect(emit(modelFlag('on'))).not.toMatch(/@[Dd]eprecated/);
   });
 
   it('rejects a missing package', () => {
