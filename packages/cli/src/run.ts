@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CodegenError, defaultFetchDeps, fetchSnapshot, readSnapshot, type Snapshot } from '@launchtarqly/core';
+import { checkFiles } from './check.js';
 import { resolveConfig, type Config } from './config.js';
 import { generateFiles, writeFiles } from './generate.js';
 import { writeStarterConfig } from './init.js';
@@ -20,6 +21,7 @@ export interface RunIO {
 
 const USAGE = `usage: launchtarqly-codegen generate [--config path] [--target id]... [--project key]
                                      [--base-uri uri] [--access-token token] [--from-snapshot file]
+       launchtarqly-codegen check    [same flags as generate]   exit 1 if any target is stale
        launchtarqly-codegen snapshot --write-snapshot file [--config path] [--project key]
                                      [--base-uri uri] [--access-token token]
        launchtarqly-codegen init [--config path]
@@ -32,6 +34,8 @@ export async function run(argv: string[], io: RunIO): Promise<number> {
     switch (command) {
       case 'generate':
         return await generateCommand(rest, io);
+      case 'check':
+        return await checkCommand(rest, io);
       case 'snapshot':
         return await snapshotCommand(rest, io);
       case 'init':
@@ -71,16 +75,32 @@ function parse(args: string[]) {
   }
 }
 
-async function generateCommand(args: string[], io: RunIO): Promise<number> {
+/** Config and snapshot for `generate` and `check`, which take the same flags. */
+async function loadInputs(args: string[], io: RunIO) {
   const opts = parse(args);
   const warn = (message: string) => io.stderr(`warning: ${message}\n`);
   const { config, dir } = await resolveConfig({ cwd: io.cwd, env: io.env, cli: opts, warn });
   const snapshotPath = opts['from-snapshot'];
   const snapshot =
     snapshotPath === undefined ? await fetchLive(config, io) : await readSnapshot(resolve(io.cwd, snapshotPath));
+  return { config, dir, snapshot, warn };
+}
+
+async function generateCommand(args: string[], io: RunIO): Promise<number> {
+  const { config, dir, snapshot, warn } = await loadInputs(args, io);
   const written = await writeFiles(generateFiles(config, snapshot, { warn }), dir);
   for (const path of written) io.stdout(`wrote ${relative(io.cwd, path) || path}\n`);
   return 0;
+}
+
+async function checkCommand(args: string[], io: RunIO): Promise<number> {
+  // Config, fetch and model errors (exit 2) all happen inside loadInputs and
+  // checkFiles' generation step, before any file is compared, so an API
+  // failure can never be reported as drift.
+  const { config, dir, snapshot, warn } = await loadInputs(args, io);
+  const result = await checkFiles(config, snapshot, dir, { warn });
+  io.stdout(result.report);
+  return result.stale ? 1 : 0;
 }
 
 /** `snapshot --write-snapshot <file>`: fetch live and save the raw responses. */
