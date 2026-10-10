@@ -25,6 +25,12 @@ describe('Writer', () => {
     );
   });
 
+  it('writes an indented doc comment, escaping */ and leaving empty entries bare', () => {
+    const w = new Writer();
+    w.indent(() => w.docComment(['Title', '', 'a */ b']));
+    expect(w.toString()).toBe('  /**\n' + '   * Title\n' + '   *\n' + '   * a *\\/ b\n' + '   */\n');
+  });
+
   it('uses the configured indent unit', () => {
     const w = new Writer({ indent: '\t' });
     w.block('{', '}', () => w.line('x'));

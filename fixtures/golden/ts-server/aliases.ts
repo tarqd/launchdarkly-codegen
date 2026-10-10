@@ -6,37 +6,105 @@ import type { LDClient, LDContext, LDEvaluationDetailTyped } from '@launchdarkly
 export class Flags {
   constructor(private readonly client: LDClient) {}
 
+  /**
+   * Two-factor auth
+   *
+   * Key starts with a digit, so ts-server needs an alias.
+   *
+   * key: `2fa-enabled`
+   * https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled
+   */
   twoFactorEnabled(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('2fa-enabled', context, fallback);
   }
+  /**
+   * Two-factor auth
+   *
+   * Key starts with a digit, so ts-server needs an alias.
+   *
+   * key: `2fa-enabled`
+   * https://app.launchdarkly.com/projects/my-project/flags/2fa-enabled
+   */
   twoFactorEnabledDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('2fa-enabled', context, fallback);
   }
 
+  /**
+   * Checkout
+   *
+   * key: `checkout`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout
+   */
   checkout(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('checkout', context, fallback);
   }
+  /**
+   * Checkout
+   *
+   * key: `checkout`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout
+   */
   checkoutDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('checkout', context, fallback);
   }
 
+  /**
+   * Checkout detail page
+   *
+   * Would collide with checkoutDetail() of flag checkout without its alias.
+   *
+   * key: `checkout-detail`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-detail
+   */
   checkoutDetailPage(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('checkout-detail', context, fallback);
   }
+  /**
+   * Checkout detail page
+   *
+   * Would collide with checkoutDetail() of flag checkout without its alias.
+   *
+   * key: `checkout-detail`
+   * https://app.launchdarkly.com/projects/my-project/flags/checkout-detail
+   */
   checkoutDetailPageDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('checkout-detail', context, fallback);
   }
 
+  /**
+   * Default theme
+   *
+   * key: `default`
+   * https://app.launchdarkly.com/projects/my-project/flags/default
+   */
   defaultTheme(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('default', context, fallback);
   }
+  /**
+   * Default theme
+   *
+   * key: `default`
+   * https://app.launchdarkly.com/projects/my-project/flags/default
+   */
   defaultThemeDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('default', context, fallback);
   }
 
+  /**
+   * Search v3
+   *
+   * key: `search-v3`
+   * https://app.launchdarkly.com/projects/my-project/flags/search-v3
+   */
   newSearch(context: LDContext, fallback: boolean): Promise<boolean> {
     return this.client.boolVariation('search-v3', context, fallback);
   }
+  /**
+   * Search v3
+   *
+   * key: `search-v3`
+   * https://app.launchdarkly.com/projects/my-project/flags/search-v3
+   */
   newSearchDetail(context: LDContext, fallback: boolean): Promise<LDEvaluationDetailTyped<boolean>> {
     return this.client.boolVariationDetail('search-v3', context, fallback);
   }
