@@ -40,3 +40,7 @@ _Avoid_: archived (archived flags are not generated at all)
 **Base URI**:
 The root URL of the LaunchDarkly instance a project lives on, used both for API calls and for links to flags in the UI. Named after the LaunchDarkly CLI's setting.
 _Avoid_: base URL, host, server
+
+**Alias**:
+An identifier the user chooses for a flag in one target (or all targets), set through the `codegen.name` custom properties. Required whenever the converted key is reserved, starts with a digit, or collides with another generated name; the generator never invents a name itself.
+_Avoid_: name override, rename
