@@ -13,6 +13,8 @@ export interface FetchRequest {
   accessToken: string;
   /** Tag filter: only flags with all of these tags. Empty or absent means no filter. */
   tags?: readonly string[];
+  /** View key: only flags linked to this view. Absent means no view. */
+  view?: string;
 }
 
 /** Side effects, injectable for tests. */
@@ -35,18 +37,95 @@ export const defaultFetchDeps: FetchDeps = {
 /** The API version every flags-list call pins. */
 export const FLAGS_API_VERSION = '20240415';
 export const FLAGS_PAGE_LIMIT = 100;
+/** The views API is beta; every views call must send this or gets a 403. */
+export const VIEWS_API_VERSION = 'beta';
+/** The server rejects a larger `limit` on linked flags (checked live, 2026-10-10). */
+export const VIEW_MEMBERS_PAGE_LIMIT = 100;
 
-/** Fetches the project's flags list, page by page, into a snapshot. */
+/**
+ * Fetches the view's member keys (if a view is set), then the project's flags
+ * list, page by page, into a snapshot. Members come first so an unknown view
+ * fails before the larger flags fetch.
+ */
 export async function fetchSnapshot(request: FetchRequest, deps: FetchDeps = defaultFetchDeps): Promise<Snapshot> {
   const client = new LdApiClient(request.baseUri, request.accessToken, deps);
+  const view = request.view === undefined ? undefined : await fetchViewMembers(client, request, request.view);
   const flagPages = await client.getPages<ApiFlagsPage>(flagsListUrl(request), FLAGS_API_VERSION);
   return {
     snapshotVersion: SNAPSHOT_VERSION,
     projectKey: request.projectKey,
     baseUri: request.baseUri,
     ...(request.tags?.length ? { tags: [...request.tags] } : {}),
+    ...(view && { view }),
     flagPages,
   };
+}
+
+/** One page of linked flags. Only these fields are read; the beta response may carry more. */
+interface ViewMembersPage extends PagedBody {
+  items?: { resourceKey?: unknown }[];
+  totalCount?: number;
+}
+
+/**
+ * Lists the view's linked flags with
+ * `GET /api/v2/projects/{projectKey}/views/{viewKey}/linked/flags`. `_links`
+ * is optional on this endpoint, so paging also stops at `totalCount` or an
+ * empty page. Only `items[].resourceKey` is kept.
+ */
+async function fetchViewMembers(
+  client: LdApiClient,
+  request: FetchRequest,
+  viewKey: string,
+): Promise<{ key: string; memberKeys: string[] }> {
+  const project = encodeURIComponent(request.projectKey);
+  const url = apiUrl(request.baseUri, `/api/v2/projects/${project}/views/${encodeURIComponent(viewKey)}/linked/flags`);
+  url.searchParams.set('limit', String(VIEW_MEMBERS_PAGE_LIMIT));
+  let pages: ViewMembersPage[];
+  try {
+    pages = await client.getPages<ViewMembersPage>(url, VIEWS_API_VERSION, (page, all) => {
+      const seen = all.reduce((n, p) => n + (p.items?.length ?? 0), 0);
+      return (page.items?.length ?? 0) > 0 && (typeof page.totalCount !== 'number' || seen < page.totalCount);
+    });
+  } catch (err) {
+    throw viewError(err, viewKey, request.projectKey);
+  }
+  const memberKeys = pages.flatMap((page, i) => {
+    if (!Array.isArray(page.items)) {
+      throw new CodegenError(`view \`${viewKey}\`: linked flags page ${i + 1} has no \`items\` list`);
+    }
+    return page.items.map((item) => {
+      if (typeof item?.resourceKey !== 'string') {
+        throw new CodegenError(`view \`${viewKey}\`: a linked flag on page ${i + 1} has no string \`resourceKey\``);
+      }
+      return item.resourceKey;
+    });
+  });
+  return { key: viewKey, memberKeys };
+}
+
+/**
+ * Maps the views API's errors to messages a user can act on. Checked live
+ * (2026-10-10): an unknown view key is 404 `View not found` (keys are
+ * case-sensitive), also in a project that has no views; an unknown project is
+ * 404 `Project not found`. Views are an Enterprise feature; an account without
+ * them could not be checked live, so any 403 is reported as views being
+ * unavailable.
+ */
+function viewError(err: unknown, viewKey: string, projectKey: string): unknown {
+  if (!(err instanceof ApiError)) return err;
+  const detail = err.detail;
+  if (err.status === 404 && /view/i.test(err.apiMessage ?? '')) {
+    return new CodegenError(
+      `view \`${viewKey}\` not found in project \`${projectKey}\`; \`view\` is a view key, not its display name, and is case-sensitive${detail}`,
+    );
+  }
+  if (err.status === 403) {
+    return new CodegenError(
+      `views are not available for project \`${projectKey}\` with this access token (views need an Enterprise plan and a token that can read them)${detail}`,
+    );
+  }
+  return err;
 }
 
 /**
@@ -126,7 +205,8 @@ export class LdApiClient {
         continue;
       }
       if (!res.ok) {
-        throw new CodegenError(`GET ${url.pathname} failed: HTTP ${res.status}${await errorDetail(res)}`);
+        const body = await errorBody(res);
+        throw new ApiError(res.status, url, body);
       }
       try {
         return (await res.json()) as T;
@@ -166,13 +246,44 @@ function rateLimitWait(headers: Headers, retries: number, now: number): number {
   return Math.min(RETRY_POLICY.backoffMaxMs, RETRY_POLICY.backoffBaseMs * 2 ** retries);
 }
 
-/** `: <code>: <message>` from an API error body `{code, message}`, if it has one. */
-async function errorDetail(res: Response): Promise<string> {
+/** A non-2xx, non-429 API response. */
+export class ApiError extends CodegenError {
+  readonly apiCode: string | undefined;
+  readonly apiMessage: string | undefined;
+  constructor(
+    readonly status: number,
+    url: URL,
+    body: { code?: string; message?: string },
+  ) {
+    super(`GET ${url.pathname} failed: HTTP ${status}${formatDetail(body)}`);
+    this.apiCode = body.code;
+    this.apiMessage = body.message;
+  }
+  /** ` (<code>: <message>)`, or '' when the body had neither. */
+  get detail(): string {
+    return formatDetail({ code: this.apiCode, message: this.apiMessage });
+  }
+}
+
+function formatDetail(body: { code?: string | undefined; message?: string | undefined }): string {
+  const parts = [body.code, body.message].filter((p): p is string => p !== undefined && p !== '');
+  return parts.length ? ` (${parts.join(': ')})` : '';
+}
+
+/** `code` and `message` from an API error body `{code, message}`, where present. */
+async function errorBody(res: Response): Promise<{ code?: string; message?: string }> {
   try {
     const body = (await res.json()) as { code?: unknown; message?: unknown };
-    const parts = [body.code, body.message].filter((p): p is string => typeof p === 'string' && p !== '');
-    return parts.length ? ` (${parts.join(': ')})` : '';
+    return {
+      ...(typeof body.code === 'string' && { code: body.code }),
+      ...(typeof body.message === 'string' && { message: body.message }),
+    };
   } catch {
-    return '';
+    return {};
   }
+}
+
+/** `: <code>: <message>` from an API error body, if it has one. */
+async function errorDetail(res: Response): Promise<string> {
+  return formatDetail(await errorBody(res));
 }

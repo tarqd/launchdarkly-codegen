@@ -276,3 +276,43 @@ describe('tag filter', () => {
     expect(keys(normalize(snapshot(flags), { tags: [] }))).toHaveLength(4);
   });
 });
+
+describe('view filter', () => {
+  const flags = [boolFlag('a'), boolFlag('b'), boolFlag('c')];
+  const keys = (model: { flags: { key: string }[] }) => model.flags.map((f) => f.key);
+
+  it("keeps only flags whose key is among the snapshot view's members", () => {
+    const recorded = { ...snapshot(flags), view: { key: 'payments', memberKeys: ['c', 'a'] } };
+    expect(keys(normalize(recorded))).toEqual(['a', 'c']);
+  });
+
+  it('ignores a member key that is missing from the flags list', () => {
+    const recorded = { ...snapshot(flags), view: { key: 'payments', memberKeys: ['b', 'deleted-flag'] } };
+    expect(keys(normalize(recorded))).toEqual(['b']);
+  });
+
+  it('keeps no flags for a view with no members', () => {
+    const recorded = { ...snapshot(flags), view: { key: 'payments', memberKeys: [] } };
+    expect(normalize(recorded).flags).toEqual([]);
+  });
+
+  it('still drops archived members', () => {
+    const recorded = {
+      ...snapshot([boolFlag('a', { archived: true }), boolFlag('b')]),
+      view: { key: 'payments', memberKeys: ['a', 'b'] },
+    };
+    expect(keys(normalize(recorded))).toEqual(['b']);
+  });
+
+  it('accepts a configured view that matches the snapshot', () => {
+    const recorded = { ...snapshot(flags), view: { key: 'payments', memberKeys: ['a'] } };
+    expect(keys(normalize(recorded, { view: 'payments' }))).toEqual(['a']);
+  });
+
+  it('rejects a configured view the snapshot was not fetched with, as exit 2', () => {
+    expect(() => normalize(snapshot(flags), { view: 'payments' })).toThrow(CodegenError);
+    expect(() => normalize(snapshot(flags), { view: 'payments' })).toThrow(/snapshot has no view/);
+    const other = { ...snapshot(flags), view: { key: 'billing', memberKeys: ['a'] } };
+    expect(() => normalize(other, { view: 'payments' })).toThrow(/view `billing`/);
+  });
+});

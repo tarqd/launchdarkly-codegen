@@ -25,6 +25,8 @@ export interface Config {
   accessToken?: string;
   /** Tag filter: only flags with all of these tags. Absent means no filter. */
   tags?: string[];
+  /** View key: only flags linked to this view. Never set together with `tags`. */
+  view?: string;
   targets: TargetConfig[];
   check?: CheckConfig;
 }
@@ -151,6 +153,11 @@ export async function resolveConfig({
   const { project, baseUri, ...rest } = resolveSettings({ cli, env, file: raw, filePath: path, warn });
   if (project === undefined) {
     return fail('`project` is not set; set it in the config file, with LD_CODEGEN_PROJECT, or with --project');
+  }
+  if (rest.view !== undefined && rest.tags !== undefined) {
+    throw new CodegenError(
+      `\`view\` and \`tags\` cannot both be set (view ${JSON.stringify(rest.view)}, tags ${JSON.stringify(rest.tags)}); use one or the other`,
+    );
   }
   for (const tag of rest.tags ?? []) {
     if (/[+,]/.test(tag)) {

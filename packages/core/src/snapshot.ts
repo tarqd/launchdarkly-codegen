@@ -47,7 +47,11 @@ export interface Snapshot {
    * only when one was set. The normalizer re-applies it.
    */
   tags?: string[];
-  /** Present only when the run used a view. */
+  /**
+   * The view the run used, present only when one was set: its key and the
+   * flag keys linked to it (`items[].resourceKey` of the linked-flags pages),
+   * in fetch order. The normalizer keeps only these flags.
+   */
   view?: { key: string; memberKeys: string[] };
   /** The flags-list pages, in fetch order. */
   flagPages: ApiFlagsPage[];
@@ -76,7 +80,16 @@ export function parseSnapshot(text: string, source = 'snapshot'): Snapshot {
   if (s.tags !== undefined && !(Array.isArray(s.tags) && s.tags.every((t) => typeof t === 'string'))) {
     throw new CodegenError(`${source}: \`tags\` must be a list of strings`);
   }
+  if (s.view !== undefined && !isView(s.view)) {
+    throw new CodegenError(`${source}: \`view\` must be {key: string, memberKeys: string[]}`);
+  }
   return s as Snapshot;
+}
+
+function isView(v: unknown): v is NonNullable<Snapshot['view']> {
+  if (typeof v !== 'object' || v === null) return false;
+  const { key, memberKeys } = v as { key?: unknown; memberKeys?: unknown };
+  return typeof key === 'string' && Array.isArray(memberKeys) && memberKeys.every((k) => typeof k === 'string');
 }
 
 /** Reads and parses a snapshot file (`--from-snapshot`). */

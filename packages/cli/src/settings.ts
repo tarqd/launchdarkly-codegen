@@ -28,6 +28,7 @@ export const SETTINGS = [
   { key: 'project', flag: 'project', env: 'LD_CODEGEN_PROJECT', inFile: true },
   { key: 'baseUri', flag: 'base-uri', env: 'LD_BASE_URI', inFile: true, default: 'https://app.launchdarkly.com' },
   { key: 'accessToken', flag: 'access-token', env: 'LD_ACCESS_TOKEN', inFile: false },
+  { key: 'view', flag: 'view', env: 'LD_CODEGEN_VIEW', inFile: true },
   { key: 'tags', flag: 'tag', env: 'LD_CODEGEN_TAGS', inFile: true, multiple: true },
 ] as const satisfies readonly SettingSpec[];
 

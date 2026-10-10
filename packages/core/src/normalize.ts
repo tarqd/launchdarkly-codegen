@@ -17,14 +17,21 @@ export interface NormalizeOptions {
    * snapshot's own `tags` (the filter it was fetched with) also applies.
    */
   tags?: readonly string[];
+  /**
+   * Configured view key. The members come from the snapshot's `view`, so the
+   * snapshot must have been fetched with this view.
+   */
+  view?: string;
 }
 
 export function normalize(snapshot: Snapshot, options: NormalizeOptions = {}): FlagModel {
   const warn = options.warn ?? (() => {});
   const hasTags = tagFilter([...(snapshot.tags ?? []), ...(options.tags ?? [])]);
+  const inView = viewFilter(snapshot, options.view);
   const flags = dedupeByKey(snapshot.flagPages.flatMap((page) => page.items))
     .filter((item) => !item.archived)
     .filter(hasTags)
+    .filter(inView)
     .map((item) => normalizeFlag(item, snapshot, warn))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { projectKey: snapshot.projectKey, flags };
@@ -37,6 +44,25 @@ export function normalize(snapshot: Snapshot, options: NormalizeOptions = {}): F
  */
 function tagFilter(required: readonly string[]): (item: ApiFlag) => boolean {
   return (item) => required.every((tag) => item.tags.includes(tag));
+}
+
+/**
+ * Keeps only the snapshot view's members, by key; a member missing from the
+ * flags list is ignored. A configured view must be the one the snapshot was
+ * fetched with, since members cannot be resolved offline.
+ */
+function viewFilter(snapshot: Snapshot, configured: string | undefined): (item: ApiFlag) => boolean {
+  const view = snapshot.view;
+  if (configured !== undefined && view?.key !== configured) {
+    throw new CodegenError(
+      view === undefined
+        ? `view \`${configured}\` is configured but the snapshot has no view; fetch it again with the view set`
+        : `view \`${configured}\` is configured but the snapshot was fetched with view \`${view.key}\``,
+    );
+  }
+  if (view === undefined) return () => true;
+  const members = new Set(view.memberKeys);
+  return (item) => members.has(item.key);
 }
 
 /** Offset paging can repeat a flag across pages; the first occurrence wins. */

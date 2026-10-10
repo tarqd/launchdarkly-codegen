@@ -193,3 +193,143 @@ describe('fetchSnapshot with a tag filter', () => {
     expect(snapshot).not.toHaveProperty('tags');
   });
 });
+
+/**
+ * A page of `GET /api/v2/projects/{projectKey}/views/{viewKey}/linked/flags`
+ * (LD-API-Version beta), shaped like a live response recorded 2026-10-10:
+ * `_links` has `next`/`last` only when there are more pages.
+ */
+function viewPage(keys: string[], { offset = 0, limit = 100, total = keys.length } = {}) {
+  const path = '/api/v2/projects/my-project/views/payments/linked/flags';
+  const links: Record<string, { href: string; type: string }> = {
+    self: { href: `${path}?limit=${limit}${offset ? `&offset=${offset}` : ''}`, type: 'application/json' },
+  };
+  if (offset + limit < total) {
+    links.next = { href: `${path}?limit=${limit}&offset=${offset + limit}`, type: 'application/json' };
+    links.last = { href: `${path}?limit=${limit}&offset=${Math.floor((total - 1) / limit) * limit}`, type: 'application/json' };
+  }
+  return {
+    _links: links,
+    items: keys.map((resourceKey, i) => ({
+      _links: { self: { href: `/api/v2/flags/my-project/${resourceKey}`, type: 'application/json' } },
+      linkedAt: 1_760_000_000_000 + i,
+      resourceKey,
+      resourceType: 'flag',
+    })),
+    totalCount: total,
+  };
+}
+
+describe('fetchSnapshot with a view', () => {
+  const viewRequest = { ...request, view: 'payments' };
+
+  it('lists the view members with LD-API-Version: beta, then the flags list, and records both', async () => {
+    const api = fakeApi(json(viewPage(['b', 'a'])), json(page(['a', 'b', 'c'])));
+    const snapshot = await fetchSnapshot(viewRequest, api.deps);
+
+    const [members, flags] = api.requests;
+    expect(members!.url.origin + members!.url.pathname).toBe(
+      `${BASE}/api/v2/projects/my-project/views/payments/linked/flags`,
+    );
+    expect(members!.url.searchParams.get('limit')).toBe('100');
+    expect(members!.headers.get('LD-API-Version')).toBe('beta');
+    expect(members!.headers.get('Authorization')).toBe('api-123');
+    // The flags list is unfiltered: the undocumented filter=view: is not used.
+    expect(flags!.url.pathname).toBe('/api/v2/flags/my-project');
+    expect(flags!.url.searchParams.has('filter')).toBe(false);
+    expect(flags!.headers.get('LD-API-Version')).toBe('20240415');
+    expect(snapshot.view).toEqual({ key: 'payments', memberKeys: ['b', 'a'] });
+    expect(snapshot.flagPages).toEqual([page(['a', 'b', 'c'])]);
+  });
+
+  it('pages the members by _links.next', async () => {
+    const api = fakeApi(
+      json(viewPage(['a', 'b'], { limit: 2, total: 5 })),
+      json(viewPage(['c', 'd'], { offset: 2, limit: 2, total: 5 })),
+      json(viewPage(['e'], { offset: 4, limit: 2, total: 5 })),
+      json(page(['a'])),
+    );
+    const snapshot = await fetchSnapshot(viewRequest, api.deps);
+    expect(api.requests.slice(0, 3).map((r) => r.url.searchParams.get('offset'))).toEqual([null, '2', '4']);
+    expect(api.requests.slice(0, 3).every((r) => r.headers.get('LD-API-Version') === 'beta')).toBe(true);
+    expect(snapshot.view?.memberKeys).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('stops paging the members once totalCount is reached, even if _links.next is present', async () => {
+    const full = viewPage(['a', 'b'], { limit: 2, total: 2 });
+    full._links.next = { href: '/api/v2/projects/my-project/views/payments/linked/flags?limit=2&offset=2', type: 'application/json' };
+    const api = fakeApi(json(full), json(page(['a'])));
+    const snapshot = await fetchSnapshot(viewRequest, api.deps);
+    expect(api.requests).toHaveLength(2);
+    expect(snapshot.view?.memberKeys).toEqual(['a', 'b']);
+  });
+
+  it('stops paging the members on an empty page', async () => {
+    const empty = viewPage([], { offset: 2, limit: 2, total: 9 });
+    empty._links.next = { href: '/api/v2/projects/my-project/views/payments/linked/flags?limit=2&offset=4', type: 'application/json' };
+    const api = fakeApi(json(viewPage(['a', 'b'], { limit: 2, total: 9 })), json(empty), json(page(['a'])));
+    const snapshot = await fetchSnapshot(viewRequest, api.deps);
+    expect(api.requests).toHaveLength(3);
+    expect(snapshot.view?.memberKeys).toEqual(['a', 'b']);
+  });
+
+  it('reads only resourceKey from member items, ignoring unknown fields and a missing _links', async () => {
+    const body = {
+      items: [
+        { resourceKey: 'a', resourceType: 'flag', linkedAt: 1, _links: {}, resourceDetails: { name: 'A' }, futureField: [1] },
+        { resourceKey: 'b', somethingNew: true },
+      ],
+      totalCount: 2,
+      newTopLevel: { x: 1 },
+    };
+    const snapshot = await fetchSnapshot(viewRequest, fakeApi(json(body), json(page(['a']))).deps);
+    expect(snapshot.view).toEqual({ key: 'payments', memberKeys: ['a', 'b'] });
+  });
+
+  it('URL-encodes the view key and keeps its case', async () => {
+    const api = fakeApi(json(viewPage([])), json(page([])));
+    await fetchSnapshot({ ...request, view: 'Team A' }, api.deps);
+    expect(api.requests[0]!.url.pathname).toBe('/api/v2/projects/my-project/views/Team%20A/linked/flags');
+  });
+
+  it('rejects a member item without a string resourceKey as exit 2', async () => {
+    const err = await fetchSnapshot(viewRequest, fakeApi(json({ items: [{ key: 'a' }], totalCount: 1 })).deps).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(CodegenError);
+    expect((err as Error).message).toMatch(/resourceKey/);
+  });
+
+  // Live, 2026-10-10: an unknown view key returns 404 {"code":"not_found","message":"View not found"}.
+  it('turns 404 View not found into an exit-2 error naming the view and project', async () => {
+    const api = fakeApi(json({ code: 'not_found', message: 'View not found' }, 404));
+    const err = await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CodegenError);
+    expect((err as CodegenError).exitCode).toBe(2);
+    const message = (err as Error).message;
+    expect(message).toContain('view `payments` not found in project `my-project`');
+    expect(message).toMatch(/view key, not its display name/);
+    expect(message).toContain('not_found: View not found');
+    expect(api.requests).toHaveLength(1);
+  });
+
+  // An account without views was not verifiable live; a 403 means views are not available.
+  it('turns a 403 into an exit-2 error saying views need an Enterprise plan', async () => {
+    const api = fakeApi(json({ code: 'forbidden', message: 'Access to the requested resource was denied' }, 403));
+    const err = await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CodegenError);
+    expect((err as CodegenError).exitCode).toBe(2);
+    expect((err as Error).message).toMatch(/views are not available/);
+    expect((err as Error).message).toMatch(/Enterprise/);
+    expect((err as Error).message).toContain('forbidden: Access to the requested resource was denied');
+  });
+
+  it('keeps the generic error for a 404 that is not about the view (unknown project)', async () => {
+    const api = fakeApi(json({ code: 'not_found', message: 'Project not found' }, 404));
+    const err = (await fetchSnapshot(viewRequest, api.deps).catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(CodegenError);
+    expect(err.message).toContain('404');
+    expect(err.message).toContain('not_found: Project not found');
+    expect(err.message).not.toMatch(/view `payments` not found/);
+  });
+});
