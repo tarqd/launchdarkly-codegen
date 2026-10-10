@@ -1,0 +1,229 @@
+{
+  "snapshotVersion": 1,
+  "projectKey": "my-project",
+  "baseUri": "https://app.launchdarkly.com",
+  "tags": [
+    "checkout",
+    "q3"
+  ],
+  "flagPages": [
+    {
+      "items": [
+        {
+          "key": "checkout-legacy",
+          "name": "Checkout legacy",
+          "description": "Old checkout path; has only one of the two tags, so the local re-check drops it.",
+          "kind": "boolean",
+          "creationDate": 1720000000000,
+          "includeInSnippet": false,
+          "clientSideAvailability": {
+            "usingEnvironmentId": false,
+            "usingMobileKey": false
+          },
+          "variations": [
+            {
+              "_id": "checkout-legacy-on",
+              "value": true
+            },
+            {
+              "_id": "checkout-legacy-off",
+              "value": false
+            }
+          ],
+          "temporary": true,
+          "tags": [
+            "checkout"
+          ],
+          "_links": {
+            "parent": {
+              "href": "/api/v2/flags/my-project",
+              "type": "application/json"
+            },
+            "self": {
+              "href": "/api/v2/flags/my-project/checkout-legacy",
+              "type": "application/json"
+            }
+          },
+          "maintainerId": "507f1f77bcf86cd799439011",
+          "_maintainer": {
+            "_id": "507f1f77bcf86cd799439011",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "role": "writer",
+            "email": "ada@example.com"
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false,
+          "defaults": {
+            "onVariation": 0,
+            "offVariation": 1
+          }
+        },
+        {
+          "key": "checkout-v2",
+          "name": "Checkout V2",
+          "description": "Routes eligible users to the rewritten checkout flow.",
+          "kind": "boolean",
+          "creationDate": 1720000001000,
+          "includeInSnippet": false,
+          "clientSideAvailability": {
+            "usingEnvironmentId": false,
+            "usingMobileKey": false
+          },
+          "variations": [
+            {
+              "_id": "checkout-v2-on",
+              "value": true
+            },
+            {
+              "_id": "checkout-v2-off",
+              "value": false
+            }
+          ],
+          "temporary": true,
+          "tags": [
+            "checkout",
+            "q3"
+          ],
+          "_links": {
+            "parent": {
+              "href": "/api/v2/flags/my-project",
+              "type": "application/json"
+            },
+            "self": {
+              "href": "/api/v2/flags/my-project/checkout-v2",
+              "type": "application/json"
+            }
+          },
+          "maintainerId": "507f1f77bcf86cd799439011",
+          "_maintainer": {
+            "_id": "507f1f77bcf86cd799439011",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "role": "writer",
+            "email": "ada@example.com"
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false,
+          "defaults": {
+            "onVariation": 0,
+            "offVariation": 1
+          }
+        },
+        {
+          "key": "express-pay",
+          "name": "Express pay",
+          "description": "One-click payment in the q3 checkout.",
+          "kind": "boolean",
+          "creationDate": 1720000002000,
+          "includeInSnippet": false,
+          "clientSideAvailability": {
+            "usingEnvironmentId": false,
+            "usingMobileKey": false
+          },
+          "variations": [
+            {
+              "_id": "express-pay-on",
+              "value": true
+            },
+            {
+              "_id": "express-pay-off",
+              "value": false
+            }
+          ],
+          "temporary": true,
+          "tags": [
+            "billing",
+            "checkout",
+            "q3"
+          ],
+          "_links": {
+            "parent": {
+              "href": "/api/v2/flags/my-project",
+              "type": "application/json"
+            },
+            "self": {
+              "href": "/api/v2/flags/my-project/express-pay",
+              "type": "application/json"
+            }
+          },
+          "maintainerId": "507f1f77bcf86cd799439011",
+          "_maintainer": {
+            "_id": "507f1f77bcf86cd799439011",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "role": "writer",
+            "email": "ada@example.com"
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false,
+          "defaults": {
+            "onVariation": 0,
+            "offVariation": 1
+          }
+        },
+        {
+          "key": "promo-banner",
+          "name": "Promo banner",
+          "description": "Not tagged for checkout; the server should not have returned it.",
+          "kind": "boolean",
+          "creationDate": 1720000003000,
+          "includeInSnippet": false,
+          "clientSideAvailability": {
+            "usingEnvironmentId": false,
+            "usingMobileKey": false
+          },
+          "variations": [
+            {
+              "_id": "promo-banner-on",
+              "value": true
+            },
+            {
+              "_id": "promo-banner-off",
+              "value": false
+            }
+          ],
+          "temporary": true,
+          "tags": [
+            "marketing"
+          ],
+          "_links": {
+            "parent": {
+              "href": "/api/v2/flags/my-project",
+              "type": "application/json"
+            },
+            "self": {
+              "href": "/api/v2/flags/my-project/promo-banner",
+              "type": "application/json"
+            }
+          },
+          "maintainerId": "507f1f77bcf86cd799439011",
+          "_maintainer": {
+            "_id": "507f1f77bcf86cd799439011",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "role": "writer",
+            "email": "ada@example.com"
+          },
+          "customProperties": {},
+          "archived": false,
+          "deprecated": false,
+          "defaults": {
+            "onVariation": 0,
+            "offVariation": 1
+          }
+        }
+      ],
+      "totalCount": 4,
+      "_links": {
+        "self": {
+          "href": "/api/v2/flags/my-project?filter=tags%3Acheckout%2Bq3&limit=100&sort=key",
+          "type": "application/json"
+        }
+      }
+    }
+  ]
+}

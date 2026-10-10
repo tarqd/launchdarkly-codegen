@@ -1,0 +1,13 @@
+{
+  "name": "@launchtarqly/compile-ts-server",
+  "private": true,
+  "type": "module",
+  "description": "Minimal project that compiles golden ts-server output against Node server SDK v9",
+  "scripts": {
+    "compile": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@launchdarkly/node-server-sdk": "9.14.4",
+    "typescript": "5.9.3"
+  }
+}

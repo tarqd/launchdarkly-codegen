@@ -1,0 +1,169 @@
+/**
+ * Snapshot → Flag model (DESIGN.md → Normalizer rules). Runs the same way on
+ * a live fetch and on a replayed snapshot.
+ */
+
+import { aliasesFor } from './aliases.js';
+import { CodegenError } from './errors.js';
+import type { Flag, FlagKind, FlagModel, Maintainer } from './model.js';
+import { singlePropertyValue } from './properties.js';
+import type { ApiFlag, Snapshot } from './snapshot.js';
+
+export interface NormalizeOptions {
+  /** Receives non-fatal problems (for example mixed variation types). */
+  warn?: (message: string) => void;
+  /**
+   * Configured tag filter: keep only flags that have all of these tags. The
+   * snapshot's own `tags` (the filter it was fetched with) also applies.
+   */
+  tags?: readonly string[];
+  /**
+   * Configured view key. The members come from the snapshot's `view`, so the
+   * snapshot must have been fetched with this view.
+   */
+  view?: string;
+}
+
+export function normalize(snapshot: Snapshot, options: NormalizeOptions = {}): FlagModel {
+  const warn = options.warn ?? (() => {});
+  const hasTags = tagFilter([...(snapshot.tags ?? []), ...(options.tags ?? [])]);
+  const inView = viewFilter(snapshot, options.view);
+  const flags = dedupeByKey(snapshot.flagPages.flatMap((page) => page.items))
+    .filter((item) => !item.archived)
+    .filter(hasTags)
+    .filter(inView)
+    .map((item) => normalizeFlag(item, snapshot, warn))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return { projectKey: snapshot.projectKey, flags };
+}
+
+/**
+ * The local re-check of `filter=tags:a+b`, which LaunchDarkly documents as
+ * "flags that have all of the tags in the list": a flag matches when its tags
+ * include every required tag. No required tags matches every flag.
+ */
+function tagFilter(required: readonly string[]): (item: ApiFlag) => boolean {
+  return (item) => required.every((tag) => item.tags.includes(tag));
+}
+
+/**
+ * Keeps only the snapshot view's members, by key; a member missing from the
+ * flags list is ignored. A configured view must be the one the snapshot was
+ * fetched with, since members cannot be resolved offline.
+ */
+function viewFilter(snapshot: Snapshot, configured: string | undefined): (item: ApiFlag) => boolean {
+  const view = snapshot.view;
+  if (configured !== undefined && view?.key !== configured) {
+    throw new CodegenError(
+      view === undefined
+        ? `view \`${configured}\` is configured but the snapshot has no view; fetch it again with the view set`
+        : `view \`${configured}\` is configured but the snapshot was fetched with view \`${view.key}\``,
+    );
+  }
+  if (view === undefined) return () => true;
+  const members = new Set(view.memberKeys);
+  return (item) => members.has(item.key);
+}
+
+/** Offset paging can repeat a flag across pages; the first occurrence wins. */
+function dedupeByKey(items: ApiFlag[]): ApiFlag[] {
+  const byKey = new Map<string, ApiFlag>();
+  for (const item of items) if (!byKey.has(item.key)) byKey.set(item.key, item);
+  return [...byKey.values()];
+}
+
+function normalizeFlag(item: ApiFlag, snapshot: Snapshot, warn: (message: string) => void): Flag {
+  const kind = inferKind(item, warn);
+  return {
+    key: item.key,
+    name: item.name,
+    description: item.description ?? '',
+    kind,
+    ...(kind === 'number' && { numberType: numberType(item) }),
+    clientSideAvailability: item.clientSideAvailability ?? {
+      usingEnvironmentId: item.includeInSnippet ?? false,
+      usingMobileKey: true,
+    },
+    tags: item.tags,
+    ...maintainerOf(item),
+    ...deprecationOf(item),
+    archived: item.archived,
+    aliases: aliasesFor(item),
+    uiUrl: `${snapshot.baseUri}/projects/${snapshot.projectKey}/flags/${item.key}`,
+  };
+}
+
+function maintainerOf(item: ApiFlag): { maintainer?: Maintainer } {
+  const member = item._maintainer;
+  if (member) {
+    const name = [member.firstName, member.lastName].filter((part) => part).join(' ');
+    return { maintainer: { kind: 'member', email: member.email, ...(name ? { name } : {}) } };
+  }
+  const team = item._maintainerTeam;
+  if (team) return { maintainer: { kind: 'team', key: team.key, name: team.name } };
+  return {};
+}
+
+/** LaunchDarkly's marker OR any `codegen.deprecated` value; the message joins the non-blank values. */
+function deprecationOf(item: ApiFlag): { deprecated: boolean; deprecationMessage?: string } {
+  const values = item.customProperties?.['codegen.deprecated']?.value ?? [];
+  const message = values
+    .map((v) => v.trim())
+    .filter((v) => v !== '')
+    .join(' ');
+  return {
+    deprecated: item.deprecated || values.length > 0,
+    ...(message ? { deprecationMessage: message } : {}),
+  };
+}
+
+/** The flag kind a single variation value implies; objects, arrays and null are all `json`. */
+function valueKind(value: unknown): FlagKind {
+  switch (typeof value) {
+    case 'boolean':
+    case 'string':
+    case 'number':
+      return typeof value as FlagKind;
+    default:
+      return 'json';
+  }
+}
+
+function inferKind(item: ApiFlag, warn: (message: string) => void): FlagKind {
+  const values = item.variations.map((v) => v.value);
+  if (item.kind === 'boolean') {
+    const bad = values.findIndex((v) => typeof v !== 'boolean');
+    if (bad !== -1) {
+      throw new CodegenError(
+        `flag ${item.key}: boolean flag has a non-boolean variation value ${JSON.stringify(values[bad]) ?? 'undefined'}`,
+      );
+    }
+    return 'boolean';
+  }
+  const types = [...new Set(values.map(valueKind))];
+  if (types.length === 1 && (types[0] === 'string' || types[0] === 'number')) return types[0];
+  if (types.length > 1) {
+    warn(`flag ${item.key}: variations mix value types (${types.join(', ')}); treating it as json`);
+  }
+  return 'json';
+}
+
+const INT32_MIN = -(2 ** 31);
+const INT32_MAX = 2 ** 31 - 1;
+
+/** `double` unless `codegen.number` is `int`, which every variation must then fit. */
+function numberType(item: ApiFlag): 'int' | 'double' {
+  const prop = 'codegen.number';
+  const setting = singlePropertyValue(item, prop);
+  if (setting === undefined) return 'double';
+  if (setting !== 'int') {
+    throw new CodegenError(`flag ${item.key}: custom property ${prop} must be "int", got ${JSON.stringify(setting)}`);
+  }
+  for (const { value } of item.variations) {
+    const n = value as number;
+    if (!Number.isInteger(n) || n < INT32_MIN || n > INT32_MAX) {
+      throw new CodegenError(`flag ${item.key}: ${prop} is int but variation value ${n} is not a 32-bit integer`);
+    }
+  }
+  return 'int';
+}
