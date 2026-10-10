@@ -30,7 +30,34 @@ export function lowerCamel(key: string): string {
     .join('');
 }
 
-/** `checkout-v2.new_flow` → `CheckoutV2NewFlow`. Acronyms are ordinary words: `api-url` → `ApiUrl`. */
-export function upperCamel(key: string): string {
-  return splitWords(key).map(capitalize).join('');
+/**
+ * staticcheck's ST1003 default initialisms as of 2025.1.1, frozen (ADR 0002).
+ * Adding or removing one renames every Go identifier built from that word.
+ */
+export const GO_INITIALISMS: ReadonlySet<string> = new Set([
+  'ACL', 'AMQP', 'API', 'ASCII', 'CPU', 'CSS', 'DB', 'DNS', 'EOF', 'GID', 'GUID', 'HTML', 'HTTP', 'HTTPS',
+  'ID', 'IP', 'JSON', 'QPS', 'RAM', 'RPC', 'RTP', 'SIP', 'SLA', 'SMTP', 'SQL', 'SSH', 'TCP', 'TLS', 'TS',
+  'TTL', 'UDP', 'UI', 'UID', 'URI', 'URL', 'UTF8', 'UUID', 'VM', 'XML', 'XMPP', 'XSRF', 'XSS',
+]);
+
+export interface UpperCamelOptions {
+  /**
+   * Words to write all upper-case instead of capitalized, spelled upper-case:
+   * with `GO_INITIALISMS`, `api-url-id` → `APIURLID`. Only whole words match.
+   */
+  initialisms?: ReadonlySet<string>;
+}
+
+/**
+ * `checkout-v2.new_flow` → `CheckoutV2NewFlow`. Acronyms are ordinary words
+ * (`api-url` → `ApiUrl`) unless listed in `initialisms`.
+ */
+export function upperCamel(key: string, options: UpperCamelOptions = {}): string {
+  const { initialisms } = options;
+  return splitWords(key)
+    .map((word) => {
+      const upper = word.toUpperCase();
+      return initialisms?.has(upper) ? upper : capitalize(word);
+    })
+    .join('');
 }

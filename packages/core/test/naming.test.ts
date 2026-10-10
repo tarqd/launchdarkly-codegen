@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lowerCamel, upperCamel } from '../src/index.js';
+import { GO_INITIALISMS, lowerCamel, upperCamel } from '../src/index.js';
 
 describe('lowerCamel', () => {
   it('converts the DESIGN.md example key', () => {
@@ -40,8 +40,13 @@ describe('lowerCamel', () => {
 });
 
 describe('upperCamel', () => {
-  it('capitalizes every word, including the first', () => {
+  it('converts the DESIGN.md example key', () => {
     expect(upperCamel('checkout-v2.new_flow')).toBe('CheckoutV2NewFlow');
+  });
+
+  it('capitalizes every word, lowercasing the rest', () => {
+    expect(upperCamel('BETA_FEATURE')).toBe('BetaFeature');
+    expect(upperCamel('beta.dark_mode')).toBe('BetaDarkMode');
   });
 
   it('treats acronyms as ordinary words, with no initialism table', () => {
@@ -55,5 +60,47 @@ describe('upperCamel', () => {
 
   it('keeps a leading digit, for the identifier check to reject', () => {
     expect(upperCamel('2fa-enabled')).toBe('2faEnabled');
+  });
+});
+
+describe('upperCamel with the Go initialisms (ADR 0002)', () => {
+  const go = (key: string) => upperCamel(key, { initialisms: GO_INITIALISMS });
+
+  it('converts the DESIGN.md example key', () => {
+    expect(go('api-url-id')).toBe('APIURLID');
+  });
+
+  // ADR 0002's list, copied here so that changing the list in core fails this test.
+  const ADR_0002 = [
+    'ACL', 'AMQP', 'API', 'ASCII', 'CPU', 'CSS', 'DB', 'DNS', 'EOF', 'GID', 'GUID', 'HTML', 'HTTP', 'HTTPS',
+    'ID', 'IP', 'JSON', 'QPS', 'RAM', 'RPC', 'RTP', 'SIP', 'SLA', 'SMTP', 'SQL', 'SSH', 'TCP', 'TLS', 'TS',
+    'TTL', 'UDP', 'UI', 'UID', 'URI', 'URL', 'UTF8', 'UUID', 'VM', 'XML', 'XMPP', 'XSRF', 'XSS',
+  ];
+
+  it('holds exactly the 42 frozen entries', () => {
+    expect(ADR_0002).toHaveLength(42);
+    expect([...GO_INITIALISMS].sort()).toEqual([...ADR_0002].sort());
+  });
+
+  it.each(ADR_0002)('upper-cases %s wherever it appears as a word', (initialism) => {
+    const word = initialism.toLowerCase();
+    expect(go(`${word}-flag`)).toBe(`${initialism}Flag`);
+    expect(go(`new-${word}`)).toBe(`New${initialism}`);
+    expect(go(`new-${word}-flag`)).toBe(`New${initialism}Flag`);
+  });
+
+  it('upper-cases runs of initialisms and initialisms found by case changes', () => {
+    expect(go('user-id-url')).toBe('UserIDURL');
+    expect(go('enableNewUI')).toBe('EnableNewUI');
+    expect(go('HTTPServerTimeout')).toBe('HTTPServerTimeout');
+    expect(go('userId')).toBe('UserID');
+  });
+
+  it('matches whole words only, so a word with a digit must itself be on the list', () => {
+    // A digit stays with the word before it: `utf8` is on the list, `http2` is not.
+    expect(go('http2-api')).toBe('Http2API');
+    expect(go('utf8-name')).toBe('UTF8Name');
+    expect(go('identity-urls')).toBe('IdentityUrls');
+    expect(go('ids')).toBe('Ids');
   });
 });

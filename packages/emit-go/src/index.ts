@@ -1,0 +1,200 @@
+/**
+ * go emitter: a typed wrapper over `github.com/launchdarkly/go-server-sdk/v7`
+ * (DESIGN.md → Generated code by target → go).
+ */
+
+import {
+  checkIdentifiers,
+  CodegenError,
+  flagIdentifier,
+  GO_INITIALISMS,
+  upperCamel,
+  Writer,
+  type EmittedIdentifier,
+  type Emitter,
+  type Flag,
+  type FlagModel,
+  type IdentifierRules,
+  type TargetConfig,
+  type TargetId,
+} from '@launchtarqly/core';
+import { deprecation, methodDoc } from './doc.js';
+import { summarizeGoChanges } from './flag-changes.js';
+import { FLAGS_STRUCT, goKind, keyConstant, KEYS_COMMENT, KIND_METHODS, METHOD_FORMS } from './output.js';
+
+export { parseGoFlags, summarizeGoChanges } from './flag-changes.js';
+
+/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+export const GO: TargetId = 'go';
+
+const SDK_COMMON = 'github.com/launchdarkly/go-sdk-common/v3';
+
+/** The Go spec's keywords, which can't name a package. */
+const GO_KEYWORDS: ReadonlySet<string> = new Set([
+  'break', 'case', 'chan', 'const', 'continue', 'default', 'defer', 'else', 'fallthrough', 'for',
+  'func', 'go', 'goto', 'if', 'import', 'interface', 'map', 'package', 'range', 'return', 'select',
+  'struct', 'switch', 'type', 'var',
+]);
+
+/**
+ * The target's `package`, after checking it and `out` (DESIGN.md → go →
+ * Config). Config loading passes these keys through unchecked, so a bad
+ * value is a CodegenError (exit 2) naming the key.
+ */
+function packageName(cfg: TargetConfig): string {
+  if (!cfg.out.endsWith('.go')) {
+    throw new CodegenError(`go target: out must be the path of a .go file, got ${JSON.stringify(cfg.out)}`);
+  }
+  const pkg = cfg.package;
+  if (typeof pkg !== 'string' || !/^[a-z][a-z0-9_]*$/.test(pkg) || GO_KEYWORDS.has(pkg)) {
+    throw new CodegenError(
+      `go target: package must be a lowercase Go identifier that is not a keyword, got ${JSON.stringify(pkg)}`,
+    );
+  }
+  return pkg;
+}
+
+const NAMING: IdentifierRules = {
+  target: GO,
+  // Go keywords are all lowercase, so the export rule already excludes them.
+  reserved: new Set(),
+  pattern: /^\p{Lu}[\p{L}\p{Nd}_]*$/u,
+  invalidReason: 'is not an exported Go identifier (it must start with an upper-case letter)',
+};
+
+/**
+ * Names the file declares itself, which no flag may take. The `client` field
+ * is left out: it is lower-case, and the export rule already keeps every flag
+ * identifier upper-case.
+ */
+const GENERATOR_NAMES = ['Client', 'Flags', 'New'];
+
+/** A flag and the identifier the file names it by. */
+interface NamedFlag {
+  flag: Flag;
+  name: string;
+}
+
+/** Each flag with its name, after checking every identifier the file will emit (DESIGN.md → Naming). */
+function namedFlags(model: FlagModel): NamedFlag[] {
+  const convert = (key: string) => upperCamel(key, { initialisms: GO_INITIALISMS });
+  const named = model.flags.map((flag) => ({ flag, name: flagIdentifier(flag, GO, convert) }));
+  const emitted: EmittedIdentifier[] = GENERATOR_NAMES.map((identifier) => ({ identifier }));
+  for (const { flag, name } of named) {
+    emitted.push(
+      ...METHOD_FORMS.map(({ suffix }) => ({ flagKey: flag.key, identifier: `${name}${suffix}`, primary: suffix === '' })),
+      { flagKey: flag.key, identifier: keyConstant(name) },
+    );
+  }
+  checkIdentifiers(NAMING, emitted);
+  return named;
+}
+
+/** A Go interpreted string literal. */
+function goString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/** A form's parameter list (after `valueParam`, the kind's Go `type`) and results. */
+function signature(form: (typeof METHOD_FORMS)[number], type: string, valueParam: string) {
+  const params = `${form.ctx ? 'ctx gocontext.Context, ' : ''}${valueParam} ${type}`;
+  const result = form.detail ? `(${type}, ldreason.EvaluationDetail, error)` : `(${type}, error)`;
+  return { params, result };
+}
+
+function emitClient(w: Writer): void {
+  w.line('// Client is the subset of the LaunchDarkly client that Flags calls: the typed');
+  w.line('// evaluation methods for every flag kind. *ld.LDClient satisfies it.');
+  w.block('type Client interface {', '}', () => {
+    for (const { method, type } of Object.values(KIND_METHODS)) {
+      for (const form of METHOD_FORMS) {
+        const { params, result } = signature(form, type, 'key string, context ldcontext.Context, defaultVal');
+        w.line(`${method}${form.suffix}(${params}) ${result}`);
+      }
+    }
+  });
+}
+
+function emitFlagMethods(w: Writer, { flag, name }: NamedFlag): void {
+  const { method, type } = KIND_METHODS[goKind(flag)];
+  const key = keyConstant(name);
+  for (const form of METHOD_FORMS) {
+    const { params, result } = signature(form, type, 'context ldcontext.Context, fallback');
+    const doc = form.variantSummary ? variantDoc(form.variantSummary(name), flag) : methodDoc(name, flag);
+    const args = `${form.ctx ? 'ctx, ' : ''}${key}, context, fallback`;
+    w.line();
+    for (const text of doc) w.line(text === '' ? '//' : `// ${text}`);
+    w.block(`func (f *Flags) ${name}${form.suffix}(${params}) ${result} {`, '}', () => {
+      w.line(`return f.client.${method}${form.suffix}(${args})`);
+    });
+  }
+}
+
+/** A variant's one-line doc, plus the `Deprecated:` paragraph for a deprecated flag. */
+function variantDoc(summary: string, flag: Flag): string[] {
+  const deprecated = deprecation(flag);
+  return deprecated === undefined ? [summary] : [summary, '', deprecated];
+}
+
+/**
+ * The `Key…` constants, `=`-aligned the way gofmt aligns a run of single-line
+ * specs (by rune count). A deprecated constant's `// Deprecated:` line ends
+ * the run before it, so that constant starts a new one.
+ */
+function emitKeys(w: Writer, flags: readonly NamedFlag[]): void {
+  const runs: NamedFlag[][] = [];
+  for (const named of flags) {
+    if (named.flag.deprecated || runs.length === 0) runs.push([named]);
+    else runs[runs.length - 1]!.push(named);
+  }
+  w.line();
+  w.line(KEYS_COMMENT);
+  w.block('const (', ')', () => {
+    for (const run of runs) {
+      const width = Math.max(...run.map(({ name }) => [...keyConstant(name)].length));
+      for (const { flag, name } of run) {
+        const deprecated = deprecation(flag);
+        if (deprecated !== undefined) w.line(`// ${deprecated}`);
+        const constant = keyConstant(name);
+        w.line(`${constant}${' '.repeat(width - [...constant].length)} = ${goString(flag.key)}`);
+      }
+    }
+  });
+}
+
+export const goEmitter: Emitter = {
+  id: GO,
+  // Config validation checks each target's `sdkMajor` against this list.
+  sdkMajors: [7],
+  emit(model, cfg, ctx) {
+    const pkg = packageName(cfg);
+    // The Flag model is sorted by key, so methods and constants are too.
+    const flags = namedFlags(model);
+    const w = new Writer({ indent: '\t', commentPrefix: '//' });
+    w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
+    w.line();
+    w.line(`// Package ${pkg} is a type-safe wrapper around the LaunchDarkly Go server SDK`);
+    w.line(`// for the flags in project ${model.projectKey}.`);
+    w.line(`package ${pkg}`);
+    w.line();
+    w.block('import (', ')', () => {
+      w.line('gocontext "context"');
+      w.line();
+      for (const sub of ['ldcontext', 'ldreason', 'ldvalue']) w.line(goString(`${SDK_COMMON}/${sub}`));
+    });
+    w.line();
+    emitClient(w);
+    w.line();
+    w.line(`// Flags evaluates the flags of project ${model.projectKey}.`);
+    w.line(FLAGS_STRUCT);
+    w.line();
+    w.line('// New returns a Flags that evaluates through client.');
+    w.line('func New(client Client) *Flags { return &Flags{client: client} }');
+    for (const named of flags) emitFlagMethods(w, named);
+    if (flags.length > 0) emitKeys(w, flags);
+    return [{ path: cfg.out, contents: w.toString() }];
+  },
+  summarizeChanges: summarizeGoChanges,
+};
+
+export default goEmitter;

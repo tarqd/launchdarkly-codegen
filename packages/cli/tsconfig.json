@@ -5,5 +5,10 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../emit-ts-server" }, { "path": "../emit-dotnet" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../emit-ts-server" },
+    { "path": "../emit-dotnet" },
+    { "path": "../emit-go" }
+  ]
 }

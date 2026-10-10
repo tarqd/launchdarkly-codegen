@@ -4,3 +4,4 @@ bundle/
 *.tsbuildinfo
 # written by compile tests
 fixtures/compile/*/src/flags.generated.*
+fixtures/compile/go/ldflags/flags_gen.go

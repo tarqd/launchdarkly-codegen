@@ -2,7 +2,8 @@ import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GENERATOR_VERSION } from '../src/index.js';
-import { projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
+import { customProperty, multivariateFlag } from '../../core/test/builders.js';
+import { projectDir, runCli, SNAPSHOTS_DIR, writeSnapshot } from './helpers.js';
 
 const snapshot = join(SNAPSHOTS_DIR, 'boolean-flags.json');
 const OUT = 'src/flags.generated.ts';
@@ -94,6 +95,49 @@ describe('check --from-snapshot', () => {
       const result = await runCli(['check', '--from-snapshot', snapshot], dir);
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: CheckoutVersion2 → CheckoutV2\)\n$/);
+    });
+
+    describe('for a go file', () => {
+      const GO_OUT = 'internal/ldflags/flags_gen.go';
+      const goConfig = { project: 'my-project', targets: [{ id: 'go', out: GO_OUT, sdkMajor: 7, package: 'ldflags' }] };
+
+      it('follows the diff of a stale go file', async () => {
+        const dir = await generatedProject(goConfig);
+        const path = join(dir, GO_OUT);
+        // As if the committed file predates a rename of checkout-v2's identifier and the removal of a flag.
+        const committed = (await readFile(path, 'utf8'))
+          .replaceAll('CheckoutV2', 'CheckoutVersion2')
+          .replace('\tKeyBetaDarkMode ', '\tKeyZombie = "zombie"\n\tKeyBetaDarkMode ')
+          .replace(
+            '\n// Flag keys',
+            '\nfunc (f *Flags) Zombie(context ldcontext.Context, fallback bool) (bool, error) {\n\treturn f.client.BoolVariation(KeyZombie, context, fallback)\n}\n\n// Flag keys',
+          );
+        await writeFile(path, committed);
+        const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 removed \(zombie\), 1 renamed \(checkout-v2: CheckoutVersion2 → CheckoutV2\)\n$/);
+      });
+
+      it('reports switching codegen.number as a changed kind', async () => {
+        const dir = await projectDir(goConfig);
+        const asInt = { customProperties: customProperty('codegen.number', ['int']) };
+        const intSnapshot = await writeSnapshot(dir, [multivariateFlag('max-items', [10, 20], asInt)]);
+        expect((await runCli(['generate', '--from-snapshot', intSnapshot], dir)).exitCode).toBe(0);
+        const doubleSnapshot = await writeSnapshot(dir, [multivariateFlag('max-items', [10, 20])]);
+        const result = await runCli(['check', '--from-snapshot', doubleSnapshot], dir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toMatch(/\n@@ [\s\S]*\nflags: 1 changed kind \(max-items: number \(int\) → number \(double\)\)\n$/);
+      });
+
+      it('prints only the diff for a hand-mangled go file', async () => {
+        const dir = await generatedProject(goConfig);
+        const path = join(dir, GO_OUT);
+        await writeFile(path, (await readFile(path, 'utf8')).replace('const (', 'var ('));
+        const result = await runCli(['check', '--from-snapshot', snapshot], dir);
+        expect(result).toMatchObject({ exitCode: 1, stderr: '' });
+        expect(result.stdout).toContain('-var (\n+const (\n');
+        expect(result.stdout).not.toContain('flags:');
+      });
     });
 
     it('is left out when the existing file cannot be parsed, but the diff is still printed', async () => {
