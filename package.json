@@ -1,0 +1,21 @@
+{
+  "name": "launchdarkly-codegen-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:compile": "vitest run -c vitest.compile.config.ts",
+    "update-golden": "UPDATE_GOLDEN=1 vitest run packages/cli/test/golden.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

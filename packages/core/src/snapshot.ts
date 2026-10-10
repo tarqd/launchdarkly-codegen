@@ -1,0 +1,81 @@
+/**
+ * Snapshot format and replay (DESIGN.md → Fetcher). A snapshot is the raw
+ * LaunchDarkly API responses for one project; nothing here interprets them.
+ * The live fetcher (later) produces the same `Snapshot` shape.
+ */
+
+import { readFile } from 'node:fs/promises';
+import { CodegenError } from './errors.js';
+
+/**
+ * One item of `GET /api/v2/flags/{projectKey}` (LD-API-Version 20240415).
+ * Only the fields the normalizer reads are typed; the rest pass through.
+ */
+export interface ApiFlag {
+  key: string;
+  name: string;
+  description?: string;
+  kind: 'boolean' | 'multivariate';
+  variations: { value: unknown; _id?: string; name?: string }[];
+  archived: boolean;
+  deprecated: boolean;
+  tags: string[];
+  clientSideAvailability?: { usingEnvironmentId: boolean; usingMobileKey: boolean };
+  includeInSnippet?: boolean;
+  customProperties?: Record<string, { name: string; value: string[] }>;
+  [field: string]: unknown;
+}
+
+/** One page of the flags list, as returned by the API. */
+export interface ApiFlagsPage {
+  items: ApiFlag[];
+  totalCount?: number;
+  _links?: Record<string, { href: string; type?: string }>;
+  [field: string]: unknown;
+}
+
+export const SNAPSHOT_VERSION = 1;
+
+export interface Snapshot {
+  snapshotVersion: typeof SNAPSHOT_VERSION;
+  projectKey: string;
+  baseUri: string;
+  /** Present only when the run used a view. */
+  view?: { key: string; memberKeys: string[] };
+  /** The flags-list pages, in fetch order. */
+  flagPages: ApiFlagsPage[];
+}
+
+/** Parses snapshot JSON text, checking the envelope (not the API payloads). */
+export function parseSnapshot(text: string, source = 'snapshot'): Snapshot {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new CodegenError(`${source}: not valid JSON (${(err as Error).message})`);
+  }
+  if (typeof data !== 'object' || data === null) {
+    throw new CodegenError(`${source}: expected a JSON object`);
+  }
+  const s = data as Partial<Snapshot>;
+  if (s.snapshotVersion !== SNAPSHOT_VERSION) {
+    throw new CodegenError(
+      `${source}: unsupported snapshotVersion ${JSON.stringify(s.snapshotVersion)} (expected ${SNAPSHOT_VERSION})`,
+    );
+  }
+  if (typeof s.projectKey !== 'string' || typeof s.baseUri !== 'string' || !Array.isArray(s.flagPages)) {
+    throw new CodegenError(`${source}: missing projectKey, baseUri or flagPages`);
+  }
+  return s as Snapshot;
+}
+
+/** Reads and parses a snapshot file (`--from-snapshot`). */
+export async function readSnapshot(path: string): Promise<Snapshot> {
+  let text: string;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch (err) {
+    throw new CodegenError(`cannot read snapshot ${path}: ${(err as Error).message}`);
+  }
+  return parseSnapshot(text, path);
+}

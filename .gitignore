@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.tsbuildinfo
+# written by compile tests
+fixtures/compile/*/src/flags.generated.*
