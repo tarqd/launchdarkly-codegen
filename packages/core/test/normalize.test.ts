@@ -252,3 +252,27 @@ describe('normalize: flag kind', () => {
     );
   });
 });
+
+describe('tag filter', () => {
+  const flags = [
+    boolFlag('both', { tags: ['billing', 'checkout', 'q3'] }),
+    boolFlag('checkout-only', { tags: ['checkout'] }),
+    boolFlag('billing-only', { tags: ['billing'] }),
+    boolFlag('untagged'),
+  ];
+  const keys = (model: { flags: { key: string }[] }) => model.flags.map((f) => f.key);
+
+  it('keeps only flags that have every configured tag, as filter=tags:a+b does on the server', () => {
+    expect(keys(normalize(snapshot(flags), { tags: ['checkout', 'billing'] }))).toEqual(['both']);
+    expect(keys(normalize(snapshot(flags), { tags: ['checkout'] }))).toEqual(['both', 'checkout-only']);
+  });
+
+  it('drops flags the server returned that do not match the tags the snapshot was fetched with', () => {
+    const recorded = { ...snapshot(flags), tags: ['checkout'] };
+    expect(keys(normalize(recorded))).toEqual(['both', 'checkout-only']);
+  });
+
+  it('keeps every flag when no tags are configured', () => {
+    expect(keys(normalize(snapshot(flags), { tags: [] }))).toHaveLength(4);
+  });
+});

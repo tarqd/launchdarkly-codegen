@@ -23,6 +23,8 @@ export interface Config {
   baseUri: string;
   /** Only ever from env or CLI, never the config file. */
   accessToken?: string;
+  /** Tag filter: only flags with all of these tags. Absent means no filter. */
+  tags?: string[];
   targets: TargetConfig[];
 }
 
@@ -143,6 +145,13 @@ export async function resolveConfig({
   const { project, baseUri, ...rest } = resolveSettings({ cli, env, file: raw, filePath: path, warn });
   if (project === undefined) {
     return fail('`project` is not set; set it in the config file, with LD_CODEGEN_PROJECT, or with --project');
+  }
+  for (const tag of rest.tags ?? []) {
+    if (/[+,]/.test(tag)) {
+      throw new CodegenError(
+        `tag ${JSON.stringify(tag)}: tags cannot contain \`+\` or \`,\`, which separate tags and filters in the API's tag filter`,
+      );
+    }
   }
   const targets = selectTargets(parseTargets(raw.targets, emitters, fail), cli.target);
   // baseUri always has a default in SETTINGS.

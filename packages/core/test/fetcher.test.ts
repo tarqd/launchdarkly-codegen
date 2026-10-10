@@ -173,3 +173,23 @@ describe('fetchSnapshot', () => {
     expect(api.requests[0]!.url.href).toMatch(/^https:\/\/app\.eu\.launchdarkly\.com\/api\/v2\/flags\/my-project\?/);
   });
 });
+
+describe('fetchSnapshot with a tag filter', () => {
+  it('sends filter=tags:a+b with the + percent-encoded, and records the tags in the snapshot', async () => {
+    const api = fakeApi(json(page(['a'])));
+    const snapshot = await fetchSnapshot({ ...request, tags: ['checkout', 'billing'] }, api.deps);
+
+    const { url } = api.requests[0]!;
+    expect(url.searchParams.get('filter')).toBe('tags:checkout+billing');
+    // A literal `+` in a query string decodes as a space; the API needs %2B.
+    expect(url.search).toContain('filter=tags%3Acheckout%2Bbilling');
+    expect(snapshot.tags).toEqual(['checkout', 'billing']);
+  });
+
+  it('sends no filter and records no tags when none are configured', async () => {
+    const api = fakeApi(json(page(['a'])));
+    const snapshot = await fetchSnapshot({ ...request, tags: [] }, api.deps);
+    expect(api.requests[0]!.url.searchParams.has('filter')).toBe(false);
+    expect(snapshot).not.toHaveProperty('tags');
+  });
+});

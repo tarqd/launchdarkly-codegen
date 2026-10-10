@@ -11,6 +11,8 @@ export interface FetchRequest {
   projectKey: string;
   baseUri: string;
   accessToken: string;
+  /** Tag filter: only flags with all of these tags. Empty or absent means no filter. */
+  tags?: readonly string[];
 }
 
 /** Side effects, injectable for tests. */
@@ -42,18 +44,21 @@ export async function fetchSnapshot(request: FetchRequest, deps: FetchDeps = def
     snapshotVersion: SNAPSHOT_VERSION,
     projectKey: request.projectKey,
     baseUri: request.baseUri,
+    ...(request.tags?.length ? { tags: [...request.tags] } : {}),
     flagPages,
   };
 }
 
 /**
  * The first flags-list URL. `env` and `expand` are never sent. Selection
- * params (e.g. a tag `filter`) are added here.
+ * params (the tag `filter`) are added here.
  */
 export function flagsListUrl(request: FetchRequest): URL {
   const url = apiUrl(request.baseUri, `/api/v2/flags/${encodeURIComponent(request.projectKey)}`);
   url.searchParams.set('limit', String(FLAGS_PAGE_LIMIT));
   url.searchParams.set('sort', 'key');
+  // `+` means "all of these tags"; URLSearchParams encodes it as %2B, as the API needs.
+  if (request.tags?.length) url.searchParams.set('filter', `tags:${request.tags.join('+')}`);
   return url;
 }
 

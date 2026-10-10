@@ -42,6 +42,11 @@ export interface Snapshot {
   snapshotVersion: typeof SNAPSHOT_VERSION;
   projectKey: string;
   baseUri: string;
+  /**
+   * The tag filter the flags list was fetched with (`filter=tags:a+b`), present
+   * only when one was set. The normalizer re-applies it.
+   */
+  tags?: string[];
   /** Present only when the run used a view. */
   view?: { key: string; memberKeys: string[] };
   /** The flags-list pages, in fetch order. */
@@ -67,6 +72,9 @@ export function parseSnapshot(text: string, source = 'snapshot'): Snapshot {
   }
   if (typeof s.projectKey !== 'string' || typeof s.baseUri !== 'string' || !Array.isArray(s.flagPages)) {
     throw new CodegenError(`${source}: missing projectKey, baseUri or flagPages`);
+  }
+  if (s.tags !== undefined && !(Array.isArray(s.tags) && s.tags.every((t) => typeof t === 'string'))) {
+    throw new CodegenError(`${source}: \`tags\` must be a list of strings`);
   }
   return s as Snapshot;
 }

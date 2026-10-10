@@ -12,15 +12,31 @@ import type { ApiFlag, Snapshot } from './snapshot.js';
 export interface NormalizeOptions {
   /** Receives non-fatal problems (for example mixed variation types). */
   warn?: (message: string) => void;
+  /**
+   * Configured tag filter: keep only flags that have all of these tags. The
+   * snapshot's own `tags` (the filter it was fetched with) also applies.
+   */
+  tags?: readonly string[];
 }
 
 export function normalize(snapshot: Snapshot, options: NormalizeOptions = {}): FlagModel {
   const warn = options.warn ?? (() => {});
+  const hasTags = tagFilter([...(snapshot.tags ?? []), ...(options.tags ?? [])]);
   const flags = dedupeByKey(snapshot.flagPages.flatMap((page) => page.items))
     .filter((item) => !item.archived)
+    .filter(hasTags)
     .map((item) => normalizeFlag(item, snapshot, warn))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { projectKey: snapshot.projectKey, flags };
+}
+
+/**
+ * The local re-check of `filter=tags:a+b`, which LaunchDarkly documents as
+ * "flags that have all of the tags in the list": a flag matches when its tags
+ * include every required tag. No required tags matches every flag.
+ */
+function tagFilter(required: readonly string[]): (item: ApiFlag) => boolean {
+  return (item) => required.every((tag) => item.tags.includes(tag));
 }
 
 /** Offset paging can repeat a flag across pages; the first occurrence wins. */

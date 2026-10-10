@@ -11,7 +11,7 @@ import { emitterFor } from './emitters.js';
 import { GENERATOR_VERSION } from './version.js';
 
 export function generateFiles(config: Config, snapshot: Snapshot, options: NormalizeOptions = {}): GeneratedFile[] {
-  const model = normalize(snapshot, options);
+  const model = normalize(snapshot, { ...options, ...(config.tags && { tags: config.tags }) });
   const ctx = { generatorVersion: GENERATOR_VERSION };
   return config.targets.flatMap((target) => emitterFor(target.id).emit(model, target, ctx));
 }

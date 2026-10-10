@@ -18,10 +18,10 @@ export interface RunIO {
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
-const USAGE = `usage: launchtarqly-codegen generate [--config path] [--target id]... [--project key]
+const USAGE = `usage: launchtarqly-codegen generate [--config path] [--target id]... [--project key] [--tag t]...
                                      [--base-uri uri] [--access-token token] [--from-snapshot file]
        launchtarqly-codegen snapshot --write-snapshot file [--config path] [--project key]
-                                     [--base-uri uri] [--access-token token]
+                                     [--tag t]... [--base-uri uri] [--access-token token]
        launchtarqly-codegen init [--config path]
 `;
 
@@ -104,14 +104,14 @@ async function snapshotCommand(args: string[], io: RunIO): Promise<number> {
 
 /** Fetches the flags list with the resolved connection settings. */
 function fetchLive(config: Config, io: RunIO): Promise<Snapshot> {
-  const { project, baseUri, accessToken } = config;
+  const { project, baseUri, accessToken, tags } = config;
   if (accessToken === undefined) {
     throw new CodegenError(
       'no LaunchDarkly access token: pass --access-token or set LD_ACCESS_TOKEN (or use --from-snapshot <file>)',
     );
   }
   return fetchSnapshot(
-    { projectKey: project, baseUri, accessToken },
+    { projectKey: project, baseUri, accessToken, ...(tags && { tags }) },
     io.fetch ? { ...defaultFetchDeps, fetch: io.fetch } : defaultFetchDeps,
   );
 }
