@@ -5,9 +5,7 @@
 
 import {
   checkIdentifiers,
-  CodegenError,
   ECMASCRIPT_RESERVED_WORDS,
-  escapeBlockCommentEnd,
   flagIdentifier,
   lowerCamel,
   Writer,
@@ -17,13 +15,19 @@ import {
   type FlagKind,
   type FlagModel,
   type IdentifierRules,
+  type TargetId,
 } from '@launchtarqly/core';
+import { summarizeTsServerChanges } from './flag-changes.js';
+
+export { parseTsServerFlags, summarizeTsServerChanges } from './flag-changes.js';
+
+/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+export const TS_SERVER: TargetId = 'ts-server';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';
-const SUPPORTED_SDK_MAJORS = [9];
 
 const NAMING: IdentifierRules = {
-  target: 'ts-server',
+  target: TS_SERVER,
   reserved: ECMASCRIPT_RESERVED_WORDS,
   pattern: /^[A-Za-z_$][A-Za-z0-9_$]*$/,
 };
@@ -32,7 +36,7 @@ const CLASS_MEMBERS = ['constructor', 'client'];
 
 /** Each flag's name, after checking every identifier the file will emit. */
 function flagNames(model: FlagModel): Map<Flag, string> {
-  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, 'ts-server', lowerCamel)]));
+  const names = new Map(model.flags.map((flag) => [flag, flagIdentifier(flag, TS_SERVER, lowerCamel)]));
   const emitted: EmittedIdentifier[] = CLASS_MEMBERS.map((identifier) => ({ identifier }));
   for (const [flag, name] of names) {
     emitted.push(
@@ -99,14 +103,10 @@ function emitFlagMethods(w: Writer, flag: Flag, name: string): void {
 }
 
 export const tsServerEmitter: Emitter = {
-  id: 'ts-server',
-  sdkMajors: SUPPORTED_SDK_MAJORS,
+  id: TS_SERVER,
+  // Config validation checks each target's `sdkMajor` against this list.
+  sdkMajors: [9],
   emit(model, cfg, ctx) {
-    if (!SUPPORTED_SDK_MAJORS.includes(cfg.sdkMajor)) {
-      throw new CodegenError(
-        `target ts-server: unsupported sdkMajor ${cfg.sdkMajor} (supported: ${SUPPORTED_SDK_MAJORS.join(', ')})`,
-      );
-    }
     const names = flagNames(model);
     const w = new Writer();
     w.header({ projectKey: model.projectKey, generatorVersion: ctx.generatorVersion });
@@ -124,12 +124,13 @@ export const tsServerEmitter: Emitter = {
     w.block('export const FlagKeys = {', '} as const;', () => {
       for (const flag of model.flags) {
         const deprecation = deprecationText(flag);
-        if (deprecation !== undefined) w.line(`/** @deprecated ${escapeBlockCommentEnd(deprecation)} */`);
+        if (deprecation !== undefined) w.inlineDocComment(`@deprecated ${deprecation}`);
         w.line(`${names.get(flag)!}: ${tsString(flag.key)},`);
       }
     });
     return [{ path: cfg.out, contents: w.toString() }];
   },
+  summarizeChanges: summarizeTsServerChanges,
 };
 
 export default tsServerEmitter;

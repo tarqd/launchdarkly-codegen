@@ -1,56 +1,17 @@
 /**
- * The one-line flag summary `check` prints for a stale ts-server file
- * (DESIGN.md → CLI). The old side is whatever is on disk, so both sides are
- * read back from generated text rather than from a Flag model.
+ * The one-line flag summary `check` prints for a stale file (DESIGN.md → CLI).
+ * The old side is whatever is on disk, so each emitter reads its own output
+ * back into `GeneratedFlag`s (`Emitter.summarizeChanges`); this compares them.
  */
 
 import type { FlagKind } from '../model.js';
 
+/** A flag as read back from generated text. */
 export interface GeneratedFlag {
   key: string;
-  /** The `FlagKeys` property, which is also the evaluation method's name. */
+  /** The identifier the target emitted for the flag. */
   identifier: string;
   kind: FlagKind;
-}
-
-const SDK_KINDS: Record<string, FlagKind> = { bool: 'boolean', string: 'string', number: 'number', json: 'json' };
-
-// `name(...): Promise<...> {` followed by `return this.client.<kind>Variation(`.
-// `Variation\s*\(` skips the `...VariationDetail(` methods. Signatures may wrap.
-const METHOD = /(?:^|\n)[ \t]*(\w+)[ \t]*\([^{;]*?\{\s*return\s+this\.client\.(bool|string|number|json)Variation\s*\(/g;
-
-const STRING = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
-const ENTRY = new RegExp(String.raw`^(\w+|${STRING})\s*:\s*(${STRING})\s*,?$`);
-
-function unquote(literal: string): string {
-  return literal.slice(1, -1).replace(/\\(.)/g, '$1');
-}
-
-/**
- * The flags in a ts-server file, in `FlagKeys` order, or `undefined` when the
- * file doesn't look like ts-server output. Tolerates doc comments and every
- * flag kind; anything else unexpected in `FlagKeys` makes it unparseable.
- */
-export function parseTsServerFlags(text: string): GeneratedFlag[] | undefined {
-  const block = /\nexport const FlagKeys = \{\n([\s\S]*?)\n\}(?: as const)?;/.exec(text);
-  if (!block) return undefined;
-
-  const kinds = new Map<string, FlagKind>();
-  for (const [, name, sdkKind] of text.matchAll(METHOD)) kinds.set(name!, SDK_KINDS[sdkKind!]!);
-
-  const body = block[1]!.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  const flags: GeneratedFlag[] = [];
-  for (const raw of body.split('\n')) {
-    const line = raw.trim();
-    if (line === '') continue;
-    const entry = ENTRY.exec(line);
-    if (!entry) return undefined;
-    const identifier = /^\w+$/.test(entry[1]!) ? entry[1]! : unquote(entry[1]!);
-    const kind = kinds.get(identifier);
-    if (!kind) return undefined;
-    flags.push({ key: unquote(entry[2]!), identifier, kind });
-  }
-  return flags;
 }
 
 function part(count: number, label: string, items: string[]): string | undefined {
@@ -58,15 +19,11 @@ function part(count: number, label: string, items: string[]): string | undefined
 }
 
 /**
- * E.g. `flags: 1 added (a), 1 renamed (b: bOld → bNew)`, comparing the
- * file on disk with the new output; `undefined` if either can't be parsed.
+ * E.g. `flags: 1 added (a), 1 renamed (b: bOld → bNew)`, comparing the flags
+ * in the file on disk with those in the new output.
  */
-export function summarizeFlagChanges(oldText: string, newText: string): string | undefined {
-  const oldFlags = parseTsServerFlags(oldText);
-  const newFlags = parseTsServerFlags(newText);
-  if (!oldFlags || !newFlags) return undefined;
-
-  const byKey = (flags: GeneratedFlag[]) => new Map(flags.map((f) => [f.key, f]));
+export function summarizeFlagChanges(oldFlags: readonly GeneratedFlag[], newFlags: readonly GeneratedFlag[]): string {
+  const byKey = (flags: readonly GeneratedFlag[]) => new Map(flags.map((f) => [f.key, f]));
   const before = byKey(oldFlags);
   const after = byKey(newFlags);
   const keys = [...new Set([...before.keys(), ...after.keys()])].sort();

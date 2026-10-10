@@ -31,6 +31,12 @@ describe('Writer', () => {
     expect(w.toString()).toBe('  /**\n' + '   * Title\n' + '   *\n' + '   * a *\\/ b\n' + '   */\n');
   });
 
+  it('writes a one-line doc comment, escaping */', () => {
+    const w = new Writer();
+    w.indent(() => w.inlineDocComment('@deprecated a */ b'));
+    expect(w.toString()).toBe('  /** @deprecated a *\\/ b */\n');
+  });
+
   it('uses the configured indent unit', () => {
     const w = new Writer({ indent: '\t' });
     w.block('{', '}', () => w.line('x'));

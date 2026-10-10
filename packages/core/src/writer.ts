@@ -1,8 +1,8 @@
 /**
  * Small line-oriented string builder shared by every emitter
  * (DESIGN.md → Emitters). Emitters write canonical text through it, so
- * indentation, the generated-file header and (later) comment escaping are
- * handled once here.
+ * indentation, the generated-file header and comment escaping are handled
+ * once here.
  */
 
 export interface WriterOptions {
@@ -75,6 +75,11 @@ export class Writer {
     this.line('/**');
     for (const text of lines) this.line(text === '' ? ' *' : ` * ${escape(text)}`);
     return this.line(' */');
+  }
+
+  /** A one-line `/** text *\/` doc comment, with `text` passed through `escape` as in `docComment`. */
+  inlineDocComment(text: string, escape: (text: string) => string = escapeBlockCommentEnd): this {
+    return this.line(`/** ${escape(text)} */`);
   }
 
   /** The text written so far, each line terminated by `\n`. */

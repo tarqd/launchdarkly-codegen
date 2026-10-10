@@ -28,4 +28,11 @@ export interface Emitter {
   /** SDK major versions this emitter supports; config validation checks `sdkMajor` against it. */
   sdkMajors: readonly number[];
   emit(model: FlagModel, cfg: TargetConfig, ctx: EmitContext): GeneratedFile[];
+  /**
+   * Optional: `check`'s one-line flag summary for a stale file, comparing what
+   * is on disk (`oldText`) with the new output (`newText`); usually by reading
+   * both back into `GeneratedFlag`s for `summarizeFlagChanges`. `undefined`
+   * when either side can't be read back; the diff then stands alone.
+   */
+  summarizeChanges?(oldText: string, newText: string): string | undefined;
 }

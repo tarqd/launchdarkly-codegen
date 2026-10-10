@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CodegenError, type Flag, type FlagModel } from '@launchtarqly/core';
+import type { Flag, FlagModel } from '@launchtarqly/core';
 import { tsServerEmitter } from '../src/index.js';
 
 function boolFlag(key: string, extra: Partial<Flag> = {}): Flag {
@@ -154,13 +154,6 @@ export const FlagKeys = {
     return this.client.stringVariationDetail('pricing-tier', context, fallback);
   }
 `);
-  });
-
-  it('rejects an SDK major it does not support', () => {
-    const model: FlagModel = { projectKey: 'my-project', flags: [] };
-    expect(() => tsServerEmitter.emit(model, { ...cfg, sdkMajor: 8 }, ctx)).toThrow(
-      new CodegenError('target ts-server: unsupported sdkMajor 8 (supported: 9)'),
-    );
   });
 
   describe('doc comments', () => {
