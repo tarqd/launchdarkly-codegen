@@ -30,6 +30,7 @@ function emitFlagMethods(w: Writer, flag: Flag): void {
 
 export const tsServerEmitter: Emitter = {
   id: 'ts-server',
+  sdkMajors: SUPPORTED_SDK_MAJORS,
   emit(model, cfg, ctx) {
     if (!SUPPORTED_SDK_MAJORS.includes(cfg.sdkMajor)) {
       throw new CodegenError(

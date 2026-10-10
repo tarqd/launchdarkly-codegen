@@ -25,5 +25,7 @@ export interface GeneratedFile {
 
 export interface Emitter {
   id: TargetId;
+  /** SDK major versions this emitter supports; config validation checks `sdkMajor` against it. */
+  sdkMajors: readonly number[];
   emit(model: FlagModel, cfg: TargetConfig, ctx: EmitContext): GeneratedFile[];
 }
