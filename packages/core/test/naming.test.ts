@@ -55,5 +55,13 @@ describe('constantCase', () => {
 
   it('keeps digits with the word before them', () => {
     expect(constantCase('maxCartItems2x')).toBe('MAX_CART_ITEMS2X');
+    expect(constantCase('checkoutV2')).toBe('CHECKOUT_V2');
+  });
+
+  it('converts alias-derived names', () => {
+    expect(constantCase('myAlias')).toBe('MY_ALIAS');
+    expect(constantCase('apiUrlId')).toBe('API_URL_ID');
+    expect(constantCase('apiURLId')).toBe('API_URL_ID');
+    expect(constantCase('twoFactorEnabled')).toBe('TWO_FACTOR_ENABLED');
   });
 });
