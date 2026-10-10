@@ -11,6 +11,17 @@ import { JAVA_KINDS, javaKind } from './kinds.js';
 import { callLines, constantLines, signatureLines, type Call, type Signature } from './layout.js';
 import { flagNames, JAVA, type JavaFlagNames } from './naming.js';
 import { javaOptions } from './options.js';
+import {
+  CLIENT_FIELD,
+  CONTEXT_PARAM,
+  CONTEXT_TYPE,
+  DEPRECATED,
+  FALLBACK_PARAM,
+  KEY_CONSTANT_HEAD,
+  KEYS_CLASS,
+  KEYS_CONSTRUCTOR,
+  KEYS_DECLARATION,
+} from './output.js';
 
 export { parseJavaFlags } from './flag-changes.js';
 export { JAVA } from './naming.js';
@@ -51,7 +62,7 @@ interface EvaluationMethod {
 function emitMethod(w: Writer, { doc, signature, call }: EvaluationMethod): void {
   w.line();
   for (const line of javadocLines(doc, MEMBER_INDENT)) w.line(line);
-  if (isDeprecated(doc)) w.line('@Deprecated');
+  if (isDeprecated(doc)) w.line(DEPRECATED);
   for (const line of signatureLines(signature, MEMBER_INDENT)) w.line(line);
   w.indent(() => {
     for (const line of callLines(call, METHOD_BODY_INDENT)) w.line(line);
@@ -61,17 +72,17 @@ function emitMethod(w: Writer, { doc, signature, call }: EvaluationMethod): void
 
 function emitFlagMethods(w: Writer, flag: Flag, names: JavaFlagNames): void {
   const { method, detailMethod, type, boxed } = JAVA_KINDS[javaKind(flag)];
-  const params = ['LDContext context', `${type} fallback`];
-  const args = [`Keys.${names.constant}`, 'context', 'fallback'];
+  const params = [`${CONTEXT_TYPE} ${CONTEXT_PARAM}`, `${type} ${FALLBACK_PARAM}`];
+  const args = [`${KEYS_CLASS}.${names.constant}`, CONTEXT_PARAM, FALLBACK_PARAM];
   emitMethod(w, {
     doc: methodDoc(flag, 'value'),
     signature: { head: `public ${type}`, name: names.method, params },
-    call: { head: `return client.${method}`, args },
+    call: { head: `return ${CLIENT_FIELD}.${method}`, args },
   });
   emitMethod(w, {
     doc: methodDoc(flag, 'detail'),
     signature: { head: `public EvaluationDetail<${boxed}>`, name: `${names.method}Detail`, params },
-    call: { head: `return client.${detailMethod}`, args },
+    call: { head: `return ${CLIENT_FIELD}.${detailMethod}`, args },
   });
 }
 
@@ -97,25 +108,25 @@ export const javaEmitter: Emitter = {
     for (const line of javadocLines(classDoc(model.projectKey), CLASS_INDENT)) w.line(line);
     w.block('public final class Flags {', '}', () => {
       w.inlineDocComment('The wrapped SDK client.');
-      w.line('private final LDClientInterface client;');
+      w.line(`private final LDClientInterface ${CLIENT_FIELD};`);
       w.line();
       w.docComment(['Wraps an SDK client.', '', '@param client the LaunchDarkly client to evaluate flags with']);
       w.block('public Flags(LDClientInterface client) {', '}', () => {
-        w.line('this.client = client;');
+        w.line(`this.${CLIENT_FIELD} = client;`);
       });
       for (const flag of model.flags) emitFlagMethods(w, flag, names.get(flag)!);
       w.line();
       w.inlineDocComment('The raw key of every flag, for code that needs the key itself.');
-      w.block('public static final class Keys {', '}', () => {
+      w.block(`${KEYS_DECLARATION} {`, '}', () => {
         w.inlineDocComment('Not instantiable.');
-        w.line('private Keys() {}');
+        w.line(KEYS_CONSTRUCTOR);
         for (const flag of model.flags) {
           w.line();
           const doc = keyConstantDoc(flag);
           for (const line of javadocLines(doc, KEYS_MEMBER_INDENT)) w.line(line);
           const constant = {
-            ...(isDeprecated(doc) ? { annotation: '@Deprecated' } : {}),
-            head: 'public static final String',
+            ...(isDeprecated(doc) ? { annotation: DEPRECATED } : {}),
+            head: KEY_CONSTANT_HEAD,
             name: names.get(flag)!.constant,
             value: javaString(flag.key),
           };

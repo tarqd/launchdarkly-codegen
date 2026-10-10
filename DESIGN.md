@@ -315,11 +315,12 @@ number flag the `int` or `double` type when the output shows it), or returns
 file on disk and the new output and compares them with
 `summarizeFlagChanges`. When either side can't be read back, or the emitter
 has no `readFlags`, `check` prints the diff alone. Only the emitter knows its own output format,
-so the parsing lives in the emitter package, not in `core` or the CLI. The
-go, ts-server and dotnet emitters keep the strings and patterns their writer
-and parser both rely on (class and field names, SDK method names, how the
-key constants are declared) in one `src/output.ts`, so the two can't drift
-apart; java shares its kinds and SDK methods through `src/kinds.ts`.
+so the parsing lives in the emitter package, not in `core` or the CLI. Each
+emitter keeps the strings and patterns its writer and parser both rely on
+(class and field names, SDK method names, how the key constants are
+declared) in one `src/output.ts`, so the two can't drift apart; java keeps
+its per-kind types and SDK methods in `src/kinds.ts`, which both sides read
+as well.
 
 Emitters are code, not text templates. The OpenFeature CLI uses Go text
 templates per language, and the experience there is that templates stop being

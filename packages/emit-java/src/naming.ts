@@ -16,6 +16,7 @@ import {
   type IdentifierRules,
   type TargetId,
 } from '@launchtarqly/core';
+import { CLIENT_FIELD, KEYS_CLASS } from './output.js';
 
 /** This target's id, as configs and `codegen.name.<target>` properties spell it. */
 export const JAVA: TargetId = 'java';
@@ -56,7 +57,7 @@ const NAMING: IdentifierRules = {
 };
 
 /** The names the emitter itself declares: the class, its nested class and its field. */
-const EMITTER_NAMES = ['Flags', 'Keys', 'client'];
+const EMITTER_NAMES = ['Flags', KEYS_CLASS, CLIENT_FIELD];
 
 export interface JavaFlagNames {
   /** The value method; the detail method is this plus `Detail`. */
