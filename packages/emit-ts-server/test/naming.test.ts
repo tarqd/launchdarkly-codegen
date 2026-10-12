@@ -24,13 +24,13 @@ describe('ts-server naming', () => {
   it('fails on a converted key with a leading digit', () => {
     expect(() => emit(modelFlag('2fa-enabled'))).toThrow(
       new CodegenError(
-        'flag 2fa-enabled: ts-server identifier "2faEnabled" starts with a digit; set the custom property codegen.name.ts-server to choose a name',
+        'flag 2fa-enabled: ts-server identifier "2faEnabled" starts with a digit; add the value ts-server:<name> to the custom property codegen.name to choose a name',
       ),
     );
   });
 
   it('fails on a reserved word', () => {
-    expect(() => emit(modelFlag('delete'))).toThrow(/flag delete: .*reserved word.*codegen\.name\.ts-server/);
+    expect(() => emit(modelFlag('delete'))).toThrow(/flag delete: .*reserved word.*ts-server:<name>/);
   });
 
   it('validates an alias like a converted key', () => {
@@ -41,7 +41,7 @@ describe('ts-server naming', () => {
   it("fails when a flag's Detail method collides with another flag", () => {
     expect(() => emit(modelFlag('checkout'), modelFlag('checkout-detail'))).toThrow(
       new CodegenError(
-        'ts-server identifier "checkoutDetail" is produced by flags checkout and checkout-detail; set the custom property codegen.name.ts-server on one of them',
+        'ts-server identifier "checkoutDetail" is produced by flags checkout and checkout-detail; add the value ts-server:<name> to the custom property codegen.name on one of them',
       ),
     );
   });

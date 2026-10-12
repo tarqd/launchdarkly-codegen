@@ -185,7 +185,7 @@ interface Flag {
   deprecated: boolean;
   deprecationMessage?: string;
   archived: boolean;
-  aliases: Partial<Record<TargetId, string>>;   // from codegen.name custom properties
+  aliases: Partial<Record<TargetId, string>>;   // from the codegen.name custom property
   uiUrl: string;
 }
 ```
@@ -219,12 +219,20 @@ Normalizer rules:
   maps to `{kind: 'team', key, name}`. If neither is present, the maintainer
   is left out. List items carry both without `expand`.
 - **Custom properties** always hold string arrays.
-  - `codegen.name.<target>` (for example `codegen.name.go`) sets that target's
-    alias; `codegen.name` sets an alias for every target that has no
-    target-specific one.
-  - `codegen.name.*` and `codegen.number` take exactly one non-blank value.
-    More than one is a hard error naming the flag and property; an empty array
-    counts as unset.
+  - `codegen.name` sets aliases. Each value is `<target>:<name>` (for example
+    `go:TwoFactorEnabled`), which sets that target's alias, or a bare `<name>`,
+    which sets the alias for every target without a target-specific value. So
+    `["twoFactor", "go:TwoFactorEnabled", "dotnet:TwoFactorEnabled"]` names
+    the flag `TwoFactorEnabled` in Go and .NET and `twoFactor` everywhere else.
+    One property key means a project defines one custom property in
+    LaunchDarkly, not one per target. Aliases never contain `:`, so the first
+    one ends the target. These are hard errors naming the flag: an unknown
+    target, two values for the same target, two bare values, a blank name, and
+    a `codegen.name.<target>` key (the old per-target form), which says which
+    value to add instead.
+  - `codegen.number` takes exactly one non-blank value. More than one is a
+    hard error naming the flag and property; an empty array counts as
+    unset.
 - **Deprecation.** `deprecated` is LaunchDarkly's deprecated marker OR any
   `codegen.deprecated` property. `deprecationMessage` is the non-blank
   `codegen.deprecated` values joined with a space. Both signals are kept: the
@@ -260,7 +268,7 @@ applies no initialism table: `api-url-id` becomes `ApiUrlId`.
 
 The generator never invents a name: an identifier is either the converted key
 or an alias the user chose. These are errors, each naming the flag and
-suggesting `codegen.name.<target>`:
+suggesting a `<target>:<name>` value for `codegen.name`:
 
 - **Leading digit.** The converted key starts with a digit.
 - **Reserved word.** TypeScript checks ECMAScript reserved words plus
@@ -1491,7 +1499,7 @@ emitters statically.
 - Unit tests on naming (key to identifier, constant case, initialisms,
   aliases, reserved words, leading digits, collisions across every emitted
   identifier), on normalization (archived dropped, kind inference and its
-  errors, `codegen.number`, single-value properties, deprecation, maintainer
+  errors, `codegen.number`, `codegen.name` values, single-value properties, deprecation, maintainer
   union, client-side availability fallback, tag and view filtering), and on
   `check` diffing.
 - Fetcher tests against recorded responses: paging, dedupe, API-version
@@ -1511,13 +1519,15 @@ emitters statically.
 
 | Situation | Behavior |
 | --- | --- |
-| Two emitted identifiers collide (methods, variants or constants) | exit 2, both keys named, suggests `codegen.name.<target>` |
-| Identifier is a reserved word | exit 2, flag named, suggests `codegen.name.<target>` |
-| Converted key starts with a digit | exit 2, flag named, suggests `codegen.name.<target>` |
+| Two emitted identifiers collide (methods, variants or constants) | exit 2, both keys named, suggests a `<target>:<name>` value for `codegen.name` |
+| Identifier is a reserved word | exit 2, flag named, suggests a `<target>:<name>` value for `codegen.name` |
+| Converted key starts with a digit | exit 2, flag named, suggests a `<target>:<name>` value for `codegen.name` |
 | Boolean flag with a non-boolean value | exit 2, flag named |
 | Mixed-type values on a multivariate flag | treated as `json`, warning printed |
 | `codegen.number: int` on a flag with a non-integer or out-of-32-bit value | exit 2, flag and value named |
-| `codegen.name.*` or `codegen.number` with more than one value | exit 2, flag and property named |
+| `codegen.number` with more than one value | exit 2, flag and property named |
+| `codegen.name` with an unknown target, a repeated target, two bare values or a blank name | exit 2, flag and value named |
+| A `codegen.name.<target>` property (the old per-target form) | exit 2, flag named, says which `codegen.name` value to add |
 | `view` and `tags` both set (in the config, or one recorded in a replayed snapshot) | exit 2 |
 | Replayed snapshot from a different project than configured | exit 2, both named |
 | Replayed snapshot from a different base URI than explicitly configured | warning, both named; the snapshot's is used |

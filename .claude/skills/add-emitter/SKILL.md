@@ -5,7 +5,7 @@ description: "Add a server-side SDK target to the generator: research the SDK, p
 
 A **target** is one language + SDK the generator writes a wrapper for. Its **emitter** turns the language-neutral Flag model into that wrapper's canonical text. Vocabulary is in `CONTEXT.md`. The rules every emitter obeys are in `DESIGN.md` → Naming, Emitters, Deprecation, Doc comments and Generated code by target. `emit-ts-server` is the reference emitter.
 
-Below, `<id>` is the target id as configs and `codegen.name.<id>` spell it (`go`, `java`, `python`).
+Below, `<id>` is the target id as configs and `codegen.name` values (`<id>:<name>`) spell it (`go`, `java`, `python`).
 
 The work runs in two halves. The **design** half (steps 1–3) ends with the target's shape settled in `DESIGN.md`. The **build** half (step 4) follows [`BUILD.md`](BUILD.md). The emitter implements a design; building one never discovers its shape.
 

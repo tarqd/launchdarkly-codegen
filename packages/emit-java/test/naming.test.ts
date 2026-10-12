@@ -10,7 +10,7 @@ function names(...flags: Flag[]) {
 
 const aliased = (key: string, alias: string): Flag => modelFlag(key, { aliases: { java: alias } });
 
-/** Expects naming `flags` to throw a CodegenError containing every fragment and suggesting codegen.name.java. */
+/** Expects naming `flags` to throw a CodegenError containing every fragment and suggesting a java: alias. */
 function expectFailure(flags: Flag[], ...fragments: string[]): void {
   let error: unknown;
   try {
@@ -20,7 +20,7 @@ function expectFailure(flags: Flag[], ...fragments: string[]): void {
   }
   expect(error).toBeInstanceOf(CodegenError);
   const message = (error as CodegenError).message;
-  expect(message).toContain('codegen.name.java');
+  expect(message).toContain('java:<name>');
   for (const fragment of fragments) expect(message).toContain(fragment);
 }
 

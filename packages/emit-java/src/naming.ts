@@ -16,7 +16,7 @@ import {
 } from '@launchtarqly/core';
 import { CLIENT_FIELD, KEYS_CLASS } from './output.js';
 
-/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+/** This target's id, as configs and `codegen.name` values spell it. */
 export const JAVA: TargetId = 'java';
 
 /** A Java identifier, ASCII only so the generated file reads the same in every encoding. */
@@ -69,7 +69,7 @@ export interface JavaFlagNames {
 
 /**
  * Each flag's Java names, after checking every identifier the file emits.
- * Throws a CodegenError (exit 2) naming the flag and `codegen.name.java`.
+ * Throws a CodegenError (exit 2) naming the flag and suggesting a `java:` value for `codegen.name`.
  */
 export function flagNames(model: FlagModel): Map<Flag, JavaFlagNames> {
   return new Map(

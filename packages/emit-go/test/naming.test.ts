@@ -11,7 +11,7 @@ function emit(...flags: Flag[]): string {
   return goEmitter.emit(model, cfg, ctx)[0]!.contents;
 }
 
-const suggestion = 'set the custom property codegen.name.go';
+const suggestion = 'add the value go:<name> to the custom property codegen.name';
 
 describe('go naming', () => {
   it('upper-cases the ADR 0002 initialisms in methods and key constants', () => {
@@ -68,7 +68,7 @@ describe('go naming', () => {
 
   it("fails when a flag's name collides with another flag's Key constant", () => {
     expect(() => emit(modelFlag('checkout'), modelFlag('key-checkout'))).toThrow(
-      /go identifier "KeyCheckout" is produced by flags checkout and key-checkout; set the custom property codegen\.name\.go on one of them/,
+      /go identifier "KeyCheckout" is produced by flags checkout and key-checkout; add the value go:<name> to the custom property codegen\.name on one of them/,
     );
   });
 

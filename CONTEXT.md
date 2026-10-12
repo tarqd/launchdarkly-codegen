@@ -42,7 +42,7 @@ The root URL of the LaunchDarkly instance a project lives on, used both for API 
 _Avoid_: base URL, host, server
 
 **Alias**:
-An identifier the user chooses for a flag in one target (or all targets), set through the `codegen.name` custom properties. Required whenever the converted key is reserved, starts with a digit, or collides with another generated name; the generator never invents a name itself.
+An identifier the user chooses for a flag in one target (or all targets), set through values of the `codegen.name` custom property (`go:Name` for one target, a bare `Name` for all). Required whenever the converted key is reserved, starts with a digit, or collides with another generated name; the generator never invents a name itself.
 _Avoid_: name override, rename
 
 **Flag name**:
