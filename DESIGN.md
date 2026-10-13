@@ -1412,7 +1412,8 @@ its emitter declares (Emitters, ADR 0005); any other key is exit 2:
 | `go` | a `.go` file | `package` (required) | The generated file's Go package name: a lowercase Go identifier that is not a keyword. | `ldflags` |
 | `java` | a directory | `package` (required) | The generated file's `package`: dot-separated Java identifiers, none a reserved word. | `com.example.flags` |
 
-A test keeps this table in step with the emitters' declarations. Every
+A test keeps this table, and the same table on the docs site's Configuration
+page, in step with the emitters' declarations. Every
 configured target is validated when the config loads, including those
 `--target` leaves out, so a broken target fails every run. Errors name the
 config file and the target's position, like every other config error:
@@ -1482,6 +1483,7 @@ packages/
   emit-go/
   emit-java/
   emit-dotnet/
+website/           user docs (VitePress); target pages embed fixtures/golden
 fixtures/
   snapshots/       recorded API responses used as inputs
   golden/<target>/ expected output per snapshot
