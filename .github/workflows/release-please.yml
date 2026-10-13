@@ -14,10 +14,11 @@
 #   - publish: stages the checked-out ref on npm, to redo a failed publish or
 #     to try a dry run. Pick the release tag as the ref.
 #
-# npm: NPM_TOKEN lives only in the `Publish` environment and can only stage
-# (`npm stage publish`), not publish. A maintainer makes a staged version live
-# with `npm stage approve <stage-id>` and 2FA; `npm stage list
-# @launchtarqly/codegen` shows what is waiting.
+# npm: trusted publishing (OIDC), no token. npm trusts this workflow file run
+# in the `Publish` environment, for `npm stage publish` only, so a version is
+# staged, never published. A maintainer makes it live with `npm stage approve
+# <stage-id>` and 2FA; `npm stage list @launchtarqly/codegen` shows what is
+# waiting. Renaming this file or the environment breaks the trust relationship.
 name: release-please
 
 on:
@@ -71,7 +72,8 @@ jobs:
     environment: Publish
     permissions:
       contents: read
-      # Signs the npm provenance attestation (public repositories only).
+      # npm swaps the job's OIDC token for a short-lived publish credential,
+      # and signs the provenance attestation with it.
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,7 +84,7 @@ jobs:
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
-      # `npm stage` needs npm 11.15.0 or later.
+      # `npm stage` needs npm 11.15.0 or later (trusted publishing, 11.5.1).
       - run: npm install -g npm@11.21.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -102,7 +104,6 @@ jobs:
           if [ "$DRY_RUN" = 'true' ]; then args+=(--dry-run); fi
           npm stage publish "$TARBALL" "${args[@]}"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           REPO_PRIVATE: ${{ github.event.repository.private }}
           # The inputs apply only to the publish task; a release always stages for real.
           PRERELEASE: ${{ inputs.task == 'publish' && inputs.prerelease }}
