@@ -44,6 +44,6 @@ The access token is never read from the config file: set `LD_ACCESS_TOKEN` or
 pass `--access-token`. `snapshot --write-snapshot flags.json` records the API
 responses, and `--from-snapshot flags.json` generates from them offline.
 
-Run `npx @launchtarqly/codegen` with no arguments for every command and flag.
+Run `npx @launchtarqly/codegen --help` for every command and flag.
 The design, including each target's output, is in
 [DESIGN.md](https://github.com/tarqd/launchdarkly-codegen/blob/main/DESIGN.md).
