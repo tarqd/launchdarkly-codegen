@@ -72,8 +72,8 @@ jobs:
     environment: Publish
     permissions:
       contents: read
-      # npm swaps the job's OIDC token for a short-lived publish credential,
-      # and signs the provenance attestation with it.
+      # npm swaps the job's OIDC token for a short-lived publish credential;
+      # Sigstore also uses it to sign the provenance attestation.
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
