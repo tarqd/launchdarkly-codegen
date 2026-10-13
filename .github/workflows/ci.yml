@@ -9,7 +9,34 @@ permissions:
   contents: read
 
 jobs:
+  # Picks the jobs below that this change needs (scripts/ci-plan.mjs): a
+  # docs-only PR runs none, a go emitter change runs only go's unit and
+  # compile tests (plus the CLI's). Pushes to main run everything.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.plan.outputs.unit }}
+      compile: ${{ steps.plan.outputs.compile }}
+      pack: ${{ steps.plan.outputs.pack }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A pull_request checkout is the merge commit; its first parent is the base.
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: plan
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            git diff --name-only --no-renames HEAD^1 HEAD | node scripts/ci-plan.mjs
+          else
+            node scripts/ci-plan.mjs --all
+          fi
+
   test:
+    needs: changes
+    if: needs.changes.outputs.unit != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,15 +47,20 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm test
+      - if: needs.changes.outputs.unit == 'all'
+        run: pnpm test
+      - if: needs.changes.outputs.unit != 'all'
+        run: pnpm test ${{ needs.changes.outputs.unit }}
 
   compile:
     name: compile (${{ matrix.target }})
+    needs: changes
+    if: needs.changes.outputs.compile != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target: [ts-server, dotnet, go, java]
+        target: ${{ fromJSON(needs.changes.outputs.compile) }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -62,6 +94,8 @@ jobs:
   # Packs @launchtarqly/codegen, installs the tarball into a scratch project
   # with npm, and runs its bin (`generate`, then `check`) on a fixture snapshot.
   pack:
+    needs: changes
+    if: needs.changes.outputs.pack == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,3 +106,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:smoke
+
+  # One check that branch protection can require: passes when every job that
+  # ran passed, whichever jobs the change skipped.
+  ci-ok:
+    if: always()
+    needs: [changes, test, compile, pack]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

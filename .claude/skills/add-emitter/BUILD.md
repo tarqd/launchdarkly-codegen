@@ -53,11 +53,11 @@ The golden test also requires empty stderr. So a case that warns (mixed-kind val
 - `packages/emit-<id>/test/<id>.compile.test.ts`, modelled on the ts-server one, copies each golden file into the fixture and runs the strict checks from `DESIGN.md`. For a language with a formatter, also assert the golden output is already formatted (for example, `gofmt -l` prints nothing). The test needs the toolchain on the PATH; check that it's installed (`which go java javac gradle`) and run the test locally.
 - CI does two things:
   - It runs `pnpm test:compile 'packages/emit-<id>/'`, which selects the compile test by file path. Don't filter by test name with `-t`: a short id like `go` also matches "golden" in other targets' test names.
-  - It needs `<id>` in the `compile` job matrix in `.github/workflows/ci.yml`, plus a toolchain setup step guarded by `if: matrix.target == '<id>'` (for example `actions/setup-go`, or `actions/setup-java` + Gradle).
+  - Its `compile` job matrix comes from `scripts/ci-plan.mjs`, which lists every target that has a `fixtures/compile/<id>/`, so `<id>` joins it on its own. The job still needs a toolchain setup step in `.github/workflows/ci.yml` guarded by `if: matrix.target == '<id>'` (for example `actions/setup-go`, or `actions/setup-java` + Gradle).
 
 When a compile test goes red and the cause isn't obvious from the compiler output, invoke `diagnosing-bugs`.
 
-**Done when** `pnpm test:compile 'packages/emit-<id>/'` passes locally and the matrix lists `<id>`.
+**Done when** `pnpm test:compile 'packages/emit-<id>/'` passes locally and `ci.yml` sets up `<id>`'s toolchain.
 
 ## Finish
 
