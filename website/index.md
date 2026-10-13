@@ -19,5 +19,5 @@ features:
   - title: Stays out of the evaluation path
     details: The wrapper only calls the SDK. No caching, no network, no baked-in defaults, no runtime package to install.
   - title: Safe in CI
-    details: "`check` regenerates in memory and fails when committed output drifts from LaunchDarkly, with a diff and a summary of which flags changed."
+    details: "<code>check</code> regenerates in memory and fails when committed output drifts from LaunchDarkly, with a diff and a summary of which flags changed."
 ---

@@ -11,7 +11,8 @@ Relative `out` paths are resolved against the config file's directory.
 
 ```yaml
 project: my-project
-# baseUri: https://app.eu.launchdarkly.com   # default https://app.launchdarkly.com
+# default https://app.launchdarkly.com
+# baseUri: https://app.eu.launchdarkly.com
 # at most one of view or tags; neither means the whole project
 view: payments            # a view key, not its display name
 # tags: [checkout, billing]

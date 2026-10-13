@@ -17,9 +17,14 @@ client, _ := ld.MakeClient(sdkKey, 5*time.Second)
 flags := ldflags.New(client)
 
 enabled, err := flags.CheckoutV2(context, false)
-enabled, err = flags.CheckoutV2Ctx(ctx, context, false)        // with a context.Context
-enabled, detail, err := flags.CheckoutV2Detail(context, false) // with the evaluation reason
-_ = ldflags.KeyCheckoutV2                                      // "checkout-v2"
+
+// with a context.Context
+enabled, err = flags.CheckoutV2Ctx(ctx, context, false)
+
+// with the evaluation reason
+enabled, detail, err := flags.CheckoutV2Detail(context, false)
+
+_ = ldflags.KeyCheckoutV2 // "checkout-v2"
 ```
 
 `New` takes the generated `Client` interface, the subset of the SDK client the
