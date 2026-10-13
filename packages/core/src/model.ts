@@ -28,7 +28,7 @@ export interface Flag {
   deprecated: boolean;
   deprecationMessage?: string;
   archived: boolean;
-  /** From `codegen.name` custom properties. */
+  /** From the `codegen.name` custom property. */
   aliases: Partial<Record<TargetId, string>>;
   uiUrl: string;
 }

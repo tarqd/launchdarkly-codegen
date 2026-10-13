@@ -20,20 +20,20 @@ describe('generate fails on names the user must choose', () => {
     const result = await generate(apiFlag('2fa-enabled'));
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('2fa-enabled');
-    expect(result.stderr).toContain('codegen.name.ts-server');
+    expect(result.stderr).toContain('ts-server:<name>');
   });
 
   it('exits 2 when a Detail method collides with another flag, naming both keys', async () => {
     const result = await generate(apiFlag('checkout'), apiFlag('checkout-detail'));
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('flags checkout and checkout-detail');
-    expect(result.stderr).toContain('codegen.name.ts-server');
+    expect(result.stderr).toContain('ts-server:<name>');
   });
 
-  it('exits 2 on a multi-valued codegen.name.ts-server, naming the flag and property', async () => {
-    const result = await generate(apiFlag('my-flag', { customProperties: customProperty('codegen.name.ts-server', ['a', 'b']) }));
+  it('exits 2 on two codegen.name values for ts-server, naming the flag and property', async () => {
+    const result = await generate(apiFlag('my-flag', { customProperties: customProperty('codegen.name', ['ts-server:a', 'ts-server:b']) }));
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain('flag my-flag: custom property codegen.name.ts-server');
+    expect(result.stderr).toContain('flag my-flag: custom property codegen.name has more than one value for ts-server');
   });
 
   it('succeeds once an alias resolves the problem', async () => {
@@ -56,17 +56,17 @@ describe('generate fails on dotnet names the user must choose', () => {
   it.each([
     ['a key with a leading digit', apiFlag('2fa-enabled'), '2fa-enabled'],
     ['a name that hides a System.Object member', apiFlag('to-string'), 'ToString'],
-    ['a C# keyword alias', apiFlag('my-flag', { customProperties: customProperty('codegen.name.dotnet', ['class']) }), 'class'],
+    ['a C# keyword alias', apiFlag('my-flag', { customProperties: customProperty('codegen.name', ['dotnet:class']) }), 'class'],
   ])('exits 2 on %s, suggesting the dotnet alias', async (_name, item, named) => {
     const result = await generateDotnet(item);
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain(named);
-    expect(result.stderr).toContain('codegen.name.dotnet');
+    expect(result.stderr).toContain('dotnet:<name>');
   });
 
   it('succeeds once a dotnet alias resolves the problem', async () => {
     const result = await generateDotnet(
-      apiFlag('2fa-enabled', { customProperties: customProperty('codegen.name.dotnet', ['TwoFactor']) }),
+      apiFlag('2fa-enabled', { customProperties: customProperty('codegen.name', ['dotnet:TwoFactor']) }),
     );
     expect(result).toMatchObject({ exitCode: 0, stderr: '' });
   });
@@ -85,11 +85,8 @@ describe('go names', () => {
     return { ...result, text };
   }
 
-  it('prefers codegen.name.go over codegen.name over the converted key', async () => {
-    const both = {
-      ...customProperty('codegen.name', ['AllTargets']),
-      ...customProperty('codegen.name.go', ['GoOnly']),
-    };
+  it('prefers a go: value over a value without a target over the converted key', async () => {
+    const both = customProperty('codegen.name', ['AllTargets', 'go:GoOnly']);
     const result = await generateGo(
       apiFlag('api-url', { customProperties: both }),
       apiFlag('fallback-flag', { customProperties: customProperty('codegen.name', ['Fallback']) }),
@@ -108,7 +105,7 @@ describe('go names', () => {
     ['a leading digit', [apiFlag('2fa-enabled')], 'flag 2fa-enabled: go identifier "2faEnabled" starts with a digit'],
     [
       'a lowercase alias',
-      [apiFlag('checkout', { customProperties: customProperty('codegen.name.go', ['checkout']) })],
+      [apiFlag('checkout', { customProperties: customProperty('codegen.name', ['go:checkout']) })],
       'flag checkout: go identifier "checkout" is not an exported Go identifier',
     ],
     [
@@ -129,10 +126,10 @@ describe('go names', () => {
     ['the name Client', [apiFlag('client')], 'flag client: go identifier "Client" collides with a name the generator uses'],
     ['the name Flags', [apiFlag('flags')], 'flag flags: go identifier "Flags" collides with a name the generator uses'],
     ['the name New', [apiFlag('new')], 'flag new: go identifier "New" collides with a name the generator uses'],
-  ])('exits 2 on %s, naming the flags and suggesting codegen.name.go', async (_name, items, message) => {
+  ])('exits 2 on %s, naming the flags and suggesting a go: alias', async (_name, items, message) => {
     const result = await generateGo(...items);
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain(message);
-    expect(result.stderr).toContain('set the custom property codegen.name.go');
+    expect(result.stderr).toContain('add the value go:<name> to the custom property codegen.name');
   });
 });

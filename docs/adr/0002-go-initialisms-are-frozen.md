@@ -27,4 +27,4 @@ because the same key would then get different names in different repos.
 This is recorded because adding or removing an entry, or changing the plural
 rule, renames every Go identifier built from that word, which breaks consumers'
 code on regeneration.
-A flag that needs a different spelling sets `codegen.name.go`.
+A flag that needs a different spelling adds a `go:<name>` value to `codegen.name`.

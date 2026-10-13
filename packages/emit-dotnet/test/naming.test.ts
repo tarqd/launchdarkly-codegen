@@ -10,15 +10,13 @@ function emit(...flags: Flag[]): string {
   return dotnetEmitter.emit({ projectKey: 'my-project', flags }, cfg, { generatorVersion: '0.3.0' })[0]!.contents;
 }
 
-/** Emits flags read from the API, so `codegen.name*` custom properties resolve as in a real run. */
+/** Emits flags read from the API, so `codegen.name` values resolve as in a real run. */
 function emitApi(...items: ApiFlag[]): string {
   return dotnetEmitter.emit(normalize(snapshotOf(items)), cfg, { generatorVersion: '0.3.0' })[0]!.contents;
 }
 
-function withProps(props: Record<string, string>): Partial<ApiFlag> {
-  return {
-    customProperties: Object.assign({}, ...Object.entries(props).map(([name, value]) => customProperty(name, [value]))),
-  };
+function withNames(...names: string[]): Partial<ApiFlag> {
+  return { customProperties: customProperty('codegen.name', names) };
 }
 
 /** The error `emit` throws: a CodegenError, which the CLI turns into exit 2. */
@@ -36,8 +34,8 @@ function emitError(...flags: Flag[]): CodegenError {
 describe('dotnet naming', () => {
   it('prefers the dotnet alias, then the all-target alias, then the converted key', () => {
     const out = emitApi(
-      apiFlag('both-aliases', withProps({ 'codegen.name': 'Shared', 'codegen.name.dotnet': 'DotnetOnly' })),
-      apiFlag('shared-alias', withProps({ 'codegen.name': 'SharedOnly', 'codegen.name.go': 'GoOnly' })),
+      apiFlag('both-aliases', withNames('Shared', 'dotnet:DotnetOnly')),
+      apiFlag('shared-alias', withNames('SharedOnly', 'go:GoOnly')),
       apiFlag('no-alias'),
     );
     expect(out).toContain('public bool DotnetOnly(Context context, bool fallback)');
@@ -57,10 +55,10 @@ describe('dotnet naming', () => {
     expect(out).toContain('public const string TwoFactorEnabled = "2fa-enabled";');
   });
 
-  it('rejects a converted key with a leading digit, suggesting codegen.name.dotnet', () => {
+  it('rejects a converted key with a leading digit, suggesting a dotnet: alias', () => {
     expect(() => emit(modelFlag('2fa-enabled'))).toThrow(
       new CodegenError(
-        'flag 2fa-enabled: dotnet identifier "2faEnabled" starts with a digit; set the custom property codegen.name.dotnet to choose a name',
+        'flag 2fa-enabled: dotnet identifier "2faEnabled" starts with a digit; add the value dotnet:<name> to the custom property codegen.name to choose a name',
       ),
     );
   });
@@ -75,7 +73,7 @@ describe('dotnet naming', () => {
     ['reference-equals', 'ReferenceEquals'],
   ])('rejects flag %s, whose name %s is a System.Object member', (key, name) => {
     expect(emitError(modelFlag(key)).message).toBe(
-      `flag ${key}: dotnet identifier "${name}" is a reserved word; set the custom property codegen.name.dotnet to choose a name`,
+      `flag ${key}: dotnet identifier "${name}" is a reserved word; add the value dotnet:<name> to the custom property codegen.name to choose a name`,
     );
   });
 
@@ -88,13 +86,13 @@ describe('dotnet naming', () => {
     ['client', { aliases: { dotnet: '_client' } }, '_client'],
   ])('rejects flag %s, whose name collides with a name the generator uses', (key, extra, name) => {
     expect(emitError(modelFlag(key, extra)).message).toBe(
-      `flag ${key}: dotnet identifier "${name}" collides with a name the generator uses; set the custom property codegen.name.dotnet to choose a name`,
+      `flag ${key}: dotnet identifier "${name}" collides with a name the generator uses; add the value dotnet:<name> to the custom property codegen.name to choose a name`,
     );
   });
 
   it.each(['class', 'string', 'object', 'namespace', 'stackalloc', 'true'])('rejects the alias %s, a C# keyword', (alias) => {
     expect(emitError(modelFlag('my-flag', { aliases: { dotnet: alias } })).message).toBe(
-      `flag my-flag: dotnet identifier "${alias}" is a reserved word; set the custom property codegen.name.dotnet to choose a name`,
+      `flag my-flag: dotnet identifier "${alias}" is a reserved word; add the value dotnet:<name> to the custom property codegen.name to choose a name`,
     );
   });
 
@@ -104,7 +102,7 @@ describe('dotnet naming', () => {
 
   it.each(['my-flag', 'has space', 'dotted.name', '$cash', '@class'])('rejects the alias %s, which is not a C# identifier', (alias) => {
     expect(emitError(modelFlag('my-flag', { aliases: { dotnet: alias } })).message).toBe(
-      `flag my-flag: dotnet identifier "${alias}" is not a valid identifier; set the custom property codegen.name.dotnet to choose a name`,
+      `flag my-flag: dotnet identifier "${alias}" is not a valid identifier; add the value dotnet:<name> to the custom property codegen.name to choose a name`,
     );
   });
 
@@ -114,13 +112,13 @@ describe('dotnet naming', () => {
 
   it("rejects a flag whose name is another flag's Detail variant, naming both keys", () => {
     expect(emitError(modelFlag('checkout'), modelFlag('checkout-detail')).message).toBe(
-      'dotnet identifier "CheckoutDetail" is produced by flags checkout and checkout-detail; set the custom property codegen.name.dotnet on one of them',
+      'dotnet identifier "CheckoutDetail" is produced by flags checkout and checkout-detail; add the value dotnet:<name> to the custom property codegen.name on one of them',
     );
   });
 
   it('rejects an alias that collides with another flag, method and FlagKeys constant alike', () => {
     expect(emitError(modelFlag('checkout'), modelFlag('checkout-v1', { aliases: { dotnet: 'Checkout' } })).message).toBe(
-      'dotnet identifier "Checkout" is produced by flags checkout and checkout-v1; set the custom property codegen.name.dotnet on one of them',
+      'dotnet identifier "Checkout" is produced by flags checkout and checkout-v1; add the value dotnet:<name> to the custom property codegen.name on one of them',
     );
   });
 

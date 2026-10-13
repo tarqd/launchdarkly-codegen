@@ -37,7 +37,7 @@ export const ECMASCRIPT_RESERVED_WORDS: ReadonlySet<string> = new Set([
 ]);
 
 function aliasHint(target: TargetId): string {
-  return `set the custom property codegen.name.${target}`;
+  return `add the value ${target}:<name> to the custom property codegen.name`;
 }
 
 /**
