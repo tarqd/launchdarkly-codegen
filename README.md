@@ -41,5 +41,8 @@ emitters are bundled into it. Releases are automated with
    npm stage approve <stage-id>
    ```
 
-To redo a failed publish, run the `release-please` workflow by hand on the
-release tag (it defaults to a dry run).
+Running the `release-please` workflow by hand takes a `task`: `release-pr`
+reruns release-please (after a `BEGIN_COMMIT_OVERRIDE` edit to a merged PR's
+body, say), and `publish` stages the selected ref, to redo a failed publish on
+the release tag (it defaults to a dry run). In Claude Code, `/release-me`
+checks the commits since the last release and gets the release PR ready.

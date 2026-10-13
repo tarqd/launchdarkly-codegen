@@ -8,9 +8,11 @@
 #   - Merging the release PR tags vX.Y.Z, creates the GitHub release, and runs
 #     the publish job, which stages the version on npm.
 #
-# MANUAL (workflow_dispatch):
-#   - Stages the checked-out ref on npm, to redo a failed publish or to try a
-#     dry run. Pick the release tag as the ref.
+# MANUAL (workflow_dispatch), by `task`:
+#   - release-pr: runs release-please now, e.g. after a merged PR's body gained
+#     a BEGIN_COMMIT_OVERRIDE block. Publishes only if it creates a release.
+#   - publish: stages the checked-out ref on npm, to redo a failed publish or
+#     to try a dry run. Pick the release tag as the ref.
 #
 # npm: NPM_TOKEN lives only in the `production` environment and can only stage
 # (`npm stage publish`), not publish. A maintainer makes a staged version live
@@ -23,13 +25,21 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      task:
+        description: 'release-pr: run release-please now. publish: stage the selected ref on npm.'
+        type: choice
+        required: true
+        default: release-pr
+        options:
+          - release-pr
+          - publish
       prerelease:
-        description: 'Is this a prerelease. If so, it is staged under the prerelease dist-tag, not latest.'
+        description: '(publish) Is this a prerelease. If so, it is staged under the prerelease dist-tag, not latest.'
         type: boolean
         required: true
         default: false
       dry_run:
-        description: 'Is this a dry run. If so, the package is packed but not staged.'
+        description: '(publish) Is this a dry run. If so, the package is packed but not staged.'
         type: boolean
         required: true
         default: true
@@ -40,7 +50,7 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || inputs.task == 'release-pr'
     permissions:
       contents: write
       pull-requests: write
@@ -55,8 +65,8 @@ jobs:
 
   publish:
     needs: [release-please]
-    # Runs after a release on push, and on its own (release-please skipped) on dispatch.
-    if: ${{ !cancelled() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
+    # Runs after a release, or on its own (release-please skipped) for the publish task.
+    if: ${{ !cancelled() && (needs.release-please.outputs.release_created == 'true' || inputs.task == 'publish') }}
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -91,5 +101,6 @@ jobs:
           npm stage publish "$TARBALL" "${args[@]}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PRERELEASE: ${{ inputs.prerelease || 'false' }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          # The inputs apply only to the publish task; a release always stages for real.
+          PRERELEASE: ${{ inputs.task == 'publish' && inputs.prerelease }}
+          DRY_RUN: ${{ inputs.task == 'publish' && inputs.dry_run }}
