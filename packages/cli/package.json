@@ -2,6 +2,11 @@
   "name": "@launchtarqly/codegen",
   "version": "0.1.0",
   "description": "Generates type-safe wrappers around the official LaunchDarkly SDKs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tarqd/launchdarkly-codegen.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"

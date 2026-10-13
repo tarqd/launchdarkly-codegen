@@ -3,11 +3,23 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { ApiFlag } from '@launchtarqly/core';
 import { snapshotOf } from '../../core/test/builders.js';
-import { run, type RunIO } from '../src/index.js';
+import { GENERATOR_VERSION, run, type RunIO } from '../src/index.js';
 
 export const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 export const SNAPSHOTS_DIR = join(REPO_ROOT, 'fixtures/snapshots');
 export const GOLDEN_DIR = join(REPO_ROOT, 'fixtures/golden');
+
+/**
+ * The generator version in the golden files' headers. It stays put while
+ * releases bump the real version, so `withGoldenVersion` rewrites generated
+ * output to it before comparing.
+ */
+export const GOLDEN_GENERATOR_VERSION = '0.1.0';
+
+/** `text` with its header's generator version replaced by `GOLDEN_GENERATOR_VERSION`. */
+export function withGoldenVersion(text: string): string {
+  return text.replace(`generator: ${GENERATOR_VERSION}`, `generator: ${GOLDEN_GENERATOR_VERSION}`);
+}
 
 /**
  * A temp directory holding `launchdarkly-codegen.config.json` with `config`.
