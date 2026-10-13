@@ -14,7 +14,7 @@
 #   - publish: stages the checked-out ref on npm, to redo a failed publish or
 #     to try a dry run. Pick the release tag as the ref.
 #
-# npm: NPM_TOKEN lives only in the `production` environment and can only stage
+# npm: NPM_TOKEN lives only in the `publish` environment and can only stage
 # (`npm stage publish`), not publish. A maintainer makes a staged version live
 # with `npm stage approve <stage-id>` and 2FA; `npm stage list
 # @launchtarqly/codegen` shows what is waiting.
@@ -68,7 +68,7 @@ jobs:
     # Runs after a release, or on its own (release-please skipped) for the publish task.
     if: ${{ !cancelled() && (needs.release-please.outputs.release_created == 'true' || inputs.task == 'publish') }}
     runs-on: ubuntu-latest
-    environment: production
+    environment: publish
     permissions:
       contents: read
       # Signs the npm provenance attestation.
