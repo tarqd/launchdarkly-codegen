@@ -1,6 +1,6 @@
 {
   "name": "@launchtarqly/codegen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generates type-safe wrappers around the official LaunchDarkly SDKs",
   "repository": {
     "type": "git",
