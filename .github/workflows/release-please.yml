@@ -71,7 +71,7 @@ jobs:
     environment: Publish
     permissions:
       contents: read
-      # Signs the npm provenance attestation.
+      # Signs the npm provenance attestation (public repositories only).
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,12 +95,15 @@ jobs:
           echo "TARBALL=$(ls "$RUNNER_TEMP"/pack/*.tgz)" >> "$GITHUB_ENV"
       - name: Stage on npm
         run: |
-          args=(--provenance --access public)
+          args=(--access public)
+          # npm accepts provenance only from public repositories.
+          if [ "$REPO_PRIVATE" != 'true' ]; then args+=(--provenance); fi
           if [ "$PRERELEASE" = 'true' ]; then args+=(--tag prerelease); fi
           if [ "$DRY_RUN" = 'true' ]; then args+=(--dry-run); fi
           npm stage publish "$TARBALL" "${args[@]}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          REPO_PRIVATE: ${{ github.event.repository.private }}
           # The inputs apply only to the publish task; a release always stages for real.
           PRERELEASE: ${{ inputs.task == 'publish' && inputs.prerelease }}
           DRY_RUN: ${{ inputs.task == 'publish' && inputs.dry_run }}
