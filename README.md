@@ -23,8 +23,9 @@ emitters are bundled into it. Releases are automated with
 `launchdarkly/js-core`:
 
 1. PR titles are [Conventional Commits](https://www.conventionalcommits.org/)
-   (checked by the `Lint PR title` workflow), and PRs are squash-merged so the
-   title is the commit on `main`. `fix:` is a patch, `feat:` a minor, and
+   (checked by the `Lint PR title` workflow). PRs are squash-merged, with the
+   PR title as the commit subject and the PR body as its body, so both reach
+   `main` as one commit. `fix:` is a patch, `feat:` a minor, and
    `feat!:` or a `BREAKING CHANGE:` footer a major; while the version is 0.x a
    breaking change bumps the minor. `chore:`, `ci:`, `docs:`, `test:` and
    `refactor:` don't release.

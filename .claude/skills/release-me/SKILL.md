@@ -36,7 +36,7 @@ Take only the branches that apply:
 
   release-please reads this in place of the squash commit, one line per change.
 - **A stray from a plain-merged PR needs a type.** A merge commit (two parents) hides which commits the override would replace, so release-please ignores overrides there. Force the version instead (next branch), and tell the human those changes stay out of the changelog.
-- **The version needs forcing.** Open a PR titled `chore: release <x.y.z>` from a fresh branch off `origin/main`, holding one empty commit (`git commit --allow-empty -m "chore: release <x.y.z>" -m "Release-As: <x.y.z>"`), with `Release-As: <x.y.z>` as the last line of the PR body too. The footer must reach `main`: tell the human to merge with rebase-merge, or with a squash message that keeps the footer. Wait for it to land.
+- **The version needs forcing.** Open a PR titled `chore: release <x.y.z>` from a fresh branch off `origin/main`, holding one empty commit (`git commit --allow-empty -m "chore: release <x.y.z>" -m "Release-As: <x.y.z>"`), with `Release-As: <x.y.z>` as the last line of the PR body too. Squash-merge uses the PR body as the commit body, so the footer reaches `main` as long as the human leaves it in. Wait for it to land.
 - **Nothing releasable and no forced version.** Report that there is nothing to release and stop.
 
 Then refresh: push to `main` refreshes on its own; for an override alone, dispatch the workflow (`gh workflow run release-please.yml -f task=release-pr`, or `POST repos/{owner}/{repo}/actions/workflows/release-please.yml/dispatches` with `{"ref":"main","inputs":{"task":"release-pr"}}`) and wait for its run to finish.
