@@ -33,8 +33,9 @@ emitters are bundled into it. Releases are automated with
    next version and `CHANGELOG.md`. A `Release-As: x.y.z` footer on a commit
    forces the version.
 3. Merging the release PR tags `vX.Y.Z`, creates the GitHub release, and stages
-   the version on npm from the `Publish` environment, whose `NPM_TOKEN` can
-   stage but not publish.
+   the version on npm from the `Publish` environment. npm trusted publishing
+   (OIDC) authenticates the job, with no token, and lets it stage but not
+   publish.
 4. A maintainer makes it live with 2FA:
 
    ```sh
