@@ -4,6 +4,13 @@ A generator that reads flag definitions from the LaunchDarkly REST API and
 emits a type-safe wrapper around the official LaunchDarkly SDK for several
 languages. See `DESIGN.md` for the design and open questions.
 
+## Commits and PR titles
+
+PR titles, and commits that may land on `main`, are
+[Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,
+`feat!:`, `chore:`, `ci:`, `docs:`, `test:`, `refactor:`). release-please reads
+them to choose the next version; see `README.md` → Releasing.
+
 ## Agent skills
 
 ### Issue tracker

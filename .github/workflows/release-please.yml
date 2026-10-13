@@ -1,0 +1,95 @@
+# Releases @launchtarqly/codegen, after launchdarkly/js-core's release-please.yml.
+#
+# AUTOMATED (push to main):
+#   - release-please reads the Conventional Commits since the last release and
+#     keeps a release PR open with the next version and CHANGELOG.md. fix: is a
+#     patch, feat: a minor, and a `!` or BREAKING CHANGE footer a major. While
+#     the version is 0.x, a breaking change bumps the minor instead.
+#   - Merging the release PR tags vX.Y.Z, creates the GitHub release, and runs
+#     the publish job, which stages the version on npm.
+#
+# MANUAL (workflow_dispatch):
+#   - Stages the checked-out ref on npm, to redo a failed publish or to try a
+#     dry run. Pick the release tag as the ref.
+#
+# npm: NPM_TOKEN lives only in the `production` environment and can only stage
+# (`npm stage publish`), not publish. A maintainer makes a staged version live
+# with `npm stage approve <stage-id>` and 2FA; `npm stage list
+# @launchtarqly/codegen` shows what is waiting.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Is this a prerelease. If so, it is staged under the prerelease dist-tag, not latest.'
+        type: boolean
+        required: true
+        default: false
+      dry_run:
+        description: 'Is this a dry run. If so, the package is packed but not staged.'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: [release-please]
+    # Runs after a release on push, and on its own (release-please skipped) on dispatch.
+    if: ${{ !cancelled() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      # Signs the npm provenance attestation.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      # `npm stage` needs npm 11.15.0 or later.
+      - run: npm install -g npm@11.21.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:smoke
+      # pnpm pack runs prepack (the esbuild bundle) and writes the tarball the smoke test checks.
+      - name: Pack
+        run: |
+          pnpm --filter @launchtarqly/codegen pack --pack-destination "$RUNNER_TEMP/pack"
+          echo "TARBALL=$(ls "$RUNNER_TEMP"/pack/*.tgz)" >> "$GITHUB_ENV"
+      - name: Stage on npm
+        run: |
+          args=(--provenance --access public)
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--tag prerelease); fi
+          if [ "$DRY_RUN" = 'true' ]; then args+=(--dry-run); fi
+          npm stage publish "$TARBALL" "${args[@]}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PRERELEASE: ${{ inputs.prerelease || 'false' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}

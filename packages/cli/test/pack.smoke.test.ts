@@ -21,9 +21,12 @@ const CLI_DIR = join(REPO_ROOT, 'packages/cli');
 const SNAPSHOT = join(REPO_ROOT, 'fixtures/snapshots/boolean-flags.json');
 const GOLDEN = join(REPO_ROOT, 'fixtures/golden/ts-server/boolean-flags.ts');
 const OUT = 'src/flags.generated.ts';
+// helpers.ts's GOLDEN_GENERATOR_VERSION: the version in the golden headers.
+const GOLDEN_GENERATOR_VERSION = '0.1.0';
 
 interface PackedManifest {
   name: string;
+  version: string;
   private?: boolean;
   bin?: Record<string, string>;
   dependencies?: Record<string, string>;
@@ -94,7 +97,8 @@ describe('installed into a fresh project', () => {
     const result = await bin(['generate', '--from-snapshot', SNAPSHOT]);
     expect(result.stderr).toBe('');
     expect(result.exitCode).toBe(0);
-    expect(await readFile(join(project, OUT), 'utf8')).toBe(
+    const actual = await readFile(join(project, OUT), 'utf8');
+    expect(actual.replace(`generator: ${manifest.version}`, `generator: ${GOLDEN_GENERATOR_VERSION}`)).toBe(
       await readFile(GOLDEN, 'utf8'),
     );
   });

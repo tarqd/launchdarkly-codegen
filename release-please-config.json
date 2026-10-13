@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "0be6fa3e62141b8ff043afb03de72c5118b2bb06",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "@launchtarqly/codegen",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "packages/cli/package.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

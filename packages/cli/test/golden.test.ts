@@ -6,7 +6,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GOLDEN_DIR, projectDir, runCli, SNAPSHOTS_DIR } from './helpers.js';
+import { GOLDEN_DIR, projectDir, runCli, SNAPSHOTS_DIR, withGoldenVersion } from './helpers.js';
 
 /**
  * `outFileName` is set for a target whose `out` is a directory: the one file it
@@ -32,7 +32,7 @@ describe.each(TARGETS)('golden output for $id', ({ id, ext, extra, outFileName }
     expect(result.stderr).toBe('');
     expect(result.exitCode).toBe(0);
 
-    const actual = await readFile(join(dir, out, outFileName ?? ''), 'utf8');
+    const actual = withGoldenVersion(await readFile(join(dir, out, outFileName ?? ''), 'utf8'));
     const goldenPath = join(GOLDEN_DIR, id, `${name}${ext}`);
     if (process.env.UPDATE_GOLDEN) {
       await mkdir(dirname(goldenPath), { recursive: true });
