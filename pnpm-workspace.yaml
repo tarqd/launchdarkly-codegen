@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - fixtures/compile/*
+  - website
 
 onlyBuiltDependencies:
   - esbuild

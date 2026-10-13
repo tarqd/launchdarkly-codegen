@@ -8,3 +8,6 @@ fixtures/compile/java/target/
 fixtures/compile/java/src/main/java/com/example/flags/
 fixtures/compile/java/src/main/java/com/example/usage/
 fixtures/compile/go/ldflags/flags_gen.go
+# docs site
+website/.vitepress/dist/
+website/.vitepress/cache/

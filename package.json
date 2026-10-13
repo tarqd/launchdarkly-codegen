@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:compile": "vitest run -c vitest.compile.config.ts",
     "test:smoke": "vitest run -c vitest.smoke.config.ts",
-    "update-golden": "UPDATE_GOLDEN=1 vitest run packages/cli/test/golden.test.ts"
+    "update-golden": "UPDATE_GOLDEN=1 vitest run packages/cli/test/golden.test.ts",
+    "docs:dev": "pnpm --filter @launchtarqly/website dev",
+    "docs:build": "pnpm --filter @launchtarqly/website build"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
