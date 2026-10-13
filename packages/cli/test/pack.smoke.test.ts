@@ -83,8 +83,9 @@ describe('the packed @launchtarqly/codegen tarball', () => {
     expect(Object.values(deps).filter((v) => v.startsWith('workspace:'))).toEqual([]);
   });
 
-  it('contains only what the CLI needs at runtime', () => {
+  it('contains only the README and what the CLI needs at runtime', () => {
     expect(files).toEqual([
+      'package/README.md',
       'package/bundle/index.js',
       'package/bundle/launchtarqly-codegen.js',
       'package/package.json',
