@@ -21,7 +21,7 @@ import { CLIENT_FIELD, FLAG_KEYS_CLASS, FLAG_KEYS_DECLARATION, KEY_CONSTANT_PREF
 
 export { parseDotnetFlags } from './flag-changes.js';
 
-/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+/** This target's id, as configs and `codegen.name` values spell it. */
 export const DOTNET: TargetId = 'dotnet';
 
 /** `System.Object` members, which a flag method would hide (CS0108) or confusingly overload. */

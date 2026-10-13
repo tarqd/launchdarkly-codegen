@@ -35,7 +35,7 @@ Keep these invariants:
 - `emit` relies on config having already checked `sdkMajor` against `sdkMajors`, `out` against `outExtensions`, and parsed `options`.
 - Output is canonical: byte-for-byte what the language's formatter would leave alone. No formatter runs, and `check` compares bytes.
 - Generated code imports only the official SDK. Any helper is emitted into the generated files, never published as a package.
-- The generator never invents a name: every naming failure tells the user to set `codegen.name.<id>`.
+- The generator never invents a name: every naming failure tells the user to add an `<id>:<name>` value to `codegen.name`.
 
 **Done when** each item above has a test that went red and then green.
 

@@ -16,16 +16,14 @@ async function generate(...items: ApiFlag[]) {
   return { ...result, dir };
 }
 
-const named = (key: string, names: Record<string, string>): ApiFlag =>
-  apiFlag(key, {
-    customProperties: Object.assign({}, ...Object.entries(names).map(([prop, value]) => customProperty(prop, [value]))),
-  });
+const named = (key: string, ...names: string[]): ApiFlag =>
+  apiFlag(key, { customProperties: customProperty('codegen.name', names) });
 
 describe('java names', () => {
   it('prefers the java alias, then the all-target alias, then the converted key', async () => {
     const { exitCode, stderr, dir } = await generate(
-      named('flag-one', { 'codegen.name.java': 'myAlias', 'codegen.name': 'sharedAlias' }),
-      named('flag-two', { 'codegen.name': 'sharedTwo', 'codegen.name.ts-server': 'tsTwo' }),
+      named('flag-one', 'java:myAlias', 'sharedAlias'),
+      named('flag-two', 'sharedTwo', 'ts-server:tsTwo'),
       apiFlag('checkout-v2.new_flow'),
       apiFlag('api-url-id'),
     );
@@ -46,11 +44,11 @@ describe('java names', () => {
 });
 
 // Each naming rule is tested in packages/emit-java/test/naming.test.ts; these check the CLI's exit code and message.
-describe('java naming failures exit 2 and suggest codegen.name.java', () => {
+describe('java naming failures exit 2 and suggest a java: alias', () => {
   async function expectFailure(items: ApiFlag[], ...fragments: string[]) {
     const result = await generate(...items);
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain('codegen.name.java');
+    expect(result.stderr).toContain('java:<name>');
     for (const fragment of fragments) expect(result.stderr).toContain(fragment);
   }
 
@@ -59,7 +57,7 @@ describe('java naming failures exit 2 and suggest codegen.name.java', () => {
 
   it('a constant collision', () =>
     expectFailure(
-      [apiFlag('api-url-id'), named('other-flag', { 'codegen.name.java': 'apiURLId' })],
+      [apiFlag('api-url-id'), named('other-flag', 'java:apiURLId')],
       'java identifier "API_URL_ID" is produced by flags api-url-id and other-flag',
     ));
 });

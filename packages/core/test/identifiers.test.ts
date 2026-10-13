@@ -20,7 +20,7 @@ const rules: NamingRules = {
   derived: (name) => [`${name}Detail`],
 };
 
-const suggestion = 'set the custom property codegen.name.ts-server to choose a name';
+const suggestion = 'add the value ts-server:<name> to the custom property codegen.name to choose a name';
 
 function modelOf(...flags: Flag[]): FlagModel {
   return { projectKey: PROJECT_KEY, flags };
@@ -112,7 +112,7 @@ describe('nameFlags', () => {
   it('names both flags when two names collide', () => {
     expect(failureOf(rules, modelFlag('checkout'), modelFlag('checkout-detail'))).toEqual(
       new CodegenError(
-        'ts-server identifier "checkoutDetail" is produced by flags checkout and checkout-detail; set the custom property codegen.name.ts-server on one of them',
+        'ts-server identifier "checkoutDetail" is produced by flags checkout and checkout-detail; add the value ts-server:<name> to the custom property codegen.name on one of them',
       ),
     );
   });
@@ -120,12 +120,12 @@ describe('nameFlags', () => {
   it("reports a collision with one of the target's own names", () => {
     expect(failureOf(rules, modelFlag('client'))).toEqual(
       new CodegenError(
-        'flag client: ts-server identifier "client" collides with a name the generator uses; set the custom property codegen.name.ts-server to choose a name',
+        'flag client: ts-server identifier "client" collides with a name the generator uses; add the value ts-server:<name> to the custom property codegen.name to choose a name',
       ),
     );
     expect(failureOf({ ...rules, ownNames: ['fooDetail'] }, modelFlag('foo'))).toEqual(
       new CodegenError(
-        'flag foo: ts-server identifier "fooDetail" collides with a name the generator uses; set the custom property codegen.name.ts-server to choose a name',
+        'flag foo: ts-server identifier "fooDetail" collides with a name the generator uses; add the value ts-server:<name> to the custom property codegen.name to choose a name',
       ),
     );
   });

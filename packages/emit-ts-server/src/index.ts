@@ -20,7 +20,7 @@ import { CLIENT_FIELD, FLAG_KEYS_CLOSE, FLAG_KEYS_OPEN, KIND_METHODS } from './o
 
 export { parseTsServerFlags } from './flag-changes.js';
 
-/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+/** This target's id, as configs and `codegen.name` values spell it. */
 export const TS_SERVER: TargetId = 'ts-server';
 
 const SDK_PACKAGE = '@launchdarkly/node-server-sdk';

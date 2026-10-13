@@ -20,7 +20,7 @@ import { FLAGS_STRUCT, goKind, keyConstant, KEYS_COMMENT, KIND_METHODS, METHOD_F
 
 export { parseGoFlags } from './flag-changes.js';
 
-/** This target's id, as configs and `codegen.name.<target>` properties spell it. */
+/** This target's id, as configs and `codegen.name` values spell it. */
 export const GO: TargetId = 'go';
 
 const SDK_COMMON = 'github.com/launchdarkly/go-sdk-common/v3';

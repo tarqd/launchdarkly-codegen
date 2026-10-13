@@ -13,10 +13,7 @@
           "variations": [{ "value": true }, { "value": false }],
           "tags": [],
           "customProperties": {
-            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["twoFactorEnabled"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["TwoFactorEnabled"] },
-            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["TwoFactorEnabled"] },
-            "codegen.name.java": { "name": "codegen.name.java", "value": ["twoFactorEnabled"] }
+            "codegen.name": { "name": "codegen.name", "value": ["ts-server:twoFactorEnabled", "go:TwoFactorEnabled", "dotnet:TwoFactorEnabled", "java:twoFactorEnabled"] }
           },
           "archived": false,
           "deprecated": false
@@ -28,9 +25,7 @@
           "variations": [{ "value": true }, { "value": false }],
           "tags": [],
           "customProperties": {
-            "codegen.name": { "name": "codegen.name", "value": ["defaultTheme"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["DefaultTheme"] },
-            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["DefaultTheme"] }
+            "codegen.name": { "name": "codegen.name", "value": ["defaultTheme", "go:DefaultTheme", "dotnet:DefaultTheme"] }
           },
           "archived": false,
           "deprecated": false
@@ -42,9 +37,7 @@
           "variations": [{ "value": true }, { "value": false }],
           "tags": [],
           "customProperties": {
-            "codegen.name": { "name": "codegen.name", "value": ["SearchV3"] },
-            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["newSearch"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": [] }
+            "codegen.name": { "name": "codegen.name", "value": ["SearchV3", "ts-server:newSearch"] }
           },
           "archived": false,
           "deprecated": false
@@ -67,10 +60,7 @@
           "variations": [{ "value": true }, { "value": false }],
           "tags": [],
           "customProperties": {
-            "codegen.name.ts-server": { "name": "codegen.name.ts-server", "value": ["checkoutDetailPage"] },
-            "codegen.name.go": { "name": "codegen.name.go", "value": ["CheckoutDetailPage"] },
-            "codegen.name.dotnet": { "name": "codegen.name.dotnet", "value": ["CheckoutDetailPage"] },
-            "codegen.name.java": { "name": "codegen.name.java", "value": ["checkoutDetailPage"] }
+            "codegen.name": { "name": "codegen.name", "value": ["ts-server:checkoutDetailPage", "go:CheckoutDetailPage", "dotnet:CheckoutDetailPage", "java:checkoutDetailPage"] }
           },
           "archived": false,
           "deprecated": false
