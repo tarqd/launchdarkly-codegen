@@ -83,8 +83,9 @@ export function plan(files, targets, compileTargets = targets) {
     } else if ((m = /^fixtures\/compile\/([^/]+)\//.exec(file)) && compileTargets.includes(m[1])) {
       compile.add(m[1]);
     } else if (file.startsWith('fixtures/snapshots/')) {
-      // Read by the CLI's tests, including the smoke test.
+      // Read by the CLI's tests (the smoke test too) and by emitters' flag-changes tests.
       unit.add('packages/cli/');
+      for (const t of targets) unit.add(`packages/emit-${t}/`);
       pack = true;
     } else {
       all = true;

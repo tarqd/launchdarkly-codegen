@@ -55,7 +55,11 @@ describe('ci-plan', () => {
 
   it('runs the CLI tests and smoke test for a CLI change', () => {
     expect(plan(['packages/cli/src/config.ts'], TARGETS)).toEqual({ unit: ['packages/cli/'], compile: [], pack: true });
-    expect(plan(['fixtures/snapshots/aliases.json'], TARGETS)).toEqual({ unit: ['packages/cli/'], compile: [], pack: true });
+    expect(plan(['fixtures/snapshots/aliases.json'], TARGETS)).toEqual({
+      unit: ['packages/cli/', ...TARGETS.map((t) => `packages/emit-${t}/`)],
+      compile: [],
+      pack: true,
+    });
   });
 
   it('runs everything for core, root config, ci.yml and unknown paths', () => {

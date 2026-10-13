@@ -29,7 +29,7 @@ jobs:
       - id: plan
         run: |
           if [ "${{ github.event_name }}" = pull_request ]; then
-            git diff --name-only HEAD^1 HEAD | node scripts/ci-plan.mjs
+            git diff --name-only --no-renames HEAD^1 HEAD | node scripts/ci-plan.mjs
           else
             node scripts/ci-plan.mjs --all
           fi
